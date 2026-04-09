@@ -59,6 +59,7 @@ function SaleModal({
   onSave: (input: SaleRecordInput) => Promise<void>
 }) {
   const defaultProductId = products[0]?.id ?? ''
+  const [buyerFocused, setBuyerFocused] = useState(false)
   const [form, setForm] = useState<SaleRecordInput>({
     status: 'negotiating',
     buyerName: '',
@@ -99,6 +100,14 @@ function SaleModal({
   const costAmount = form.quantityKg * (selectedProduct?.cost ?? initial?.costPerKg ?? 0)
   const grossProfit = revenue - costAmount
   const remainingStock = (selectedProduct?.currentStockKg ?? 0) + (initial?.productId === form.productId ? initial.quantityKg : 0) - form.quantityKg
+  const buyerSuggestions = useMemo(() => {
+    const query = form.buyerName.trim().toLowerCase()
+    const filtered = query
+      ? buyers.filter(buyer => buyer.name.toLowerCase().includes(query))
+      : buyers
+
+    return filtered.slice(0, 8)
+  }, [buyers, form.buyerName])
 
   const applyBuyer = (buyer: Buyer) => {
     setForm(prev => ({
@@ -108,6 +117,7 @@ function SaleModal({
       terms: buyer.terms ?? prev.terms,
       notes: prev.notes || buyer.notes || '',
     }))
+    setBuyerFocused(false)
   }
 
   const handleProductChange = (productId: string) => {
@@ -175,21 +185,43 @@ function SaleModal({
                 <option value="cancelled">取消</option>
               </select>
             </div>
-            <div>
+            <div className="relative">
               <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
               <input
                 required
-                list="buyer-options"
                 value={form.buyerName}
                 onChange={event => handleBuyerNameChange(event.target.value)}
+                onFocus={() => setBuyerFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setBuyerFocused(false), 120)
+                }}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 placeholder="例: Tea Atelier SORA"
               />
-              <datalist id="buyer-options">
-                {buyers.map(buyer => (
-                  <option key={buyer.id} value={buyer.name} />
-                ))}
-              </datalist>
+              {buyerFocused && buyerSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+                  {buyerSuggestions.map(buyer => (
+                    <button
+                      key={buyer.id}
+                      type="button"
+                      onMouseDown={event => {
+                        event.preventDefault()
+                        applyBuyer(buyer)
+                      }}
+                      className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-[#173c2a]">{buyer.name}</span>
+                        <span className="block text-xs text-[#68756c]">
+                          {buyer.country || '国未設定'}
+                          {buyer.terms ? ` / ${buyer.terms}` : ''}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs text-[#68756c]">{buyer.saleCount}件</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
