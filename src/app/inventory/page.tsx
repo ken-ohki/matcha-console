@@ -551,23 +551,35 @@ export default function InventoryPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#173c2a]">在庫マスター</h1>
-            <p className="text-sm text-[#68756c] mt-1">商品登録と販売引当を連動させたお茶在庫管理です。</p>
+            <h1 className="text-2xl font-bold text-[#173c2a]">在庫マスター</h1>
+            <p className="text-sm text-[#68756c] mt-1">全{products.length}件</p>
           </div>
           {user?.role === 'admin' && (
-            <button
-              onClick={() => {
-                setEditingProduct(null)
-                setModalOpen(true)
-              }}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
-            >
-              <Plus size={16} />
-              商品登録
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditingGroup(null)
+                  setGroupModalOpen(true)
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <Plus size={16} />
+                グループ追加
+              </button>
+              <button
+                onClick={() => {
+                  setEditingProduct(null)
+                  setModalOpen(true)
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723]"
+              >
+                <Plus size={16} />
+                商品登録
+              </button>
+            </div>
           )}
         </div>
 
@@ -599,56 +611,60 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#d9d1be] bg-white p-4 shadow-sm">
-          <div className="flex gap-3 overflow-x-auto">
+        <div className="flex items-center border-b border-gray-200 gap-1 overflow-x-auto">
             {groups.map(group => (
               <div
                 key={group.id}
                 draggable={user?.role === 'admin'}
                 onDragStart={() => setDragGroupId(group.id)}
                 onDragOver={event => {
+                  if (user?.role !== 'admin') return
                   event.preventDefault()
                   setDragOverGroupId(group.id)
                 }}
                 onDragLeave={() => setDragOverGroupId(prev => (prev === group.id ? null : prev))}
                 onDrop={() => handleGroupDrop(group.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition ${
+                onDragEnd={() => {
+                  setDragGroupId(null)
+                  setDragOverGroupId(null)
+                }}
+                className={`group flex shrink-0 items-center gap-1 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px cursor-pointer transition-colors ${
                   activeGroupId === group.id
-                    ? 'border-[#174c33] bg-[#174c33] text-white'
-                    : 'border-[#d9d1be] bg-white text-gray-700 hover:border-[#b5aa90]'
-                } ${dragOverGroupId === group.id ? 'ring-2 ring-emerald-300' : ''}`}
+                    ? 'border-[#174c33] text-[#174c33]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } ${dragOverGroupId === group.id && dragGroupId !== group.id ? 'bg-[#eef3eb]' : ''} ${dragGroupId === group.id ? 'opacity-50' : ''}`}
+                onClick={() => setActiveGroupId(group.id)}
               >
-                <button onClick={() => setActiveGroupId(group.id)}>{group.name}</button>
-                {user?.role === 'admin' && activeGroupId === group.id && (
+                {user?.role === 'admin' && <GripVertical size={14} className="text-gray-300" />}
+                {group.name}
+                <span className="ml-1 text-xs text-gray-400">
+                  ({products.filter(product => product.inventoryGroupId === group.id).length})
+                </span>
+                {user?.role === 'admin' && (
                   <>
                     <button
-                      onClick={() => {
+                      onClick={event => {
+                        event.stopPropagation()
                         setEditingGroup(group)
                         setGroupModalOpen(true)
                       }}
-                      className="rounded p-1 hover:bg-black/10"
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-[#174c33] transition-all"
                     >
-                      <Pencil size={13} />
+                      <Pencil size={12} />
                     </button>
-                    <button onClick={() => handleDeleteGroup(group)} className="rounded p-1 hover:bg-black/10">
-                      <Trash2 size={13} />
+                    <button
+                      onClick={event => {
+                        event.stopPropagation()
+                        void handleDeleteGroup(group)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-red-600 transition-all"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </>
                 )}
               </div>
             ))}
-            {user?.role === 'admin' && (
-              <button
-                onClick={() => {
-                  setEditingGroup(null)
-                  setGroupModalOpen(true)
-                }}
-                className="shrink-0 rounded-xl px-3 py-2 text-sm font-medium text-[#174c33] hover:bg-[#eef3eb]"
-              >
-                + グループ追加
-              </button>
-            )}
-          </div>
         </div>
 
         <div className="relative">
