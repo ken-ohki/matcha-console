@@ -436,12 +436,7 @@ export default function SalesPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#e5efe5] px-3 py-1 text-sm font-medium text-[#174c33]">
-              <ClipboardPenLine size={15} />
-              販売計画管理
-            </div>
-            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売ステータスと売上を一画面で管理</h1>
-            <p className="mt-2 text-sm text-[#68756c]">販売先は Firestore に保存され、次回から候補として再利用できます。</p>
+            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売管理</h1>
           </div>
           <div className="flex gap-2">
             <a
