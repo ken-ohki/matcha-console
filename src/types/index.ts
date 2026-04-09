@@ -60,6 +60,19 @@ export interface SaleRecord {
   updatedAt: Date
 }
 
+export interface Buyer {
+  id: string
+  name: string
+  normalizedName: string
+  country?: string
+  terms?: string
+  notes?: string
+  saleCount: number
+  lastSoldAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface ProductInput {
   sku: string
   name: string

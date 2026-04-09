@@ -20,6 +20,7 @@ import {
 } from 'firebase/auth'
 import type {
   AuthUser,
+  Buyer,
   InventoryGroup,
   InventoryGroupInput,
   Product,
@@ -43,6 +44,7 @@ const COLLECTIONS = {
   groups: 'inventory_groups',
   products: 'products',
   sales: 'sales',
+  buyers: 'buyers',
   settings: 'settings',
   users: 'users',
 } as const
@@ -125,6 +127,21 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
   }
 }
 
+function mapBuyer(id: string, data: DocumentData): Buyer {
+  return {
+    id,
+    name: String(data.name ?? ''),
+    normalizedName: String(data.normalizedName ?? ''),
+    country: data.country ? String(data.country) : undefined,
+    terms: data.terms ? String(data.terms) : undefined,
+    notes: data.notes ? String(data.notes) : undefined,
+    saleCount: Number(data.saleCount ?? 0),
+    lastSoldAt: data.lastSoldAt ? toDate(data.lastSoldAt) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
 function mapSettings(data?: DocumentData): Settings {
   const defaults = getDefaultSettings()
   if (!data) return defaults
@@ -139,6 +156,10 @@ function sanitizeRecord<T extends object>(input: T): T {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   ) as T
+}
+
+function normalizeBuyerName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 async function getUserRole(uid: string): Promise<'admin' | 'viewer'> {
@@ -194,6 +215,12 @@ async function getAllSales(): Promise<SaleRecord[]> {
   const db = getFirebaseDb()
   const snap = await getDocs(collection(db, COLLECTIONS.sales))
   return snap.docs.map(document => mapSale(document.id, document.data()))
+}
+
+async function getAllBuyers(): Promise<Buyer[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.buyers))
+  return snap.docs.map(document => mapBuyer(document.id, document.data()))
 }
 
 async function getSettings(): Promise<Settings> {
@@ -270,6 +297,50 @@ async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
       updatedAt: serverTimestamp(),
     })
   })
+  await batch.commit()
+}
+
+async function syncBuyersCollection(): Promise<void> {
+  const db = getFirebaseDb()
+  const sales = await getAllSales()
+  const buyers = await getAllBuyers()
+  const grouped = sales.reduce<Record<string, SaleRecord[]>>((acc, sale) => {
+    const normalizedName = normalizeBuyerName(sale.buyerName)
+    if (!normalizedName) return acc
+    acc[normalizedName] = [...(acc[normalizedName] ?? []), sale]
+    return acc
+  }, {})
+
+  const existingByNormalized = new Map(buyers.map(buyer => [buyer.normalizedName, buyer]))
+  const batch = writeBatch(db)
+
+  Object.entries(grouped).forEach(([normalizedName, records]) => {
+    const sorted = [...records].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const latest = sorted[0]
+    const existing = existingByNormalized.get(normalizedName)
+    const ref = existing
+      ? doc(db, COLLECTIONS.buyers, existing.id)
+      : doc(collection(db, COLLECTIONS.buyers))
+
+    batch.set(ref, sanitizeRecord({
+      name: latest.buyerName.trim(),
+      normalizedName,
+      country: latest.country.trim() || undefined,
+      terms: latest.terms?.trim() || undefined,
+      notes: latest.notes?.trim() || undefined,
+      saleCount: records.length,
+      lastSoldAt: latest.updatedAt,
+      createdAt: existing?.createdAt ?? serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }), { merge: true })
+
+    existingByNormalized.delete(normalizedName)
+  })
+
+  existingByNormalized.forEach(existing => {
+    batch.delete(doc(db, COLLECTIONS.buyers, existing.id))
+  })
+
   await batch.commit()
 }
 
@@ -424,6 +495,15 @@ export function createFirebaseServices(): IServices {
       return sales.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     },
 
+    async getBuyers() {
+      const buyers = await getAllBuyers()
+      return buyers.sort((a, b) => {
+        const left = a.lastSoldAt?.getTime() ?? a.updatedAt.getTime()
+        const right = b.lastSoldAt?.getTime() ?? b.updatedAt.getTime()
+        return right - left
+      })
+    },
+
     async createSaleRecord(input) {
       const { product } = await assertSufficientStock(input)
 
@@ -448,6 +528,7 @@ export function createFirebaseServices(): IServices {
       })
 
       const ref = await addDoc(collection(db, COLLECTIONS.sales), payload)
+      await syncBuyersCollection()
       return {
         id: ref.id,
         ...input,
@@ -499,6 +580,7 @@ export function createFirebaseServices(): IServices {
         grossProfit: revenue - costAmount,
         updatedAt: serverTimestamp(),
       }))
+      await syncBuyersCollection()
 
       return {
         id,
@@ -516,6 +598,7 @@ export function createFirebaseServices(): IServices {
 
     async deleteSaleRecord(id) {
       await deleteDoc(doc(db, COLLECTIONS.sales, id))
+      await syncBuyersCollection()
     },
   }
 

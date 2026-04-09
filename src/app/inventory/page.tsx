@@ -153,7 +153,7 @@ function ProductModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">haiz利用 (kg)</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">shopify在庫分 (kg)</label>
               <input
                 type="number"
                 min="0"
@@ -672,7 +672,7 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">品種 / 製法</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">産地</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">初期在庫</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">haiz利用</th>
+                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">shopify在庫分</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">販売引当</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">現在在庫</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">状態</th>

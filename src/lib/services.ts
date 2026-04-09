@@ -5,6 +5,7 @@ import type {
   Product,
   ProductInput,
   ProductWithInventory,
+  Buyer,
   SaleRecord,
   SaleRecordInput,
   Settings,
@@ -25,6 +26,7 @@ export interface IInventoryService {
 
 export interface ISalesService {
   getSaleRecords(): Promise<SaleRecord[]>
+  getBuyers(): Promise<Buyer[]>
   createSaleRecord(input: SaleRecordInput): Promise<SaleRecord>
   updateSaleRecord(id: string, input: Partial<SaleRecordInput>): Promise<SaleRecord>
   deleteSaleRecord(id: string): Promise<void>

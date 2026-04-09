@@ -5,8 +5,9 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
-import type { ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus } from '@/types'
+import type { Buyer, ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus } from '@/types'
 import {
+  Building2,
   CircleDollarSign,
   ClipboardPenLine,
   Package2,
@@ -44,12 +45,14 @@ function statusColor(status: SaleStatus): string {
 
 function SaleModal({
   open,
+  buyers,
   products,
   initial,
   onClose,
   onSave,
 }: {
   open: boolean
+  buyers: Buyer[]
   products: ProductWithInventory[]
   initial: SaleRecord | null
   onClose: () => void
@@ -74,27 +77,38 @@ function SaleModal({
     if (!open) return
 
     const nextProductId = initial?.productId ?? defaultProductId
-    const selected = products.find(product => product.id === nextProductId) ?? products[0]
+    const selectedProduct = products.find(product => product.id === nextProductId) ?? products[0]
+    const matchedBuyer = buyers.find(buyer => buyer.name === (initial?.buyerName ?? ''))
 
     setForm({
       status: initial?.status ?? 'negotiating',
       buyerName: initial?.buyerName ?? '',
       productId: nextProductId,
       quantityKg: initial?.quantityKg ?? 0,
-      unitPrice: initial?.unitPrice ?? selected?.price ?? 0,
-      country: initial?.country ?? '',
+      unitPrice: initial?.unitPrice ?? selectedProduct?.price ?? 0,
+      country: initial?.country ?? matchedBuyer?.country ?? '',
       dueDate: initial?.dueDate ?? '',
-      terms: initial?.terms ?? '',
-      notes: initial?.notes ?? '',
+      terms: initial?.terms ?? matchedBuyer?.terms ?? '',
+      notes: initial?.notes ?? matchedBuyer?.notes ?? '',
     })
     setError('')
-  }, [open, initial, defaultProductId, products])
+  }, [open, initial, defaultProductId, products, buyers])
 
   const selectedProduct = products.find(product => product.id === form.productId)
   const revenue = form.quantityKg * form.unitPrice
   const costAmount = form.quantityKg * (selectedProduct?.cost ?? initial?.costPerKg ?? 0)
   const grossProfit = revenue - costAmount
   const remainingStock = (selectedProduct?.currentStockKg ?? 0) + (initial?.productId === form.productId ? initial.quantityKg : 0) - form.quantityKg
+
+  const applyBuyer = (buyer: Buyer) => {
+    setForm(prev => ({
+      ...prev,
+      buyerName: buyer.name,
+      country: buyer.country ?? prev.country,
+      terms: buyer.terms ?? prev.terms,
+      notes: prev.notes || buyer.notes || '',
+    }))
+  }
 
   const handleProductChange = (productId: string) => {
     const product = products.find(item => item.id === productId)
@@ -103,6 +117,12 @@ function SaleModal({
       productId,
       unitPrice: product?.price ?? prev.unitPrice,
     }))
+  }
+
+  const handleBuyerNameChange = (buyerName: string) => {
+    setForm(prev => ({ ...prev, buyerName }))
+    const matched = buyers.find(buyer => buyer.name === buyerName)
+    if (matched) applyBuyer(matched)
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -128,7 +148,7 @@ function SaleModal({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '販売案件を編集' : '販売案件を登録'}</h2>
-            <p className="text-sm text-[#68756c] mt-1">商品選択に応じて売上と粗利を自動計算します。</p>
+            <p className="text-sm text-[#68756c] mt-1">登録済みの販売先は候補から再利用できます。</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
             <X size={18} />
@@ -159,13 +179,37 @@ function SaleModal({
               <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
               <input
                 required
+                list="buyer-options"
                 value={form.buyerName}
-                onChange={event => setForm(prev => ({ ...prev, buyerName: event.target.value }))}
+                onChange={event => handleBuyerNameChange(event.target.value)}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 placeholder="例: Tea Atelier SORA"
               />
+              <datalist id="buyer-options">
+                {buyers.map(buyer => (
+                  <option key={buyer.id} value={buyer.name} />
+                ))}
+              </datalist>
             </div>
           </div>
+
+          {buyers.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-[#68756c]">最近の販売先</p>
+              <div className="flex flex-wrap gap-2">
+                {buyers.slice(0, 6).map(buyer => (
+                  <button
+                    key={buyer.id}
+                    type="button"
+                    onClick={() => applyBuyer(buyer)}
+                    className="rounded-full border border-[#d9d1be] bg-[#f7f5ee] px-3 py-1.5 text-xs text-[#173c2a] transition hover:border-[#b5aa90] hover:bg-white"
+                  >
+                    {buyer.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr,0.8fr]">
             <div>
@@ -295,6 +339,7 @@ function SaleModal({
 
 export default function SalesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
+  const [buyers, setBuyers] = useState<Buyer[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -306,11 +351,13 @@ export default function SalesPage() {
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const [nextSales, nextProducts] = await Promise.all([
+    const [nextSales, nextBuyers, nextProducts] = await Promise.all([
       services.sales.getSaleRecords(),
+      services.sales.getBuyers(),
       services.inventory.getProductsWithInventory(),
     ])
     setSales(nextSales)
+    setBuyers(nextBuyers)
     setProducts(nextProducts)
     setLoading(false)
   }
@@ -394,18 +441,27 @@ export default function SalesPage() {
               販売計画管理
             </div>
             <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売ステータスと売上を一画面で管理</h1>
-            <p className="mt-2 text-sm text-[#68756c]">販売案件を登録すると、対象商品の在庫が自動で引き当てられます。</p>
+            <p className="mt-2 text-sm text-[#68756c]">販売先は Firestore に保存され、次回から候補として再利用できます。</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingSale(null)
-              setModalOpen(true)
-            }}
-            className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
-          >
-            <Plus size={16} />
-            新規作成
-          </button>
+          <div className="flex gap-2">
+            <a
+              href="/buyers"
+              className="inline-flex items-center gap-2 self-start rounded-xl border border-[#d9d1be] bg-white px-4 py-2.5 text-sm font-medium text-[#173c2a] transition hover:border-[#b5aa90]"
+            >
+              <Building2 size={16} />
+              販売先一覧
+            </a>
+            <button
+              onClick={() => {
+                setEditingSale(null)
+                setModalOpen(true)
+              }}
+              className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
+            >
+              <Plus size={16} />
+              新規作成
+            </button>
+          </div>
         </div>
 
         {message && (
@@ -436,16 +492,10 @@ export default function SalesPage() {
                   </div>
                   <div className="grid gap-2 md:grid-cols-2">
                     <div className="rounded-full bg-[#eef3eb]">
-                      <div
-                        className="h-4 rounded-full bg-[#2f5d26]"
-                        style={{ width: `${(item.revenue / maxBuyerRevenue) * 100}%` }}
-                      />
+                      <div className="h-4 rounded-full bg-[#2f5d26]" style={{ width: `${(item.revenue / maxBuyerRevenue) * 100}%` }} />
                     </div>
                     <div className="rounded-full bg-[#eef3eb]">
-                      <div
-                        className="h-4 rounded-full bg-[#7dbb57]"
-                        style={{ width: `${Math.max((item.profit / maxBuyerRevenue) * 100, 3)}%` }}
-                      />
+                      <div className="h-4 rounded-full bg-[#7dbb57]" style={{ width: `${Math.max((item.profit / maxBuyerRevenue) * 100, 3)}%` }} />
                     </div>
                   </div>
                   <div className="flex gap-5 text-xs text-[#68756c]">
@@ -572,6 +622,7 @@ export default function SalesPage() {
 
         <SaleModal
           open={modalOpen}
+          buyers={buyers}
           products={products}
           initial={editingSale}
           onClose={() => {

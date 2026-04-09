@@ -39,12 +39,10 @@ export default function LoginPage() {
             <Lock size={28} className="text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">ChaFlow</h1>
-          <p className="text-emerald-50/80 mt-1">お茶の在庫と販売計画を一つに</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">ログイン</h2>
-          <p className="mb-6 text-sm text-gray-500">Firebase Authentication に登録済みのアカウントでサインインします。</p>
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
