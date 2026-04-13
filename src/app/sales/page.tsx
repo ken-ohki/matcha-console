@@ -86,7 +86,7 @@ function SaleModal({
       buyerName: initial?.buyerName ?? '',
       productId: nextProductId,
       quantityKg: initial?.quantityKg ?? 0,
-      unitPrice: initial?.unitPrice ?? selectedProduct?.price ?? 0,
+      unitPrice: initial?.unitPrice ?? selectedProduct?.standardWholesalePrice ?? 0,
       country: initial?.country ?? matchedBuyer?.country ?? '',
       dueDate: initial?.dueDate ?? '',
       terms: initial?.terms ?? matchedBuyer?.terms ?? '',
@@ -97,7 +97,7 @@ function SaleModal({
 
   const selectedProduct = products.find(product => product.id === form.productId)
   const revenue = form.quantityKg * form.unitPrice
-  const costAmount = form.quantityKg * (selectedProduct?.cost ?? initial?.costPerKg ?? 0)
+  const costAmount = form.quantityKg * (selectedProduct?.purchaseUnitPrice ?? initial?.costPerKg ?? 0)
   const grossProfit = revenue - costAmount
   const remainingStock = (selectedProduct?.currentStockKg ?? 0) + (initial?.productId === form.productId ? initial.quantityKg : 0) - form.quantityKg
   const buyerSuggestions = useMemo(() => {
@@ -125,7 +125,7 @@ function SaleModal({
     setForm(prev => ({
       ...prev,
       productId,
-      unitPrice: product?.price ?? prev.unitPrice,
+      unitPrice: product?.standardWholesalePrice ?? prev.unitPrice,
     }))
   }
 

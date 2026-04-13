@@ -19,6 +19,7 @@ import {
   type User,
 } from 'firebase/auth'
 import type {
+  ArrivalRecord,
   AuthUser,
   Buyer,
   InventoryGroup,
@@ -55,6 +56,78 @@ function toDate(value: unknown): Date {
   return new Date(0)
 }
 
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map(item => String(item ?? '').trim())
+      .filter(Boolean)
+  }
+  if (typeof value === 'string' && value.trim()) {
+    return [value.trim()]
+  }
+  return []
+}
+
+function normalizeArrivalRecords(records: ArrivalRecord[]): ArrivalRecord[] {
+  return records
+    .map(record => ({
+      id: String(record.id ?? '').trim(),
+      arrivalDate: String(record.arrivalDate ?? '').trim(),
+      quantityKg: Number(record.quantityKg ?? 0),
+    }))
+    .filter(record => record.arrivalDate || record.quantityKg > 0)
+}
+
+function deriveArrivalDate(records: ArrivalRecord[]): string {
+  const dated = records
+    .map(record => record.arrivalDate.trim())
+    .filter(Boolean)
+    .sort((left, right) => right.localeCompare(left))
+
+  return dated[0] ?? ''
+}
+
+function deriveInitialStockKg(records: ArrivalRecord[]): number {
+  return records.reduce((sum, record) => sum + Number(record.quantityKg ?? 0), 0)
+}
+
+function toLegacyArrivalRecord(id: string, data: DocumentData): ArrivalRecord[] {
+  const arrivalDate = String(data.arrivalDate ?? '').trim()
+  const quantityKg = Number(data.initialStockKg ?? 0)
+  if (!arrivalDate && quantityKg <= 0) return []
+
+  return [{
+    id: `legacy-${id}`,
+    arrivalDate,
+    quantityKg,
+  }]
+}
+
+function buildProductPayload(input: ProductInput) {
+  const arrivalRecords = normalizeArrivalRecords(input.arrivalRecords)
+
+  return sanitizeRecord({
+    ...input,
+    purchaseProductName: input.purchaseProductName?.trim() || undefined,
+    supplier: input.supplier?.trim() || undefined,
+    teaType: input.teaType?.trim() || undefined,
+    grade: input.grade?.trim() || undefined,
+    origins: toStringArray(input.origins),
+    cultivars: toStringArray(input.cultivars),
+    pluckingMethods: toStringArray(input.pluckingMethods),
+    harvestSeasons: toStringArray(input.harvestSeasons),
+    shadingMethods: toStringArray(input.shadingMethods),
+    certifications: toStringArray(input.certifications),
+    arrivalRecords,
+    arrivalDate: deriveArrivalDate(arrivalRecords),
+    initialStockKg: deriveInitialStockKg(arrivalRecords),
+    standardWholesalePrice: input.standardWholesalePrice,
+    purchaseUnitPrice: input.purchaseUnitPrice,
+    adminNote: input.adminNote?.trim() || undefined,
+    salesNote: input.salesNote?.trim() || undefined,
+  })
+}
+
 function getStockStatus(currentKg: number, initialKg: number, alertRatio: number): StockStatus {
   if (currentKg <= 0) return 'out'
   if (currentKg <= initialKg * alertRatio) return 'low'
@@ -70,22 +143,47 @@ function getDefaultSettings(): Settings {
 }
 
 function mapProduct(id: string, data: DocumentData): Product {
+  const arrivalRecords = Array.isArray(data.arrivalRecords)
+    ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
+    : toLegacyArrivalRecord(id, data)
+  const initialStockKg = arrivalRecords.length > 0
+    ? deriveInitialStockKg(arrivalRecords)
+    : Number(data.initialStockKg ?? 0)
+  const arrivalDate = arrivalRecords.length > 0
+    ? deriveArrivalDate(arrivalRecords)
+    : String(data.arrivalDate ?? '')
+
   return {
     id,
     sku: String(data.sku ?? ''),
     name: String(data.name ?? ''),
-    arrivalDate: String(data.arrivalDate ?? ''),
+    purchaseProductName: data.purchaseProductName ? String(data.purchaseProductName) : undefined,
+    supplier: data.supplier ? String(data.supplier) : data.producer ? String(data.producer) : undefined,
+    teaType: data.teaType ? String(data.teaType) : undefined,
+    grade: data.grade ? String(data.grade) : undefined,
+    origins: toStringArray(data.origins ?? data.region),
+    cultivars: toStringArray(data.cultivars ?? data.variety),
+    pluckingMethods: toStringArray(data.pluckingMethods),
+    harvestSeasons: toStringArray(data.harvestSeasons),
+    shadingMethods: toStringArray(data.shadingMethods),
+    certifications: toStringArray(data.certifications),
+    arrivalRecords,
+    arrivalDate,
     inventoryGroupId: String(data.inventoryGroupId ?? ''),
-    initialStockKg: Number(data.initialStockKg ?? 0),
+    initialStockKg,
     haizUsedKg: Number(data.haizUsedKg ?? 0),
-    variety: data.variety ? String(data.variety) : undefined,
-    process: data.process ? String(data.process) : undefined,
-    producer: data.producer ? String(data.producer) : undefined,
-    farm: data.farm ? String(data.farm) : undefined,
-    altitude: data.altitude ? String(data.altitude) : undefined,
-    region: data.region ? String(data.region) : undefined,
-    price: data.price != null ? Number(data.price) : undefined,
-    cost: data.cost != null ? Number(data.cost) : undefined,
+    standardWholesalePrice: data.standardWholesalePrice != null
+      ? Number(data.standardWholesalePrice)
+      : data.price != null
+        ? Number(data.price)
+        : undefined,
+    purchaseUnitPrice: data.purchaseUnitPrice != null
+      ? Number(data.purchaseUnitPrice)
+      : data.cost != null
+        ? Number(data.cost)
+        : undefined,
+    adminNote: data.adminNote ? String(data.adminNote) : undefined,
+    salesNote: data.salesNote ? String(data.salesNote) : undefined,
     sortOrder: Number(data.sortOrder ?? 0),
     isActive: data.isActive !== false,
     createdAt: toDate(data.createdAt),
@@ -286,7 +384,7 @@ async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
 
   const batch = writeBatch(db)
   related.forEach(sale => {
-    const costPerKg = product.cost ?? 0
+    const costPerKg = product.purchaseUnitPrice ?? 0
     const costAmount = sale.quantityKg * costPerKg
     batch.update(doc(db, COLLECTIONS.sales, sale.id), {
       productSku: product.sku,
@@ -371,20 +469,17 @@ export function createFirebaseServices(): IServices {
         .filter(product => product.inventoryGroupId === input.inventoryGroupId && product.isActive)
         .reduce((max, product) => Math.max(max, product.sortOrder), -1) + 1
 
-      const payload = sanitizeRecord({
-        ...input,
+      const payload = {
+        ...buildProductPayload(input),
         sortOrder,
         isActive: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }
       const ref = await addDoc(collection(db, COLLECTIONS.products), payload)
 
       return {
-        id: ref.id,
-        ...input,
-        sortOrder,
-        isActive: true,
+        ...mapProduct(ref.id, payload),
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -399,13 +494,37 @@ export function createFirebaseServices(): IServices {
         throw new Error(`SKU "${input.sku}" は既に登録されています`)
       }
 
-      const payload = sanitizeRecord({
-        ...input,
+      const mergedInput: ProductInput = {
+        sku: input.sku ?? current.sku,
+        name: input.name ?? current.name,
+        purchaseProductName: input.purchaseProductName ?? current.purchaseProductName,
+        supplier: input.supplier ?? current.supplier,
+        teaType: input.teaType ?? current.teaType,
+        grade: input.grade ?? current.grade,
+        origins: input.origins ?? current.origins,
+        cultivars: input.cultivars ?? current.cultivars,
+        pluckingMethods: input.pluckingMethods ?? current.pluckingMethods,
+        harvestSeasons: input.harvestSeasons ?? current.harvestSeasons,
+        shadingMethods: input.shadingMethods ?? current.shadingMethods,
+        certifications: input.certifications ?? current.certifications,
+        arrivalRecords: input.arrivalRecords ?? current.arrivalRecords,
+        arrivalDate: current.arrivalDate,
+        inventoryGroupId: input.inventoryGroupId ?? current.inventoryGroupId,
+        initialStockKg: current.initialStockKg,
+        haizUsedKg: input.haizUsedKg ?? current.haizUsedKg,
+        standardWholesalePrice: input.standardWholesalePrice ?? current.standardWholesalePrice,
+        purchaseUnitPrice: input.purchaseUnitPrice ?? current.purchaseUnitPrice,
+        adminNote: input.adminNote ?? current.adminNote,
+        salesNote: input.salesNote ?? current.salesNote,
+      }
+
+      const payload = {
+        ...buildProductPayload(mergedInput),
         updatedAt: serverTimestamp(),
-      })
+      }
       await updateDoc(doc(db, COLLECTIONS.products, id), payload)
 
-      const merged = { ...current, ...input, updatedAt: new Date() }
+      const merged = { ...current, ...buildProductPayload(mergedInput), updatedAt: new Date() }
       await upsertRelatedSalesFromProduct(merged)
       return merged
     },
@@ -507,7 +626,7 @@ export function createFirebaseServices(): IServices {
     async createSaleRecord(input) {
       const { product } = await assertSufficientStock(input)
 
-      const costPerKg = product.cost ?? 0
+      const costPerKg = product.purchaseUnitPrice ?? 0
       const revenue = input.quantityKg * input.unitPrice
       const costAmount = input.quantityKg * costPerKg
       const payload = sanitizeRecord({
@@ -561,7 +680,7 @@ export function createFirebaseServices(): IServices {
       }
 
       const { product } = await assertSufficientStock(merged, { excludeSaleId: id })
-      const costPerKg = product.cost ?? 0
+      const costPerKg = product.purchaseUnitPrice ?? 0
       const revenue = merged.quantityKg * merged.unitPrice
       const costAmount = merged.quantityKg * costPerKg
 

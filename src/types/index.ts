@@ -11,22 +11,35 @@ export interface InventoryGroup {
   updatedAt: Date
 }
 
+export interface ArrivalRecord {
+  id: string
+  arrivalDate: string
+  quantityKg: number
+}
+
 export interface Product {
   id: string
   sku: string
   name: string
+  purchaseProductName?: string
+  supplier?: string
+  teaType?: string
+  grade?: string
+  origins: string[]
+  cultivars: string[]
+  pluckingMethods: string[]
+  harvestSeasons: string[]
+  shadingMethods: string[]
+  certifications: string[]
+  arrivalRecords: ArrivalRecord[]
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number
   haizUsedKg: number
-  variety?: string
-  process?: string
-  producer?: string
-  farm?: string
-  altitude?: string
-  region?: string
-  price?: number
-  cost?: number
+  standardWholesalePrice?: number
+  purchaseUnitPrice?: number
+  adminNote?: string
+  salesNote?: string
   sortOrder: number
   isActive: boolean
   createdAt: Date
@@ -76,18 +89,25 @@ export interface Buyer {
 export interface ProductInput {
   sku: string
   name: string
+  purchaseProductName?: string
+  supplier?: string
+  teaType?: string
+  grade?: string
+  origins: string[]
+  cultivars: string[]
+  pluckingMethods: string[]
+  harvestSeasons: string[]
+  shadingMethods: string[]
+  certifications: string[]
+  arrivalRecords: ArrivalRecord[]
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number
   haizUsedKg: number
-  variety?: string
-  process?: string
-  producer?: string
-  farm?: string
-  altitude?: string
-  region?: string
-  price?: number
-  cost?: number
+  standardWholesalePrice?: number
+  purchaseUnitPrice?: number
+  adminNote?: string
+  salesNote?: string
 }
 
 export interface InventoryGroupInput {
