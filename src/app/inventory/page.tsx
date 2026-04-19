@@ -18,6 +18,7 @@ import {
 import { getServices } from '@/lib/services'
 import type {
   ArrivalRecord,
+  InventoryCheckRecord,
   InventoryGroup,
   InventoryGroupInput,
   ProductInput,
@@ -38,6 +39,15 @@ function compactText(value?: string): string {
   return value?.trim() || '-'
 }
 
+function formatKg(value: number): string {
+  return `${value.toFixed(1)} kg`
+}
+
+function formatSignedKg(value: number): string {
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${value.toFixed(1)} kg`
+}
+
 function createArrivalRecord(): ArrivalRecord {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -46,12 +56,26 @@ function createArrivalRecord(): ArrivalRecord {
   }
 }
 
+function createInventoryCheckRecord(): InventoryCheckRecord {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    checkedDate: '',
+    countedQuantityKg: 0,
+    expectedQuantityKg: 0,
+    adjustmentKg: 0,
+  }
+}
+
 function getArrivalRecordsTotal(records: ArrivalRecord[]): number {
   return records.reduce((sum, record) => sum + (Number(record.quantityKg) || 0), 0)
 }
 
+function getInventoryAdjustmentTotal(records: InventoryCheckRecord[]): number {
+  return records.reduce((sum, record) => sum + (Number(record.adjustmentKg) || 0), 0)
+}
+
 function buildProductForm(
-  initial: (Partial<ProductInput> & { id?: string }) | undefined,
+  initial: (Partial<ProductWithInventory> & { id?: string }) | undefined,
   defaultGroupId: string,
 ): ProductInput {
   return {
@@ -68,6 +92,7 @@ function buildProductForm(
     shadingMethods: initial?.shadingMethods ?? [],
     certifications: initial?.certifications ?? [],
     arrivalRecords: initial?.arrivalRecords ?? [],
+    inventoryChecks: initial?.inventoryChecks ?? [],
     arrivalDate: initial?.arrivalDate ?? '',
     inventoryGroupId: initial?.inventoryGroupId ?? defaultGroupId,
     initialStockKg: initial?.initialStockKg ?? getArrivalRecordsTotal(initial?.arrivalRecords ?? []),
@@ -215,29 +240,73 @@ function ProductModal({
   onSave,
 }: {
   open: boolean
-  initial?: Partial<ProductInput> & { id?: string }
+  initial?: Partial<ProductWithInventory> & { id?: string }
   groups: InventoryGroup[]
   defaultGroupId: string
   onClose: () => void
   onSave: (input: ProductInput) => Promise<void>
 }) {
+  const [pendingInventoryCheck, setPendingInventoryCheck] = useState<{ checkedDate: string; countedQuantityKg: string }>({
+    checkedDate: '',
+    countedQuantityKg: '',
+  })
   const [form, setForm] = useState<ProductInput>(() => buildProductForm(initial, defaultGroupId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const totalArrivalKg = useMemo(() => getArrivalRecordsTotal(form.arrivalRecords), [form.arrivalRecords])
+  const totalInventoryAdjustmentKg = useMemo(() => getInventoryAdjustmentTotal(form.inventoryChecks), [form.inventoryChecks])
+  const salesAllocatedKg = initial?.salesAllocatedKg ?? 0
+  const selfConsumedKg = initial?.selfConsumedKg ?? 0
+  const currentStockKg = initial?.currentStockKg ?? 0
+  const simulatedCurrentStockKg = useMemo(
+    () => totalArrivalKg + totalInventoryAdjustmentKg - form.haizUsedKg - salesAllocatedKg - selfConsumedKg,
+    [form.haizUsedKg, salesAllocatedKg, selfConsumedKg, totalArrivalKg, totalInventoryAdjustmentKg],
+  )
+  const hasPendingInventoryCheckInput = pendingInventoryCheck.checkedDate.trim() !== '' || pendingInventoryCheck.countedQuantityKg.trim() !== ''
+  const pendingCountedQuantityKg = pendingInventoryCheck.countedQuantityKg.trim() === ''
+    ? null
+    : Number(pendingInventoryCheck.countedQuantityKg)
+  const simulatedCurrentStockAfterCheckKg = pendingCountedQuantityKg == null
+    ? simulatedCurrentStockKg
+    : pendingCountedQuantityKg
+  const pendingInventoryAdjustmentKg = pendingCountedQuantityKg == null
+    ? 0
+    : pendingCountedQuantityKg - simulatedCurrentStockKg
 
   useEffect(() => {
     if (!open) return
     setForm(buildProductForm(initial, defaultGroupId))
+    setPendingInventoryCheck({ checkedDate: '', countedQuantityKg: '' })
     setError('')
   }, [open, initial, defaultGroupId])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+
+    if (hasPendingInventoryCheckInput) {
+      if (!pendingInventoryCheck.checkedDate.trim() || pendingCountedQuantityKg == null || Number.isNaN(pendingCountedQuantityKg)) {
+        setError('棚卸を反映するには、確認日と在庫数量を両方入力してください')
+        return
+      }
+    }
+
     setSaving(true)
     setError('')
 
     try {
+      const nextInventoryChecks = hasPendingInventoryCheckInput && pendingCountedQuantityKg != null
+        ? [
+            ...form.inventoryChecks,
+            {
+              ...createInventoryCheckRecord(),
+              checkedDate: pendingInventoryCheck.checkedDate.trim(),
+              countedQuantityKg: pendingCountedQuantityKg,
+              expectedQuantityKg: simulatedCurrentStockKg,
+              adjustmentKg: pendingInventoryAdjustmentKg,
+            },
+          ]
+        : form.inventoryChecks
+
       await onSave({
         ...form,
         sku: form.sku.trim(),
@@ -260,6 +329,7 @@ function ProductModal({
             quantityKg: Number(record.quantityKg) || 0,
           }))
           .filter(record => record.arrivalDate || record.quantityKg > 0),
+        inventoryChecks: nextInventoryChecks,
         arrivalDate: '',
         initialStockKg: totalArrivalKg,
         adminNote: form.adminNote?.trim() || undefined,
@@ -410,6 +480,125 @@ function ProductModal({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-white p-4">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">棚卸</p>
+                  <p className="text-xs text-[#68756c]">現状在庫は編集せず表示し、フォームの変更内容を保存後シミュレーションへ反映します。</p>
+                </div>
+                <div className="rounded-xl bg-[#f7f5ee] px-3 py-2 text-xs text-[#68756c]">
+                  現状の在庫数: <span className="font-semibold text-[#173c2a]">{formatKg(currentStockKg)}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[180px_1fr_180px]">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">現状の在庫数 (編集不可)</label>
+                  <div className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm font-medium text-[#173c2a]">
+                    {formatKg(currentStockKg)}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">確認日</label>
+                  <input
+                    type="date"
+                    value={pendingInventoryCheck.checkedDate}
+                    onChange={event => setPendingInventoryCheck(prev => ({ ...prev, checkedDate: event.target.value }))}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">在庫数量 (kg)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={pendingInventoryCheck.countedQuantityKg}
+                    onChange={event => setPendingInventoryCheck(prev => ({ ...prev, countedQuantityKg: event.target.value }))}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    placeholder="実棚数量"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
+                  <p className="text-xs text-[#68756c]">保存後の見込み在庫</p>
+                  <p className="mt-1 text-sm font-semibold text-[#173c2a]">{formatKg(simulatedCurrentStockKg)}</p>
+                  <p className="mt-1 text-[11px] text-[#68756c]">入荷・Shopify在庫分・棚卸履歴の変更を反映</p>
+                </div>
+                <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
+                  <p className="text-xs text-[#68756c]">今回の棚卸差分</p>
+                  <p className={`mt-1 text-sm font-semibold ${
+                    pendingCountedQuantityKg == null
+                      ? 'text-[#68756c]'
+                      : pendingInventoryAdjustmentKg < 0
+                        ? 'text-red-700'
+                        : pendingInventoryAdjustmentKg > 0
+                          ? 'text-emerald-700'
+                          : 'text-[#173c2a]'
+                  }`}>
+                    {pendingCountedQuantityKg == null ? '入力待ち' : formatSignedKg(pendingInventoryAdjustmentKg)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
+                  <p className="text-xs text-[#68756c]">棚卸反映後の在庫</p>
+                  <p className="mt-1 text-sm font-semibold text-[#173c2a]">
+                    {formatKg(simulatedCurrentStockAfterCheckKg)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#68756c]">棚卸を入力しなければ上の見込み在庫と同じです</p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {form.inventoryChecks.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-[#68756c]">
+                    まだ棚卸記録がありません。必要なタイミングで追加してください。
+                  </div>
+                )}
+                {form.inventoryChecks
+                  .slice()
+                  .sort((left, right) => right.checkedDate.localeCompare(left.checkedDate))
+                  .map(record => (
+                    <div key={record.id} className="grid gap-3 rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3 md:grid-cols-[1fr_140px_140px_140px_auto]">
+                      <div>
+                        <p className="text-xs font-medium text-gray-600">確認日</p>
+                        <p className="mt-1 text-sm text-[#173c2a]">{record.checkedDate || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600">実棚数量</p>
+                        <p className="mt-1 text-sm text-[#173c2a]">{formatKg(record.countedQuantityKg)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600">理論在庫</p>
+                        <p className="mt-1 text-sm text-[#173c2a]">{formatKg(record.expectedQuantityKg)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-600">反映差分</p>
+                        <p className={`mt-1 text-sm font-semibold ${
+                          record.adjustmentKg < 0 ? 'text-red-700' : record.adjustmentKg > 0 ? 'text-emerald-700' : 'text-[#173c2a]'
+                        }`}>
+                          {formatSignedKg(record.adjustmentKg)}
+                        </p>
+                      </div>
+                      <div className="flex items-end justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setForm(prev => ({
+                            ...prev,
+                            inventoryChecks: prev.inventoryChecks.filter(item => item.id !== record.id),
+                          }))}
+                          className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                          aria-label={`${record.checkedDate || '棚卸'} を削除`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
@@ -694,7 +883,7 @@ export default function InventoryPage() {
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
   const { user } = useAuth()
 
-  const load = async () => {
+  const load = async (preferredActiveGroupId?: string) => {
     setLoading(true)
     const services = await getServices()
     const [nextGroups, nextProducts] = await Promise.all([
@@ -704,6 +893,9 @@ export default function InventoryPage() {
     setGroups(nextGroups)
     setProducts(nextProducts)
     setActiveGroupId(prev => {
+      if (preferredActiveGroupId && nextGroups.some(group => group.id === preferredActiveGroupId)) {
+        return preferredActiveGroupId
+      }
       if (prev && nextGroups.some(group => group.id === prev)) return prev
       return nextGroups[0]?.id ?? ''
     })
@@ -711,7 +903,7 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    load()
+    void load()
   }, [])
 
   const groupProducts = useMemo(() => (
@@ -751,33 +943,37 @@ export default function InventoryPage() {
 
   const handleSaveProduct = async (input: ProductInput) => {
     const services = await getServices()
+    const savedProduct = editingProduct
+      ? await services.inventory.updateProduct(editingProduct.id, input)
+      : await services.inventory.createProduct(input)
+
     if (editingProduct) {
-      await services.inventory.updateProduct(editingProduct.id, input)
       setFeedbackTone('success')
       setFeedbackMessage('商品情報を更新しました')
     } else {
-      await services.inventory.createProduct(input)
       setFeedbackTone('success')
       setFeedbackMessage('商品を登録しました')
     }
     setModalOpen(false)
     setEditingProduct(null)
-    await load()
+    await load(savedProduct.inventoryGroupId)
   }
 
   const handleSaveGroup = async (input: InventoryGroupInput) => {
     const services = await getServices()
+    const savedGroup = editingGroup
+      ? await services.inventory.updateInventoryGroup(editingGroup.id, input)
+      : await services.inventory.createInventoryGroup(input)
+
     if (editingGroup) {
-      await services.inventory.updateInventoryGroup(editingGroup.id, input)
       setFeedbackMessage('グループ名を更新しました')
     } else {
-      await services.inventory.createInventoryGroup(input)
       setFeedbackMessage('グループを追加しました')
     }
     setFeedbackTone('success')
     setGroupModalOpen(false)
     setEditingGroup(null)
-    await load()
+    await load(savedGroup.id)
   }
 
   const handleDeleteProduct = async (product: ProductWithInventory) => {
@@ -992,7 +1188,69 @@ export default function InventoryPage() {
           />
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white shadow-sm">
+        <div className="space-y-3 md:hidden">
+          {filtered.map(product => (
+            <div key={product.id} className="rounded-2xl border border-[#d9d1be] bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium text-[#173c2a]">{product.name}</div>
+                  <div className="mt-1 font-mono text-xs text-[#68756c]">{product.sku}</div>
+                  <div className="mt-2 text-xs text-[#68756c]">
+                    最終入荷 {product.arrivalDate || '-'} / 棚卸 {product.latestInventoryCheck?.checkedDate || '未実施'}
+                  </div>
+                </div>
+                <StockStatusBadge status={product.stockStatus} />
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-[#f7f5ee] p-3">
+                  <p className="text-xs text-[#68756c]">残在庫</p>
+                  <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatKg(product.currentStockKg)}</p>
+                </div>
+                <div className="rounded-xl bg-[#f7f5ee] p-3 text-xs text-[#68756c]">
+                  <div>入荷 {formatKg(product.initialStockKg)}</div>
+                  <div>棚卸 {formatSignedKg(product.inventoryAdjustmentKg)}</div>
+                  <div>Shopify {formatKg(product.haizUsedKg)}</div>
+                  <div>引当 {formatKg(product.salesAllocatedKg)}</div>
+                  <div>自社消費 {formatKg(product.selfConsumedKg)}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 text-xs text-[#68756c]">
+                {product.latestInventoryCheck
+                  ? `最新棚卸: ${product.latestInventoryCheck.checkedDate} / 実棚 ${formatKg(product.latestInventoryCheck.countedQuantityKg)}`
+                  : '棚卸記録なし'}
+              </div>
+
+              {user?.role === 'admin' && (
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingProduct(product)
+                      setModalOpen(true)
+                    }}
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(product)}
+                    className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {filtered.length === 0 && (
+            <div className="rounded-2xl border border-[#d9d1be] bg-white px-4 py-12 text-center text-[#68756c] shadow-sm">
+              商品がありません
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-[#d9d1be] bg-white shadow-sm md:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-[#f7f5ee]">
@@ -1049,17 +1307,22 @@ export default function InventoryPage() {
                     <td className="px-4 py-4 text-gray-700">
                       <div className="font-semibold text-[#173c2a]">{product.currentStockKg.toFixed(1)} kg</div>
                       <div className="text-xs text-[#68756c]">
-                        入荷 {product.initialStockKg.toFixed(1)} / Shopify {product.haizUsedKg.toFixed(1)} / 引当 {product.salesAllocatedKg.toFixed(1)}
+                        入荷 {product.initialStockKg.toFixed(1)} / 棚卸 {formatSignedKg(product.inventoryAdjustmentKg)} / Shopify {product.haizUsedKg.toFixed(1)}
                       </div>
                       <div className="mt-1 text-xs text-[#68756c]">
-                        {product.arrivalRecords.length > 0
-                          ? product.arrivalRecords
-                              .slice()
-                              .sort((left, right) => right.arrivalDate.localeCompare(left.arrivalDate))
-                              .slice(0, 2)
-                              .map(record => `${record.arrivalDate} ${record.quantityKg.toFixed(1)}kg`)
-                              .join(' / ')
-                          : '入荷履歴なし'}
+                        引当 {product.salesAllocatedKg.toFixed(1)} / 自社消費 {product.selfConsumedKg.toFixed(1)}
+                      </div>
+                      <div className="mt-1 text-xs text-[#68756c]">
+                        {product.latestInventoryCheck
+                          ? `棚卸 ${product.latestInventoryCheck.checkedDate} 実棚 ${product.latestInventoryCheck.countedQuantityKg.toFixed(1)}kg`
+                          : product.arrivalRecords.length > 0
+                            ? product.arrivalRecords
+                                .slice()
+                                .sort((left, right) => right.arrivalDate.localeCompare(left.arrivalDate))
+                                .slice(0, 2)
+                                .map(record => `${record.arrivalDate} ${record.quantityKg.toFixed(1)}kg`)
+                                .join(' / ')
+                            : '入荷履歴なし'}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">{formatCurrency(product.standardWholesalePrice)}</td>

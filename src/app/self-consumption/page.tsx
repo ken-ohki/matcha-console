@@ -95,7 +95,7 @@ function SelfConsumptionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '自社消費を編集' : '自社消費を登録'}</h2>
@@ -186,7 +186,7 @@ function SelfConsumptionModal({
             </p>
           </div>
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
             <button
               type="button"
               onClick={onClose}
@@ -328,13 +328,13 @@ export default function SelfConsumptionPage() {
                   value={search}
                   onChange={event => setSearch(event.target.value)}
                   placeholder="商品名・SKU・用途で検索"
-                  className="w-56 rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-56"
                 />
               </div>
               <select
                 value={usageFilter}
                 onChange={event => setUsageFilter(event.target.value as 'all' | SelfConsumptionUsageType)}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-auto"
               >
                 <option value="all">すべての用途</option>
                 <option value="retail">小売</option>
@@ -344,7 +344,54 @@ export default function SelfConsumptionPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-3 md:hidden">
+            {!loading && filteredRecords.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+                条件に合う自社消費の記録はありません。
+              </div>
+            )}
+            {filteredRecords.map(record => (
+              <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-[#173c2a]">{record.productName}</div>
+                    <div className="mt-1 text-xs text-[#68756c]">{record.productSku}</div>
+                  </div>
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#173c2a]">
+                    {usageLabels[record.usageType]}
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>日付 {formatDate(record.usedOn)}</div>
+                    <div className="mt-1 font-semibold text-[#173c2a]">数量 {formatKg(record.quantityKg)}</div>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>備考 {record.notes || '-'}</div>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingRecord(record)
+                      setModalOpen(true)
+                    }}
+                    className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-[#174c33]"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(record)}
+                    className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">

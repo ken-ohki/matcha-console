@@ -18,6 +18,14 @@ export interface ArrivalRecord {
   quantityKg: number
 }
 
+export interface InventoryCheckRecord {
+  id: string
+  checkedDate: string
+  countedQuantityKg: number
+  expectedQuantityKg: number
+  adjustmentKg: number
+}
+
 export interface Product {
   id: string
   sku: string
@@ -33,6 +41,7 @@ export interface Product {
   shadingMethods: string[]
   certifications: string[]
   arrivalRecords: ArrivalRecord[]
+  inventoryChecks: InventoryCheckRecord[]
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number
@@ -51,6 +60,8 @@ export interface ProductWithInventory extends Product {
   currentStockKg: number
   salesAllocatedKg: number
   selfConsumedKg: number
+  inventoryAdjustmentKg: number
+  latestInventoryCheck?: InventoryCheckRecord
   stockStatus: StockStatus
 }
 
@@ -115,6 +126,7 @@ export interface ProductInput {
   shadingMethods: string[]
   certifications: string[]
   arrivalRecords: ArrivalRecord[]
+  inventoryChecks: InventoryCheckRecord[]
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number

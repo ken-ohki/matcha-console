@@ -154,7 +154,7 @@ function SaleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4">
-      <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '販売案件を編集' : '販売案件を登録'}</h2>
@@ -347,7 +347,7 @@ function SaleModal({
             </div>
           </div>
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
             <button
               type="button"
               onClick={onClose}
@@ -470,10 +470,10 @@ export default function SalesPage() {
           <div>
             <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売管理</h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <a
               href="/buyers"
-              className="inline-flex items-center gap-2 self-start rounded-xl border border-[#d9d1be] bg-white px-4 py-2.5 text-sm font-medium text-[#173c2a] transition hover:border-[#b5aa90]"
+              className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-[#d9d1be] bg-white px-4 py-2.5 text-sm font-medium text-[#173c2a] transition hover:border-[#b5aa90]"
             >
               <Building2 size={16} />
               販売先一覧
@@ -483,7 +483,7 @@ export default function SalesPage() {
                 setEditingSale(null)
                 setModalOpen(true)
               }}
-              className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
+              className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
             >
               <Plus size={16} />
               新規作成
@@ -565,13 +565,13 @@ export default function SalesPage() {
                   value={search}
                   onChange={event => setSearch(event.target.value)}
                   placeholder="商品名・購入者で検索"
-                  className="w-56 rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-56"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={event => setStatusFilter(event.target.value as 'all' | SaleStatus)}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-auto"
               >
                 <option value="all">すべて</option>
                 <option value="negotiating">商談中</option>
@@ -581,7 +581,59 @@ export default function SalesPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-3 md:hidden">
+            {!loading && filteredSales.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+                条件に合う販売案件はありません。
+              </div>
+            )}
+            {filteredSales.map(record => (
+              <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium text-[#173c2a]">{record.buyerName}</div>
+                    <div className="mt-1 text-xs text-[#68756c]">{record.country} / 納期 {record.dueDate || '-'}</div>
+                  </div>
+                  <SalesStatusBadge status={record.status} />
+                </div>
+                <div className="mt-3 rounded-xl bg-white p-3">
+                  <div className="text-sm text-[#173c2a]">{record.productName}</div>
+                  <div className="mt-1 text-xs text-[#68756c]">{record.productSku}</div>
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>数量 {formatKg(record.quantityKg)}</div>
+                    <div className="mt-1">売上高 {formatCurrency(record.revenue)}</div>
+                    <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
+                    <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>条件 {record.terms || '-'}</div>
+                    <div className="mt-1">メモ {record.notes || '-'}</div>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingSale(record)
+                      setModalOpen(true)
+                    }}
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(record)}
+                    className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">

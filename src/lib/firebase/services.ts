@@ -22,6 +22,7 @@ import type {
   ArrivalRecord,
   AuthUser,
   Buyer,
+  InventoryCheckRecord,
   InventoryGroup,
   InventoryGroupInput,
   Product,
@@ -83,6 +84,23 @@ function normalizeArrivalRecords(records: ArrivalRecord[]): ArrivalRecord[] {
     .filter(record => record.arrivalDate || record.quantityKg > 0)
 }
 
+function normalizeInventoryChecks(records: InventoryCheckRecord[]): InventoryCheckRecord[] {
+  return records
+    .map(record => ({
+      id: String(record.id ?? '').trim(),
+      checkedDate: String(record.checkedDate ?? '').trim(),
+      countedQuantityKg: Number(record.countedQuantityKg ?? 0),
+      expectedQuantityKg: Number(record.expectedQuantityKg ?? 0),
+      adjustmentKg: Number(record.adjustmentKg ?? 0),
+    }))
+    .filter(record => (
+      record.checkedDate ||
+      record.countedQuantityKg !== 0 ||
+      record.expectedQuantityKg !== 0 ||
+      record.adjustmentKg !== 0
+    ))
+}
+
 function deriveArrivalDate(records: ArrivalRecord[]): string {
   const dated = records
     .map(record => record.arrivalDate.trim())
@@ -94,6 +112,16 @@ function deriveArrivalDate(records: ArrivalRecord[]): string {
 
 function deriveInitialStockKg(records: ArrivalRecord[]): number {
   return records.reduce((sum, record) => sum + Number(record.quantityKg ?? 0), 0)
+}
+
+function deriveInventoryAdjustmentKg(records: InventoryCheckRecord[]): number {
+  return records.reduce((sum, record) => sum + Number(record.adjustmentKg ?? 0), 0)
+}
+
+function getLatestInventoryCheck(records: InventoryCheckRecord[]): InventoryCheckRecord | undefined {
+  return records
+    .slice()
+    .sort((left, right) => right.checkedDate.localeCompare(left.checkedDate))[0]
 }
 
 function toLegacyArrivalRecord(id: string, data: DocumentData): ArrivalRecord[] {
@@ -110,6 +138,7 @@ function toLegacyArrivalRecord(id: string, data: DocumentData): ArrivalRecord[] 
 
 function buildProductPayload(input: ProductInput) {
   const arrivalRecords = normalizeArrivalRecords(input.arrivalRecords)
+  const inventoryChecks = normalizeInventoryChecks(input.inventoryChecks)
 
   return sanitizeRecord({
     ...input,
@@ -124,6 +153,7 @@ function buildProductPayload(input: ProductInput) {
     shadingMethods: toStringArray(input.shadingMethods),
     certifications: toStringArray(input.certifications),
     arrivalRecords,
+    inventoryChecks,
     arrivalDate: deriveArrivalDate(arrivalRecords),
     initialStockKg: deriveInitialStockKg(arrivalRecords),
     standardWholesalePrice: input.standardWholesalePrice,
@@ -151,6 +181,9 @@ function mapProduct(id: string, data: DocumentData): Product {
   const arrivalRecords = Array.isArray(data.arrivalRecords)
     ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
     : toLegacyArrivalRecord(id, data)
+  const inventoryChecks = Array.isArray(data.inventoryChecks)
+    ? normalizeInventoryChecks(data.inventoryChecks as InventoryCheckRecord[])
+    : []
   const initialStockKg = arrivalRecords.length > 0
     ? deriveInitialStockKg(arrivalRecords)
     : Number(data.initialStockKg ?? 0)
@@ -173,6 +206,7 @@ function mapProduct(id: string, data: DocumentData): Product {
     shadingMethods: toStringArray(data.shadingMethods),
     certifications: toStringArray(data.certifications),
     arrivalRecords,
+    inventoryChecks,
     arrivalDate,
     inventoryGroupId: String(data.inventoryGroupId ?? ''),
     initialStockKg,
@@ -382,15 +416,19 @@ function computeInventory(
     .filter(product => product.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map(product => {
+      const inventoryAdjustmentKg = deriveInventoryAdjustmentKg(product.inventoryChecks)
       const salesAllocatedKg = reservedByProduct[product.id] ?? 0
       const selfConsumedKg = selfConsumedByProduct[product.id] ?? 0
-      const currentStockKg = product.initialStockKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg
+      const effectiveInitialKg = product.initialStockKg + inventoryAdjustmentKg
+      const currentStockKg = effectiveInitialKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg
       return {
         ...product,
         salesAllocatedKg,
         selfConsumedKg,
+        inventoryAdjustmentKg,
+        latestInventoryCheck: getLatestInventoryCheck(product.inventoryChecks),
         currentStockKg,
-        stockStatus: getStockStatus(currentStockKg, product.initialStockKg, settings.stockAlertRatio),
+        stockStatus: getStockStatus(currentStockKg, Math.max(effectiveInitialKg, 0), settings.stockAlertRatio),
       }
     })
 }
@@ -416,7 +454,11 @@ async function assertSufficientStock(
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === nextSale.productId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
-  const availableKg = product.initialStockKg - product.haizUsedKg - reservedKg - selfConsumedKg
+  const availableKg = product.initialStockKg
+    + deriveInventoryAdjustmentKg(product.inventoryChecks)
+    - product.haizUsedKg
+    - reservedKg
+    - selfConsumedKg
 
   if (isReservedSale(nextSale.status) && nextSale.quantityKg > availableKg) {
     throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
@@ -443,7 +485,11 @@ async function assertSufficientSelfConsumptionStock(
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
-  const availableKg = product.initialStockKg - product.haizUsedKg - reservedKg - selfConsumedKg
+  const availableKg = product.initialStockKg
+    + deriveInventoryAdjustmentKg(product.inventoryChecks)
+    - product.haizUsedKg
+    - reservedKg
+    - selfConsumedKg
 
   if (input.quantityKg > availableKg) {
     throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
@@ -589,6 +635,7 @@ export function createFirebaseServices(): IServices {
         shadingMethods: input.shadingMethods ?? current.shadingMethods,
         certifications: input.certifications ?? current.certifications,
         arrivalRecords: input.arrivalRecords ?? current.arrivalRecords,
+        inventoryChecks: input.inventoryChecks ?? current.inventoryChecks,
         arrivalDate: current.arrivalDate,
         inventoryGroupId: input.inventoryGroupId ?? current.inventoryGroupId,
         initialStockKg: current.initialStockKg,

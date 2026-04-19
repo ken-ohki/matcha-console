@@ -67,12 +67,36 @@ export default function BuyersPage() {
                 value={search}
                 onChange={event => setSearch(event.target.value)}
                 placeholder="販売先名・国・条件で検索"
-                className="w-64 rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-64"
               />
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-3 md:hidden">
+            {!loading && filtered.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+                登録済みの販売先はありません。
+              </div>
+            )}
+            {filtered.map(buyer => (
+              <div key={buyer.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+                <div className="font-medium text-[#173c2a]">{buyer.name}</div>
+                <div className="mt-1 text-xs text-[#68756c]">{buyer.country || '国未設定'}</div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>利用回数 {buyer.saleCount}件</div>
+                    <div className="mt-1">最終利用日 {formatDate(buyer.lastSoldAt)}</div>
+                  </div>
+                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                    <div>直近条件 {buyer.terms || '-'}</div>
+                    <div className="mt-1">メモ {buyer.notes || '-'}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">

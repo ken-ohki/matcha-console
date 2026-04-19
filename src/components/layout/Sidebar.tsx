@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, Leaf, Package, LogOut, PackageMinus } from 'lucide-react'
+import { useEffect } from 'react'
+import { Building2, Leaf, Package, LogOut, PackageMinus, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
@@ -12,55 +13,89 @@ const navItems = [
   { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
 ]
 
-export function Sidebar() {
+export function Sidebar({
+  open,
+  onClose,
+}: {
+  open: boolean
+  onClose: () => void
+}) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
 
+  useEffect(() => {
+    onClose()
+  }, [pathname, onClose])
+
   return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-[#173c2a] flex flex-col z-30">
-      <div className="px-6 py-5 border-b border-white/10">
-        <p className="text-xs uppercase tracking-[0.2em] text-emerald-100/70 mb-1">Tea Ops</p>
-        <h1 className="text-white font-bold text-lg leading-tight">ChaFlow</h1>
-      </div>
-
-      <nav className="flex-1 py-4 px-3">
-        {navItems.map(item => {
-          const Icon = item.icon
-          const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-[#285e3f] text-white'
-                  : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <Icon size={18} />
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="px-3 py-4 border-t border-white/10">
-        {user && (
-          <div className="px-3 py-2 mb-2">
-            <p className="text-emerald-50/60 text-xs truncate">{user.email}</p>
-            <span className={`text-xs font-medium ${user.role === 'admin' ? 'text-emerald-300' : 'text-emerald-50/50'}`}>
-              {user.role === 'admin' ? 'Admin' : 'Viewer'}
-            </span>
+    <>
+      <div
+        className={`fixed inset-0 z-30 bg-black/35 transition-opacity md:hidden ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={onClose}
+      />
+      <aside className={`fixed left-0 top-0 z-40 flex h-full w-72 max-w-[85vw] flex-col bg-[#173c2a] transition-transform md:w-60 md:max-w-none md:translate-x-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+          <div>
+          <p className="mb-1 text-xs uppercase tracking-[0.2em] text-emerald-100/70">Tea Ops</p>
+          <h1 className="text-lg font-bold leading-tight text-white">ChaFlow</h1>
           </div>
-        )}
-        <button
-          onClick={() => logout()}
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-50/80 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <LogOut size={18} />
-          ログアウト
-        </button>
-      </div>
-    </aside>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-emerald-50/80 transition hover:bg-white/10 hover:text-white md:hidden"
+            aria-label="メニューを閉じる"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className="flex-1 px-3 py-4">
+          {navItems.map(item => {
+            const Icon = item.icon
+            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-[#285e3f] text-white'
+                    : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-white/10 px-3 py-4">
+          {user && (
+            <div className="mb-2 px-3 py-2">
+              <p className="truncate text-xs text-emerald-50/60">{user.email}</p>
+              <span className={`text-xs font-medium ${user.role === 'admin' ? 'text-emerald-300' : 'text-emerald-50/50'}`}>
+                {user.role === 'admin' ? 'Admin' : 'Viewer'}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              onClose()
+              void logout()
+            }}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-50/80 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <LogOut size={18} />
+            ログアウト
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }
