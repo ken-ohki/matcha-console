@@ -746,6 +746,7 @@ export default function InventoryPage() {
   const totalInitialStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.initialStockKg, 0), [groupProducts])
   const totalCurrentStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.currentStockKg, 0), [groupProducts])
   const totalAllocatedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.salesAllocatedKg, 0), [groupProducts])
+  const totalSelfConsumedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.selfConsumedKg, 0), [groupProducts])
   const isDraggable = !search && user?.role === 'admin'
 
   const handleSaveProduct = async (input: ProductInput) => {
@@ -915,11 +916,13 @@ export default function InventoryPage() {
             <p className="mt-1 text-3xl font-bold text-[#173c2a]">{totalInitialStockKg.toFixed(1)} kg</p>
           </div>
           <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <p className="text-sm text-[#68756c]">残在庫量 / 販売引当</p>
+            <p className="text-sm text-[#68756c]">残在庫量 / 販売引当 / 自社消費</p>
             <p className={`mt-1 text-3xl font-bold ${totalCurrentStockKg <= totalInitialStockKg * 0.2 ? 'text-amber-600' : 'text-[#173c2a]'}`}>
               {totalCurrentStockKg.toFixed(1)} kg
             </p>
-            <p className="mt-1 text-sm text-[#68756c]">引当 {totalAllocatedKg.toFixed(1)} kg</p>
+            <p className="mt-1 text-sm text-[#68756c]">
+              引当 {totalAllocatedKg.toFixed(1)} kg / 自社消費 {totalSelfConsumedKg.toFixed(1)} kg
+            </p>
           </div>
         </div>
 

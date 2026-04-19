@@ -29,12 +29,16 @@ import type {
   ProductWithInventory,
   SaleRecord,
   SaleRecordInput,
+  SelfConsumptionRecord,
+  SelfConsumptionRecordInput,
+  SelfConsumptionUsageType,
   Settings,
   StockStatus,
 } from '@/types'
 import type {
   IAuthService,
   IInventoryService,
+  ISelfConsumptionService,
   ISalesService,
   ISettingsService,
   IServices,
@@ -46,6 +50,7 @@ const COLLECTIONS = {
   products: 'products',
   sales: 'sales',
   buyers: 'buyers',
+  selfConsumptions: 'self_consumptions',
   settings: 'settings',
   users: 'users',
 } as const
@@ -240,6 +245,26 @@ function mapBuyer(id: string, data: DocumentData): Buyer {
   }
 }
 
+function normalizeSelfConsumptionUsageType(value: unknown): SelfConsumptionUsageType {
+  if (value === 'sample_free' || value === 'sample_paid') return value
+  return 'retail'
+}
+
+function mapSelfConsumption(id: string, data: DocumentData): SelfConsumptionRecord {
+  return {
+    id,
+    productId: String(data.productId ?? ''),
+    productSku: String(data.productSku ?? ''),
+    productName: String(data.productName ?? ''),
+    quantityKg: Number(data.quantityKg ?? 0),
+    usedOn: String(data.usedOn ?? ''),
+    usageType: normalizeSelfConsumptionUsageType(data.usageType),
+    notes: data.notes ? String(data.notes) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
 function mapSettings(data?: DocumentData): Settings {
   const defaults = getDefaultSettings()
   if (!data) return defaults
@@ -321,6 +346,12 @@ async function getAllBuyers(): Promise<Buyer[]> {
   return snap.docs.map(document => mapBuyer(document.id, document.data()))
 }
 
+async function getAllSelfConsumptions(): Promise<SelfConsumptionRecord[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.selfConsumptions))
+  return snap.docs.map(document => mapSelfConsumption(document.id, document.data()))
+}
+
 async function getSettings(): Promise<Settings> {
   const db = getFirebaseDb()
   const snap = await getDoc(doc(db, COLLECTIONS.settings, 'main'))
@@ -331,10 +362,19 @@ function isReservedSale(status: SaleRecord['status']): boolean {
   return status === 'negotiating' || status === 'confirmed'
 }
 
-function computeInventory(products: Product[], sales: SaleRecord[], settings: Settings): ProductWithInventory[] {
+function computeInventory(
+  products: Product[],
+  sales: SaleRecord[],
+  selfConsumptions: SelfConsumptionRecord[],
+  settings: Settings,
+): ProductWithInventory[] {
   const reservedByProduct = sales.reduce<Record<string, number>>((acc, sale) => {
     if (!isReservedSale(sale.status)) return acc
     acc[sale.productId] = (acc[sale.productId] ?? 0) + sale.quantityKg
+    return acc
+  }, {})
+  const selfConsumedByProduct = selfConsumptions.reduce<Record<string, number>>((acc, record) => {
+    acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
 
@@ -343,10 +383,12 @@ function computeInventory(products: Product[], sales: SaleRecord[], settings: Se
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map(product => {
       const salesAllocatedKg = reservedByProduct[product.id] ?? 0
-      const currentStockKg = product.initialStockKg - product.haizUsedKg - salesAllocatedKg
+      const selfConsumedKg = selfConsumedByProduct[product.id] ?? 0
+      const currentStockKg = product.initialStockKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg
       return {
         ...product,
         salesAllocatedKg,
+        selfConsumedKg,
         currentStockKg,
         stockStatus: getStockStatus(currentStockKg, product.initialStockKg, settings.stockAlertRatio),
       }
@@ -357,7 +399,11 @@ async function assertSufficientStock(
   nextSale: SaleRecordInput,
   options?: { excludeSaleId?: string },
 ): Promise<{ product: Product; currentProductSales: SaleRecord[] }> {
-  const [products, sales] = await Promise.all([getAllProducts(), getAllSales()])
+  const [products, sales, selfConsumptions] = await Promise.all([
+    getAllProducts(),
+    getAllSales(),
+    getAllSelfConsumptions(),
+  ])
   const product = products.find(item => item.id === nextSale.productId && item.isActive)
   if (!product) throw new Error('商品が見つかりません')
 
@@ -367,13 +413,43 @@ async function assertSufficientStock(
     isReservedSale(sale.status)
   ))
   const reservedKg = currentProductSales.reduce((sum, sale) => sum + sale.quantityKg, 0)
-  const availableKg = product.initialStockKg - product.haizUsedKg - reservedKg
+  const selfConsumedKg = selfConsumptions
+    .filter(record => record.productId === nextSale.productId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
+  const availableKg = product.initialStockKg - product.haizUsedKg - reservedKg - selfConsumedKg
 
   if (isReservedSale(nextSale.status) && nextSale.quantityKg > availableKg) {
     throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
   }
 
   return { product, currentProductSales }
+}
+
+async function assertSufficientSelfConsumptionStock(
+  input: SelfConsumptionRecordInput,
+  options?: { excludeSelfConsumptionId?: string },
+): Promise<Product> {
+  const [products, sales, selfConsumptions] = await Promise.all([
+    getAllProducts(),
+    getAllSales(),
+    getAllSelfConsumptions(),
+  ])
+  const product = products.find(item => item.id === input.productId && item.isActive)
+  if (!product) throw new Error('商品が見つかりません')
+
+  const reservedKg = sales
+    .filter(sale => sale.productId === input.productId && isReservedSale(sale.status))
+    .reduce((sum, sale) => sum + sale.quantityKg, 0)
+  const selfConsumedKg = selfConsumptions
+    .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
+  const availableKg = product.initialStockKg - product.haizUsedKg - reservedKg - selfConsumedKg
+
+  if (input.quantityKg > availableKg) {
+    throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
+  }
+
+  return product
 }
 
 async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
@@ -455,8 +531,13 @@ export function createFirebaseServices(): IServices {
     },
 
     async getProductsWithInventory() {
-      const [products, sales, settings] = await Promise.all([getAllProducts(), getAllSales(), getSettings()])
-      return computeInventory(products, sales, settings)
+      const [products, sales, selfConsumptions, settings] = await Promise.all([
+        getAllProducts(),
+        getAllSales(),
+        getAllSelfConsumptions(),
+        getSettings(),
+      ])
+      return computeInventory(products, sales, selfConsumptions, settings)
     },
 
     async createProduct(input) {
@@ -721,6 +802,83 @@ export function createFirebaseServices(): IServices {
     },
   }
 
+  const selfConsumptionService: ISelfConsumptionService = {
+    async getSelfConsumptionRecords() {
+      const records = await getAllSelfConsumptions()
+      return records.sort((a, b) => {
+        const dateDiff = b.usedOn.localeCompare(a.usedOn)
+        if (dateDiff !== 0) return dateDiff
+        return b.updatedAt.getTime() - a.updatedAt.getTime()
+      })
+    },
+
+    async createSelfConsumptionRecord(input) {
+      const product = await assertSufficientSelfConsumptionStock(input)
+      const payload = sanitizeRecord({
+        ...input,
+        usedOn: input.usedOn.trim(),
+        notes: input.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      const ref = await addDoc(collection(db, COLLECTIONS.selfConsumptions), payload)
+
+      return {
+        id: ref.id,
+        ...input,
+        usedOn: input.usedOn.trim(),
+        notes: input.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    },
+
+    async updateSelfConsumptionRecord(id, input) {
+      const snap = await getDoc(doc(db, COLLECTIONS.selfConsumptions, id))
+      if (!snap.exists()) throw new Error('自社消費の記録が見つかりません')
+      const current = mapSelfConsumption(snap.id, snap.data() ?? {})
+
+      const merged: SelfConsumptionRecordInput = {
+        productId: input.productId ?? current.productId,
+        quantityKg: input.quantityKg ?? current.quantityKg,
+        usedOn: input.usedOn ?? current.usedOn,
+        usageType: input.usageType ?? current.usageType,
+        notes: input.notes ?? current.notes,
+      }
+
+      const product = await assertSufficientSelfConsumptionStock(merged, { excludeSelfConsumptionId: id })
+
+      await updateDoc(doc(db, COLLECTIONS.selfConsumptions, id), sanitizeRecord({
+        ...merged,
+        usedOn: merged.usedOn.trim(),
+        notes: merged.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        updatedAt: serverTimestamp(),
+      }))
+
+      return {
+        id,
+        ...merged,
+        usedOn: merged.usedOn.trim(),
+        notes: merged.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        createdAt: current.createdAt,
+        updatedAt: new Date(),
+      }
+    },
+
+    async deleteSelfConsumptionRecord(id) {
+      await deleteDoc(doc(db, COLLECTIONS.selfConsumptions, id))
+    },
+  }
+
   const settingsService: ISettingsService = {
     async getSettings() {
       return getSettings()
@@ -768,6 +926,7 @@ export function createFirebaseServices(): IServices {
   return {
     inventory: inventoryService,
     sales: salesService,
+    selfConsumption: selfConsumptionService,
     settings: settingsService,
     auth: authService,
   }

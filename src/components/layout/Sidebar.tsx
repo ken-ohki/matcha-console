@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Building2, Leaf, Package, LogOut } from 'lucide-react'
+import { Building2, Leaf, Package, LogOut, PackageMinus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { href: '/inventory', label: '在庫マスター', icon: Package },
   { href: '/sales', label: '販売管理', icon: Leaf },
   { href: '/buyers', label: '販売先一覧', icon: Building2 },
+  { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
 ]
 
 export function Sidebar() {

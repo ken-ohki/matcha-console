@@ -8,6 +8,8 @@ import type {
   Buyer,
   SaleRecord,
   SaleRecordInput,
+  SelfConsumptionRecord,
+  SelfConsumptionRecordInput,
   Settings,
 } from '@/types'
 
@@ -32,6 +34,13 @@ export interface ISalesService {
   deleteSaleRecord(id: string): Promise<void>
 }
 
+export interface ISelfConsumptionService {
+  getSelfConsumptionRecords(): Promise<SelfConsumptionRecord[]>
+  createSelfConsumptionRecord(input: SelfConsumptionRecordInput): Promise<SelfConsumptionRecord>
+  updateSelfConsumptionRecord(id: string, input: Partial<SelfConsumptionRecordInput>): Promise<SelfConsumptionRecord>
+  deleteSelfConsumptionRecord(id: string): Promise<void>
+}
+
 export interface ISettingsService {
   getSettings(): Promise<Settings>
   updateSettings(input: Partial<Settings>): Promise<Settings>
@@ -47,6 +56,7 @@ export interface IAuthService {
 export interface IServices {
   inventory: IInventoryService
   sales: ISalesService
+  selfConsumption: ISelfConsumptionService
   settings: ISettingsService
   auth: IAuthService
 }

@@ -1,6 +1,7 @@
 export type UserRole = 'admin' | 'viewer'
 export type StockStatus = 'normal' | 'low' | 'out'
 export type SaleStatus = 'negotiating' | 'confirmed' | 'cancelled'
+export type SelfConsumptionUsageType = 'retail' | 'sample_free' | 'sample_paid'
 
 export interface InventoryGroup {
   id: string
@@ -49,6 +50,7 @@ export interface Product {
 export interface ProductWithInventory extends Product {
   currentStockKg: number
   salesAllocatedKg: number
+  selfConsumedKg: number
   stockStatus: StockStatus
 }
 
@@ -82,6 +84,19 @@ export interface Buyer {
   notes?: string
   saleCount: number
   lastSoldAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface SelfConsumptionRecord {
+  id: string
+  productId: string
+  productSku: string
+  productName: string
+  quantityKg: number
+  usedOn: string
+  usageType: SelfConsumptionUsageType
+  notes?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -123,6 +138,14 @@ export interface SaleRecordInput {
   country: string
   dueDate?: string
   terms?: string
+  notes?: string
+}
+
+export interface SelfConsumptionRecordInput {
+  productId: string
+  quantityKg: number
+  usedOn: string
+  usageType: SelfConsumptionUsageType
   notes?: string
 }
 
