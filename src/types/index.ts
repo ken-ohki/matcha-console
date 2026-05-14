@@ -89,6 +89,11 @@ export interface SaleRecord {
   dueDate?: string
   terms?: string
   notes?: string
+  paymentMethod?: string
+  paymentDate?: string
+  shippingMethod?: string
+  shippingDate?: string
+  trackingNumber?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -206,6 +211,11 @@ export interface SaleRecordInput {
   dueDate?: string
   terms?: string
   notes?: string
+  paymentMethod?: string
+  paymentDate?: string
+  shippingMethod?: string
+  shippingDate?: string
+  trackingNumber?: string
 }
 
 export interface SelfConsumptionRecordInput {

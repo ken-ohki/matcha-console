@@ -13,6 +13,7 @@ import {
   CircleDollarSign,
   ClipboardPenLine,
   Copy,
+  FileText,
   Package2,
   Percent,
   Pencil,
@@ -513,6 +514,7 @@ export default function SalesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<SaleRecord | null>(null)
   const [prefillSale, setPrefillSale] = useState<SaleRecord | null>(null)
+  const [detailSaleId, setDetailSaleId] = useState<string | null>(null)
 
   const handleDuplicate = (record: SaleRecord) => {
     setEditingSale(null)
@@ -954,7 +956,11 @@ export default function SalesPage() {
               </div>
             )}
             {filteredSales.map(record => (
-              <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+              <div
+                key={record.id}
+                onClick={() => setDetailSaleId(record.id)}
+                className="cursor-pointer rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4 transition hover:border-[#bcb39a]"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium text-[#173c2a]">{record.buyerName}</div>
@@ -981,7 +987,7 @@ export default function SalesPage() {
                     <div>メモ {record.notes || '-'}</div>
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
+                <div className="mt-4 flex flex-wrap justify-end gap-2" onClick={e => e.stopPropagation()}>
                   <button
                     onClick={() => handleDuplicate(record)}
                     aria-label="複製"
@@ -1034,7 +1040,11 @@ export default function SalesPage() {
                   </tr>
                 )}
                 {filteredSales.map(record => (
-                  <tr key={record.id} className="border-b border-[#f0ebdf] text-[#173c2a]">
+                  <tr
+                    key={record.id}
+                    onClick={() => setDetailSaleId(record.id)}
+                    className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
+                  >
                     <td className="px-3 py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <SalesStatusBadge status={record.status} />
@@ -1054,7 +1064,7 @@ export default function SalesPage() {
                     <td className="px-3 py-4">{record.country}</td>
                     <td className="px-3 py-4">{record.dueDate || '-'}</td>
                     <td className="px-3 py-4">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-1" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleDuplicate(record)}
                           aria-label="複製"
@@ -1099,6 +1109,27 @@ export default function SalesPage() {
           }}
           onSave={handleSave}
         />
+
+        {detailSaleId && (() => {
+          const detailRecord = sales.find(s => s.id === detailSaleId)
+          if (!detailRecord) return null
+          return (
+            <SaleDetailModal
+              record={detailRecord}
+              onClose={() => setDetailSaleId(null)}
+              onEdit={() => {
+                setEditingSale(detailRecord)
+                setModalOpen(true)
+                setDetailSaleId(null)
+              }}
+              onUpdate={async input => {
+                const services = await getServices()
+                await services.sales.updateSaleRecord(detailRecord.id, input)
+                await load()
+              }}
+            />
+          )
+        })()}
       </div>
     </AppLayout>
   )
@@ -1159,6 +1190,357 @@ function FilterMultiSelect({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function SaleDetailModal({
+  record,
+  onClose,
+  onEdit,
+  onUpdate,
+}: {
+  record: SaleRecord
+  onClose: () => void
+  onEdit: () => void
+  onUpdate: (input: Partial<SaleRecordInput>) => Promise<void>
+}) {
+  const [payment, setPayment] = useState({
+    paymentStatus: record.paymentStatus,
+    paymentMethod: record.paymentMethod ?? '',
+    paymentDate: record.paymentDate ?? '',
+  })
+  const [shipping, setShipping] = useState({
+    shippingStatus: record.shippingStatus,
+    shippingMethod: record.shippingMethod ?? '',
+    shippingDate: record.shippingDate ?? '',
+    trackingNumber: record.trackingNumber ?? '',
+  })
+  const [savingSection, setSavingSection] = useState<'payment' | 'shipping' | null>(null)
+  const [feedback, setFeedback] = useState<string | null>(null)
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const paymentDirty =
+    payment.paymentStatus !== record.paymentStatus ||
+    (payment.paymentMethod || '') !== (record.paymentMethod ?? '') ||
+    (payment.paymentDate || '') !== (record.paymentDate ?? '')
+
+  const shippingDirty =
+    shipping.shippingStatus !== record.shippingStatus ||
+    (shipping.shippingMethod || '') !== (record.shippingMethod ?? '') ||
+    (shipping.shippingDate || '') !== (record.shippingDate ?? '') ||
+    (shipping.trackingNumber || '') !== (record.trackingNumber ?? '')
+
+  const savePayment = async () => {
+    setSavingSection('payment')
+    setFeedback(null)
+    try {
+      await onUpdate({
+        paymentStatus: payment.paymentStatus,
+        paymentMethod: payment.paymentMethod.trim() || undefined,
+        paymentDate: payment.paymentDate || undefined,
+      })
+      setFeedback('支払い情報を更新しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSavingSection(null)
+    }
+  }
+
+  const saveShipping = async () => {
+    setSavingSection('shipping')
+    setFeedback(null)
+    try {
+      await onUpdate({
+        shippingStatus: shipping.shippingStatus,
+        shippingMethod: shipping.shippingMethod.trim() || undefined,
+        shippingDate: shipping.shippingDate || undefined,
+        trackingNumber: shipping.trackingNumber.trim() || undefined,
+      })
+      setFeedback('発送情報を更新しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSavingSection(null)
+    }
+  }
+
+  const fieldClass =
+    'w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-white'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="閉じる"
+          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+        >
+          <X size={18} />
+        </button>
+        <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">販売案件</p>
+          <h2 className="mt-1 text-xl font-semibold text-[#173c2a]">{record.buyerName}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <SalesStatusBadge status={record.status} />
+            <PaymentBadge status={record.paymentStatus} />
+            <ShippingBadge status={record.shippingStatus} />
+          </div>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          {/* 注文内容 */}
+          <Section title="注文内容" onEdit={onEdit}>
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <DetailField label="商品" value={record.productName + (record.productSku ? ` (${record.productSku})` : '')} />
+              <DetailField label="国" value={record.country || '-'} />
+              <DetailField label="納期" value={record.dueDate || '-'} />
+              <DetailField label="数量" value={formatKg(record.quantityKg)} />
+              <DetailField label="単価" value={formatCurrency(record.unitPrice)} />
+              <DetailField label="売上" value={formatCurrency(record.revenue)} />
+              <DetailField label="原価" value={formatCurrency(record.costAmount)} />
+              <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
+              <DetailField label="取引条件" value={record.terms || '-'} />
+              <DetailField label="作成日" value={record.createdAt.toLocaleDateString('ja-JP')} />
+            </div>
+            {record.notes && (
+              <div className="mt-3">
+                <p className="text-[11px] uppercase tracking-wider text-[#68756c]">メモ</p>
+                <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-2.5 text-sm text-[#173c2a]">{record.notes}</p>
+              </div>
+            )}
+          </Section>
+
+          {/* 支払い */}
+          <Section title="支払い">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払いステータス</p>
+                <select
+                  value={payment.paymentStatus}
+                  onChange={e => setPayment(prev => ({ ...prev, paymentStatus: e.target.value as PaymentStatus }))}
+                  className={fieldClass}
+                >
+                  <option value="uninvoiced">未請求</option>
+                  <option value="invoiced">請求済</option>
+                  <option value="paid">支払済</option>
+                </select>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い方法</p>
+                <input
+                  type="text"
+                  list="payment-method-options"
+                  value={payment.paymentMethod}
+                  onChange={e => setPayment(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                  placeholder="銀行振込、クレジットカード ..."
+                  className={fieldClass}
+                />
+                <datalist id="payment-method-options">
+                  <option value="銀行振込" />
+                  <option value="クレジットカード" />
+                  <option value="PayPal" />
+                  <option value="現金" />
+                  <option value="その他" />
+                </datalist>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い日</p>
+                <input
+                  type="date"
+                  value={payment.paymentDate}
+                  onChange={e => setPayment(prev => ({ ...prev, paymentDate: e.target.value }))}
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+            {paymentDirty && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={savePayment}
+                  disabled={savingSection === 'payment'}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+                >
+                  {savingSection === 'payment' ? '保存中…' : '支払い情報を保存'}
+                </button>
+              </div>
+            )}
+          </Section>
+
+          {/* 発送 */}
+          <Section title="発送">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送ステータス</p>
+                <select
+                  value={shipping.shippingStatus}
+                  onChange={e => setShipping(prev => ({ ...prev, shippingStatus: e.target.value as ShippingStatus }))}
+                  className={fieldClass}
+                >
+                  <option value="ordering">発注中</option>
+                  <option value="producing">製造中</option>
+                  <option value="shipped">発送完了</option>
+                </select>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送方法</p>
+                <input
+                  type="text"
+                  list="shipping-method-options"
+                  value={shipping.shippingMethod}
+                  onChange={e => setShipping(prev => ({ ...prev, shippingMethod: e.target.value }))}
+                  placeholder="ヤマト、佐川、EMS、DHL ..."
+                  className={fieldClass}
+                />
+                <datalist id="shipping-method-options">
+                  <option value="ヤマト運輸" />
+                  <option value="佐川急便" />
+                  <option value="日本郵便" />
+                  <option value="EMS" />
+                  <option value="DHL" />
+                  <option value="FedEx" />
+                  <option value="自社配送" />
+                  <option value="引取り" />
+                </datalist>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送日</p>
+                <input
+                  type="date"
+                  value={shipping.shippingDate}
+                  onChange={e => setShipping(prev => ({ ...prev, shippingDate: e.target.value }))}
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">追跡番号</p>
+                <input
+                  type="text"
+                  value={shipping.trackingNumber}
+                  onChange={e => setShipping(prev => ({ ...prev, trackingNumber: e.target.value }))}
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+            {shippingDirty && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={saveShipping}
+                  disabled={savingSection === 'shipping'}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+                >
+                  {savingSection === 'shipping' ? '保存中…' : '発送情報を保存'}
+                </button>
+              </div>
+            )}
+          </Section>
+
+          {/* 書類発行 */}
+          <section className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">書類発行</p>
+            <div className="space-y-2">
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-[#68756c]">日本語</p>
+                <div className="flex flex-wrap gap-2">
+                  <a href={`/sales/${record.id}/document?type=invoice&lang=ja`} className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43]">
+                    <FileText size={14} /> 請求書を発行
+                  </a>
+                  <a href={`/sales/${record.id}/document?type=delivery&lang=ja`} className="inline-flex items-center gap-2 rounded-xl border border-[#174c33] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]">
+                    <FileText size={14} /> 納品書を発行
+                  </a>
+                  <a href={`/sales/${record.id}/document?type=quotation&lang=ja`} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                    <FileText size={14} /> 見積書を発行
+                  </a>
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-wider text-[#68756c]">English</p>
+                <div className="flex flex-wrap gap-2">
+                  <a href={`/sales/${record.id}/document?type=invoice&lang=en`} className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43]">
+                    <FileText size={14} /> Issue Invoice
+                  </a>
+                  <a href={`/sales/${record.id}/document?type=delivery&lang=en`} className="inline-flex items-center gap-2 rounded-xl border border-[#174c33] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]">
+                    <FileText size={14} /> Issue Delivery Note
+                  </a>
+                  <a href={`/sales/${record.id}/document?type=quotation&lang=en`} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                    <FileText size={14} /> Issue Quotation
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {feedback && (
+            <p className="text-sm text-emerald-700">{feedback}</p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              閉じる
+            </button>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43]"
+            >
+              <Pencil size={14} />
+              すべての項目を編集
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, onEdit, children }: { title: string; onEdit?: () => void; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-[#ece5d7] bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[#173c2a]">{title}</h3>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-xs text-[#174c33] underline-offset-2 hover:underline"
+          >
+            編集
+          </button>
+        )}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function DetailField({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-[#68756c]">{label}</p>
+      <p className={`mt-0.5 text-sm text-[#173c2a] ${valueClass ?? ''}`}>{value}</p>
     </div>
   )
 }

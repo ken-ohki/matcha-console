@@ -281,6 +281,11 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     dueDate: data.dueDate ? String(data.dueDate) : undefined,
     terms: data.terms ? String(data.terms) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
+    paymentMethod: data.paymentMethod ? String(data.paymentMethod) : undefined,
+    paymentDate: data.paymentDate ? String(data.paymentDate) : undefined,
+    shippingMethod: data.shippingMethod ? String(data.shippingMethod) : undefined,
+    shippingDate: data.shippingDate ? String(data.shippingDate) : undefined,
+    trackingNumber: data.trackingNumber ? String(data.trackingNumber) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -958,6 +963,11 @@ export function createFirebaseServices(): IServices {
         dueDate: input.dueDate ?? current.dueDate,
         terms: input.terms ?? current.terms,
         notes: input.notes ?? current.notes,
+        paymentMethod: input.paymentMethod ?? current.paymentMethod,
+        paymentDate: input.paymentDate ?? current.paymentDate,
+        shippingMethod: input.shippingMethod ?? current.shippingMethod,
+        shippingDate: input.shippingDate ?? current.shippingDate,
+        trackingNumber: input.trackingNumber ?? current.trackingNumber,
       }
 
       const { product } = await assertSufficientStock(merged, { excludeSaleId: id })
