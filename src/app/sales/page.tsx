@@ -252,7 +252,7 @@ function SaleModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">販売ステータス</label>
               <select
@@ -265,32 +265,6 @@ function SaleModal({
                 <option value="cancelled">取消</option>
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">支払いステータス</label>
-              <select
-                value={form.paymentStatus}
-                onChange={event => setForm(prev => ({ ...prev, paymentStatus: event.target.value as PaymentStatus }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                <option value="uninvoiced">未請求</option>
-                <option value="invoiced">請求済</option>
-                <option value="paid">支払済</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">発送ステータス</label>
-              <select
-                value={form.shippingStatus}
-                onChange={event => setForm(prev => ({ ...prev, shippingStatus: event.target.value as ShippingStatus }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                <option value="ordering">発注中</option>
-                <option value="producing">製造中</option>
-                <option value="shipped">発送完了</option>
-              </select>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
             <div className="relative">
               <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
               <input
@@ -1345,21 +1319,19 @@ function SaleDetailModal({
               </div>
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い方法</p>
-                <input
-                  type="text"
-                  list="payment-method-options"
+                <select
                   value={payment.paymentMethod}
                   onChange={e => setPayment(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                  placeholder="銀行振込、クレジットカード ..."
                   className={fieldClass}
-                />
-                <datalist id="payment-method-options">
-                  <option value="銀行振込" />
-                  <option value="クレジットカード" />
-                  <option value="PayPal" />
-                  <option value="現金" />
-                  <option value="その他" />
-                </datalist>
+                >
+                  <option value="">未設定</option>
+                  <option value="銀行振込">銀行振込</option>
+                  <option value="Stripe">Stripe</option>
+                  <option value="PayPal">PayPal</option>
+                  <option value="Square">Square</option>
+                  <option value="現金">現金</option>
+                  <option value="その他">その他</option>
+                </select>
               </div>
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い日</p>

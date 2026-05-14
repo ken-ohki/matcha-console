@@ -122,6 +122,7 @@ export default function DocumentPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [includeTerms, setIncludeTerms] = useState(true)
+  const [terms, setTerms] = useState<{ heading: string; body: string }[]>([])
   const { user } = useAuth()
 
   useEffect(() => {
@@ -129,10 +130,12 @@ export default function DocumentPage() {
     ;(async () => {
       try {
         const services = await getServices()
-        const [sales, buyers] = await Promise.all([
+        const [sales, buyers, storedTerms] = await Promise.all([
           services.sales.getSaleRecords(),
           services.sales.getBuyers(),
+          services.settings.getDocumentTermsEn(),
         ])
+        setTerms(storedTerms.length > 0 ? storedTerms : TERMS_AND_CONDITIONS_EN.map(s => ({ heading: s.heading, body: s.body })))
         if (cancelled) return
         const target = sales.find(s => s.id === params.id)
         if (!target) {
@@ -487,10 +490,10 @@ export default function DocumentPage() {
             <p className="mt-2 text-center text-xs text-[#68756c]">{ISSUER.companyEn}　·　{ISSUER.addressEn}</p>
 
             <div className="mt-8 space-y-4 text-sm leading-relaxed text-[#1f2a23]">
-              {TERMS_AND_CONDITIONS_EN.map(section => (
-                <div key={section.heading}>
+              {terms.map((section, i) => (
+                <div key={i}>
                   <h3 className="font-semibold text-[#173c2a]">{section.heading}</h3>
-                  <p className="mt-1">{section.body}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{section.body}</p>
                 </div>
               ))}
             </div>

@@ -54,9 +54,16 @@ export interface ISelfConsumptionService {
   deleteSelfConsumptionRecord(id: string): Promise<void>
 }
 
+export interface TermsSection {
+  heading: string
+  body: string
+}
+
 export interface ISettingsService {
   getSettings(): Promise<Settings>
   updateSettings(input: Partial<Settings>): Promise<Settings>
+  getDocumentTermsEn(): Promise<TermsSection[]>
+  updateDocumentTermsEn(sections: TermsSection[]): Promise<void>
 }
 
 export interface IMastersService {

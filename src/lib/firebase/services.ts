@@ -1241,6 +1241,26 @@ export function createFirebaseServices(): IServices {
       await setDoc(doc(db, COLLECTIONS.settings, 'main'), payload, { merge: true })
       return getSettings()
     },
+
+    async getDocumentTermsEn() {
+      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'terms_en'))
+      const data = snap.data()
+      const sections = Array.isArray(data?.sections) ? data!.sections : []
+      return sections
+        .map((s: unknown) => {
+          const obj = s as { heading?: unknown; body?: unknown }
+          return { heading: String(obj?.heading ?? ''), body: String(obj?.body ?? '') }
+        })
+        .filter((s: { heading: string; body: string }) => s.heading || s.body)
+    },
+
+    async updateDocumentTermsEn(sections) {
+      await setDoc(
+        doc(db, COLLECTIONS.settings, 'terms_en'),
+        { sections, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+    },
   }
 
   const authService: IAuthService = {
