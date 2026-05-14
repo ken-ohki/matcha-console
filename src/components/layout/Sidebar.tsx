@@ -3,14 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { Building2, Leaf, Package, LogOut, PackageMinus, X } from 'lucide-react'
+import { Building2, ExternalLink, Leaf, Package, LogOut, PackageMinus, Settings, ShoppingBag, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { href: '/inventory', label: '在庫マスター', icon: Package },
   { href: '/sales', label: '販売管理', icon: Leaf },
+  { href: '/ec-sales', label: '販売管理（EC）', icon: ShoppingBag },
   { href: '/buyers', label: '販売先一覧', icon: Building2 },
   { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
+  { href: '/settings/masters', label: '設定', icon: Settings },
 ]
 
 export function Sidebar({
@@ -41,7 +43,7 @@ export function Sidebar({
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>
           <p className="mb-1 text-xs uppercase tracking-[0.2em] text-emerald-100/70">Tea Ops</p>
-          <h1 className="text-lg font-bold leading-tight text-white">ChaFlow</h1>
+          <h1 className="text-lg font-bold leading-tight text-white">Matcha Console</h1>
           </div>
           <button
             type="button"
@@ -76,6 +78,18 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-white/10 px-3 py-4">
+          <a
+            href="/catalog"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
+          >
+            <span className="flex items-center gap-3">
+              <Leaf size={18} />
+              カタログを開く
+            </span>
+            <ExternalLink size={14} className="text-emerald-50/70" />
+          </a>
           {user && (
             <div className="mb-2 px-3 py-2">
               <p className="truncate text-xs text-emerald-50/60">{user.email}</p>

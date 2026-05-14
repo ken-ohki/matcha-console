@@ -1,7 +1,9 @@
 export type UserRole = 'admin' | 'viewer'
 export type StockStatus = 'normal' | 'low' | 'out'
 export type SaleStatus = 'negotiating' | 'confirmed' | 'cancelled'
-export type SelfConsumptionUsageType = 'retail' | 'sample_free' | 'sample_paid'
+export type PaymentStatus = 'uninvoiced' | 'invoiced' | 'paid'
+export type ShippingStatus = 'ordering' | 'producing' | 'shipped'
+export type SelfConsumptionUsageType = 'ingredient' | 'retail' | 'sample'
 
 export interface InventoryGroup {
   id: string
@@ -52,6 +54,8 @@ export interface Product {
   salesNote?: string
   sortOrder: number
   isActive: boolean
+  showInCatalog: boolean
+  inquireToOrder: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -60,6 +64,7 @@ export interface ProductWithInventory extends Product {
   currentStockKg: number
   salesAllocatedKg: number
   selfConsumedKg: number
+  ecSoldKg: number
   inventoryAdjustmentKg: number
   latestInventoryCheck?: InventoryCheckRecord
   stockStatus: StockStatus
@@ -68,6 +73,8 @@ export interface ProductWithInventory extends Product {
 export interface SaleRecord {
   id: string
   status: SaleStatus
+  paymentStatus: PaymentStatus
+  shippingStatus: ShippingStatus
   buyerName: string
   productId: string
   productSku: string
@@ -93,10 +100,54 @@ export interface Buyer {
   country?: string
   terms?: string
   notes?: string
+  email?: string
+  website?: string
+  phone?: string
+  shippingAddress?: string
+  shippingPostalCode?: string
+  contactPersonName?: string
   saleCount: number
   lastSoldAt?: Date
   createdAt: Date
   updatedAt: Date
+}
+
+export interface BuyerDetailsInput {
+  email?: string
+  website?: string
+  phone?: string
+  shippingAddress?: string
+  shippingPostalCode?: string
+  contactPersonName?: string
+  notes?: string
+  country?: string
+  terms?: string
+}
+
+export interface EcSaleRecord {
+  id: string
+  productId: string
+  productSku: string
+  productName: string
+  quantityKg: number
+  soldOn: string
+  orderNumber?: string
+  unitPrice?: number
+  revenue?: number
+  channel?: string
+  notes?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface EcSaleRecordInput {
+  productId: string
+  quantityKg: number
+  soldOn: string
+  orderNumber?: string
+  unitPrice?: number
+  channel?: string
+  notes?: string
 }
 
 export interface SelfConsumptionRecord {
@@ -135,6 +186,8 @@ export interface ProductInput {
   purchaseUnitPrice?: number
   adminNote?: string
   salesNote?: string
+  showInCatalog?: boolean
+  inquireToOrder?: boolean
 }
 
 export interface InventoryGroupInput {
@@ -143,6 +196,8 @@ export interface InventoryGroupInput {
 
 export interface SaleRecordInput {
   status: SaleStatus
+  paymentStatus: PaymentStatus
+  shippingStatus: ShippingStatus
   buyerName: string
   productId: string
   quantityKg: number
@@ -165,6 +220,35 @@ export interface Settings {
   appName: string
   currency: string
   stockAlertRatio: number
+}
+
+export type MasterType =
+  | 'tea_type'
+  | 'grade'
+  | 'origin'
+  | 'cultivar'
+  | 'plucking'
+  | 'harvest'
+  | 'shading'
+  | 'certification'
+  | 'terms'
+
+export interface MasterEntry {
+  id: string
+  type: MasterType
+  englishName: string
+  japaneseName: string
+  sortOrder: number
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface MasterEntryInput {
+  type: MasterType
+  englishName: string
+  japaneseName: string
+  sortOrder?: number
 }
 
 export interface AuthUser {

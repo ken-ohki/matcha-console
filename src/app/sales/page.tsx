@@ -5,11 +5,14 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
-import type { Buyer, ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus } from '@/types'
+import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
+import { COUNTRY_OPTIONS } from '@/lib/countries'
+import { optionsForType } from '@/lib/masters'
 import {
   Building2,
   CircleDollarSign,
   ClipboardPenLine,
+  Copy,
   Package2,
   Percent,
   Pencil,
@@ -18,6 +21,39 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+
+type ViewMode = 'list' | 'by-month' | 'by-fiscal' | 'by-country' | 'by-product'
+
+interface AggregateRow {
+  key: string
+  label: string
+  count: number
+  quantityKg: number
+  revenue: number
+  costAmount: number
+  grossProfit: number
+}
+
+function fiscalYearOf(date: Date): number {
+  const year = date.getFullYear()
+  const month = date.getMonth() // 0-11
+  return month >= 3 ? year : year - 1 // Apr (3) - Mar
+}
+
+function aggregateSales(records: SaleRecord[], keyFn: (r: SaleRecord) => { key: string; label: string }): AggregateRow[] {
+  const groups = new Map<string, AggregateRow>()
+  for (const r of records) {
+    const { key, label } = keyFn(r)
+    const existing = groups.get(key) ?? { key, label, count: 0, quantityKg: 0, revenue: 0, costAmount: 0, grossProfit: 0 }
+    existing.count += 1
+    existing.quantityKg += r.quantityKg
+    existing.revenue += r.revenue
+    existing.costAmount += r.costAmount
+    existing.grossProfit += r.grossProfit
+    groups.set(key, existing)
+  }
+  return [...groups.values()]
+}
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ja-JP', {
@@ -29,6 +65,42 @@ function formatCurrency(amount: number): string {
 
 function formatKg(value: number): string {
   return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
+}
+
+const PAYMENT_LABELS: Record<PaymentStatus, string> = {
+  uninvoiced: '未請求',
+  invoiced: '請求済',
+  paid: '支払済',
+}
+const PAYMENT_COLORS: Record<PaymentStatus, string> = {
+  uninvoiced: 'bg-gray-100 text-gray-700',
+  invoiced: 'bg-amber-100 text-amber-800',
+  paid: 'bg-emerald-100 text-emerald-800',
+}
+const SHIPPING_LABELS: Record<ShippingStatus, string> = {
+  ordering: '発注中',
+  producing: '製造中',
+  shipped: '発送完了',
+}
+const SHIPPING_COLORS: Record<ShippingStatus, string> = {
+  ordering: 'bg-slate-100 text-slate-700',
+  producing: 'bg-blue-100 text-blue-800',
+  shipped: 'bg-emerald-100 text-emerald-800',
+}
+
+function PaymentBadge({ status }: { status: PaymentStatus }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${PAYMENT_COLORS[status]}`}>
+      {PAYMENT_LABELS[status]}
+    </span>
+  )
+}
+function ShippingBadge({ status }: { status: ShippingStatus }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${SHIPPING_COLORS[status]}`}>
+      {SHIPPING_LABELS[status]}
+    </span>
+  )
 }
 
 function getStatusLabel(status: SaleStatus): string {
@@ -47,6 +119,7 @@ function SaleModal({
   open,
   buyers,
   products,
+  masters,
   initial,
   onClose,
   onSave,
@@ -54,14 +127,18 @@ function SaleModal({
   open: boolean
   buyers: Buyer[]
   products: ProductWithInventory[]
+  masters: MasterEntry[]
   initial: SaleRecord | null
   onClose: () => void
   onSave: (input: SaleRecordInput) => Promise<void>
 }) {
+  const termsOptions = useMemo(() => optionsForType(masters, 'terms'), [masters])
   const defaultProductId = products[0]?.id ?? ''
   const [buyerFocused, setBuyerFocused] = useState(false)
   const [form, setForm] = useState<SaleRecordInput>({
     status: 'negotiating',
+    paymentStatus: 'uninvoiced',
+    shippingStatus: 'ordering',
     buyerName: '',
     productId: defaultProductId,
     quantityKg: 0,
@@ -83,6 +160,8 @@ function SaleModal({
 
     setForm({
       status: initial?.status ?? 'negotiating',
+      paymentStatus: initial?.paymentStatus ?? 'uninvoiced',
+      shippingStatus: initial?.shippingStatus ?? 'ordering',
       buyerName: initial?.buyerName ?? '',
       productId: nextProductId,
       quantityKg: initial?.quantityKg ?? 0,
@@ -172,7 +251,7 @@ function SaleModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">販売ステータス</label>
               <select
@@ -185,6 +264,32 @@ function SaleModal({
                 <option value="cancelled">取消</option>
               </select>
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">支払いステータス</label>
+              <select
+                value={form.paymentStatus}
+                onChange={event => setForm(prev => ({ ...prev, paymentStatus: event.target.value as PaymentStatus }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              >
+                <option value="uninvoiced">未請求</option>
+                <option value="invoiced">請求済</option>
+                <option value="paid">支払済</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">発送ステータス</label>
+              <select
+                value={form.shippingStatus}
+                onChange={event => setForm(prev => ({ ...prev, shippingStatus: event.target.value as ShippingStatus }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              >
+                <option value="ordering">発注中</option>
+                <option value="producing">製造中</option>
+                <option value="shipped">発送完了</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="relative">
               <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
               <input
@@ -287,13 +392,20 @@ function SaleModal({
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">国</label>
-              <input
+              <select
                 required
                 value={form.country}
                 onChange={event => setForm(prev => ({ ...prev, country: event.target.value }))}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                placeholder="例: 日本"
-              />
+              >
+                <option value="">選択してください</option>
+                {COUNTRY_OPTIONS.map(option => (
+                  <option key={option.code} value={option.name}>{option.name}</option>
+                ))}
+                {form.country && !COUNTRY_OPTIONS.some(c => c.name === form.country) && (
+                  <option value={form.country}>{form.country}（未登録）</option>
+                )}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">納期</label>
@@ -305,13 +417,27 @@ function SaleModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">条件</label>
-              <input
-                value={form.terms}
+              <label className="mb-1 block text-sm font-medium text-gray-700">取引条件</label>
+              <select
+                value={form.terms ?? ''}
                 onChange={event => setForm(prev => ({ ...prev, terms: event.target.value }))}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                placeholder="例: 前金50%"
-              />
+              >
+                <option value="">未選択</option>
+                {termsOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label || option.value}
+                  </option>
+                ))}
+                {form.terms && !termsOptions.some(o => o.value === form.terms) && (
+                  <option value={form.terms}>{form.terms}（未登録）</option>
+                )}
+              </select>
+              {termsOptions.length === 0 && (
+                <p className="mt-1 text-[11px] text-amber-700">
+                  設定 → マスター管理 → 取引条件 で項目を登録してください
+                </p>
+              )}
             </div>
           </div>
 
@@ -373,24 +499,49 @@ export default function SalesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
+  const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | SaleStatus>('all')
+  const [statusFilters, setStatusFilters] = useState<Set<SaleStatus>>(new Set())
+  const [buyerFilters, setBuyerFilters] = useState<Set<string>>(new Set())
+  const [countryFilters, setCountryFilters] = useState<Set<string>>(new Set())
+  const [productFilters, setProductFilters] = useState<Set<string>>(new Set())
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<SaleRecord | null>(null)
+  const [prefillSale, setPrefillSale] = useState<SaleRecord | null>(null)
+
+  const handleDuplicate = (record: SaleRecord) => {
+    setEditingSale(null)
+    setPrefillSale({
+      ...record,
+      id: '',
+      status: 'negotiating',
+      paymentStatus: 'uninvoiced',
+      shippingStatus: 'ordering',
+      dueDate: undefined,
+      notes: record.notes ? `${record.notes}（複製）` : '複製',
+    })
+    setModalOpen(true)
+  }
   const [message, setMessage] = useState('')
 
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const [nextSales, nextBuyers, nextProducts] = await Promise.all([
+    const [nextSales, nextBuyers, nextProducts, nextMasters] = await Promise.all([
       services.sales.getSaleRecords(),
       services.sales.getBuyers(),
       services.inventory.getProductsWithInventory(),
+      services.masters.listMasters(),
     ])
     setSales(nextSales)
     setBuyers(nextBuyers)
     setProducts(nextProducts)
+    setMasters(nextMasters)
     setLoading(false)
   }
 
@@ -398,25 +549,96 @@ export default function SalesPage() {
     load()
   }, [])
 
-  const filteredSales = useMemo(() => sales.filter(record => {
-    if (statusFilter !== 'all' && record.status !== statusFilter) return false
-    if (!search) return true
-    const query = search.toLowerCase()
-    return (
-      record.buyerName.toLowerCase().includes(query) ||
-      record.productName.toLowerCase().includes(query) ||
-      record.productSku.toLowerCase().includes(query) ||
-      record.country.toLowerCase().includes(query)
-    )
-  }), [sales, search, statusFilter])
+  const filteredSales = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const fromTime = dateFrom ? new Date(dateFrom).getTime() : null
+    const toTime = dateTo ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null
+    return sales.filter(record => {
+      if (statusFilters.size > 0 && !statusFilters.has(record.status)) return false
+      if (buyerFilters.size > 0 && !buyerFilters.has(record.buyerName)) return false
+      if (countryFilters.size > 0 && !countryFilters.has(record.country || '(未設定)')) return false
+      if (productFilters.size > 0) {
+        const key = record.productSku || record.productId
+        if (!productFilters.has(key)) return false
+      }
+      const t = record.createdAt.getTime()
+      if (fromTime != null && t < fromTime) return false
+      if (toTime != null && t > toTime) return false
+      if (!q) return true
+      return (
+        record.buyerName.toLowerCase().includes(q) ||
+        record.productName.toLowerCase().includes(q) ||
+        record.productSku.toLowerCase().includes(q) ||
+        record.country.toLowerCase().includes(q)
+      )
+    })
+  }, [sales, search, statusFilters, buyerFilters, countryFilters, productFilters, dateFrom, dateTo])
 
-  const confirmedSales = filteredSales.filter(record => record.status === 'confirmed')
-  const confirmedRevenue = confirmedSales.reduce((sum, record) => sum + record.revenue, 0)
-  const confirmedQuantity = confirmedSales.reduce((sum, record) => sum + record.quantityKg, 0)
-  const confirmedProfit = confirmedSales.reduce((sum, record) => sum + record.grossProfit, 0)
-  const confirmedMargin = confirmedRevenue === 0 ? 0 : (confirmedProfit / confirmedRevenue) * 100
+  const aggregations = useMemo(() => ({
+    monthly: aggregateSales(filteredSales, r => {
+      const d = r.createdAt
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      return { key, label: key }
+    }).sort((a, b) => b.key.localeCompare(a.key)),
+    fiscal: aggregateSales(filteredSales, r => {
+      const fy = fiscalYearOf(r.createdAt)
+      return { key: String(fy), label: `FY${fy}（${fy}/4 - ${fy + 1}/3）` }
+    }).sort((a, b) => b.key.localeCompare(a.key)),
+    country: aggregateSales(filteredSales, r => ({ key: r.country || '(未設定)', label: r.country || '(未設定)' }))
+      .sort((a, b) => b.revenue - a.revenue),
+    product: aggregateSales(filteredSales, r => ({ key: `${r.productSku || r.productId}::${r.productName}`, label: r.productName }))
+      .sort((a, b) => b.revenue - a.revenue),
+  }), [filteredSales])
 
-  const buyerSummary = Object.values(confirmedSales.reduce<Record<string, {
+  const filterOptions = useMemo(() => {
+    const buyers = new Set<string>()
+    const countries = new Set<string>()
+    const products = new Map<string, string>() // key → label
+    for (const r of sales) {
+      if (r.buyerName) buyers.add(r.buyerName)
+      countries.add(r.country || '(未設定)')
+      const key = r.productSku || r.productId
+      products.set(key, `${r.productName}${r.productSku ? ` (${r.productSku})` : ''}`)
+    }
+    return {
+      buyers: [...buyers].sort(),
+      countries: [...countries].sort(),
+      products: [...products.entries()].map(([key, label]) => ({ key, label })).sort((a, b) => a.label.localeCompare(b.label)),
+    }
+  }, [sales])
+
+  const activeFilterCount =
+    statusFilters.size + buyerFilters.size + countryFilters.size + productFilters.size +
+    (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
+
+  const toggleSetItem = <T,>(setter: (next: Set<T>) => void, current: Set<T>, item: T) => {
+    const next = new Set(current)
+    if (next.has(item)) next.delete(item)
+    else next.add(item)
+    setter(next)
+  }
+
+  const resetFilters = () => {
+    setStatusFilters(new Set())
+    setBuyerFilters(new Set())
+    setCountryFilters(new Set())
+    setProductFilters(new Set())
+    setDateFrom('')
+    setDateTo('')
+    setSearch('')
+  }
+
+  const scopeRevenue = filteredSales.reduce((sum, record) => sum + record.revenue, 0)
+  const scopeQuantity = filteredSales.reduce((sum, record) => sum + record.quantityKg, 0)
+  const scopeProfit = filteredSales.reduce((sum, record) => sum + record.grossProfit, 0)
+  const scopeMargin = scopeRevenue === 0 ? 0 : (scopeProfit / scopeRevenue) * 100
+  const scopeAvgUnitPrice = scopeQuantity === 0 ? 0 : scopeRevenue / scopeQuantity
+
+  const scopeLabel = statusFilters.size === 0
+    ? '全案件'
+    : [...statusFilters].map(getStatusLabel).join(' + ')
+
+  const buyerSummary = Object.values(filteredSales.reduce<Record<string, {
     buyerName: string
     revenue: number
     profit: number
@@ -451,6 +673,7 @@ export default function SalesPage() {
       setMessage('販売案件を登録しました')
     }
     setEditingSale(null)
+    setPrefillSale(null)
     setModalOpen(false)
     await load()
   }
@@ -498,18 +721,35 @@ export default function SalesPage() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <KPICard title="確定売上高" value={formatCurrency(confirmedRevenue)} color="green" icon={<CircleDollarSign size={18} />} />
-          <KPICard title="確定数量" value={formatKg(confirmedQuantity)} color="default" icon={<Package2 size={18} />} />
-          <KPICard title="確定粗利" value={formatCurrency(confirmedProfit)} color="amber" icon={<ClipboardPenLine size={18} />} />
-          <KPICard title="粗利率" value={`${confirmedMargin.toFixed(1)}%`} color="violet" icon={<Percent size={18} />} />
+          <KPICard title={`売上高（${scopeLabel}）`} value={formatCurrency(scopeRevenue)} color="green" icon={<CircleDollarSign size={18} />} />
+          <KPICard title="数量" value={formatKg(scopeQuantity)} color="default" icon={<Package2 size={18} />} />
+          <KPICard title="粗利" value={formatCurrency(scopeProfit)} color="amber" icon={<ClipboardPenLine size={18} />} />
+          <KPICard title="粗利率" value={`${scopeMargin.toFixed(1)}%`} color="violet" icon={<Percent size={18} />} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KPICard title="案件数" value={`${filteredSales.length} 件`} color="default" icon={<ClipboardPenLine size={18} />} />
+          <KPICard title="平均単価 / kg" value={scopeAvgUnitPrice > 0 ? formatCurrency(scopeAvgUnitPrice) : '-'} color="default" icon={<CircleDollarSign size={18} />} />
+          <KPICard
+            title="未請求金額"
+            value={formatCurrency(filteredSales.filter(r => r.paymentStatus !== 'paid').reduce((s, r) => s + r.revenue, 0))}
+            color="amber"
+            icon={<CircleDollarSign size={18} />}
+          />
+          <KPICard
+            title="未発送件数"
+            value={`${filteredSales.filter(r => r.shippingStatus !== 'shipped').length} 件`}
+            color="default"
+            icon={<Package2 size={18} />}
+          />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
           <section className="rounded-3xl border border-[#d9d1be] bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#173c2a]">購入者別売上高・粗利（確定）</h2>
+            <h2 className="text-lg font-semibold text-[#173c2a]">購入者別売上高・粗利（{scopeLabel}）</h2>
             <div className="mt-6 space-y-4">
               {buyerSummary.length === 0 && (
-                <p className="text-sm text-[#68756c]">確定案件がまだありません。</p>
+                <p className="text-sm text-[#68756c]">対象の案件がありません。</p>
               )}
               {buyerSummary.map(item => (
                 <div key={item.buyerName} className="space-y-2">
@@ -556,32 +796,158 @@ export default function SalesPage() {
         </div>
 
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {([
+              { mode: 'list', label: '一覧' },
+              { mode: 'by-month', label: '月別' },
+              { mode: 'by-fiscal', label: '年度別' },
+              { mode: 'by-country', label: '国別' },
+              { mode: 'by-product', label: '商品別' },
+            ] as { mode: ViewMode; label: string }[]).map(tab => (
+              <button
+                key={tab.mode}
+                type="button"
+                onClick={() => setViewMode(tab.mode)}
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  viewMode === tab.mode
+                    ? 'bg-[#174c33] text-white'
+                    : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-semibold text-[#173c2a]">販売案件一覧</h2>
+            <h2 className="text-lg font-semibold text-[#173c2a]">
+              {viewMode === 'list' ? '販売案件一覧'
+                : viewMode === 'by-month' ? '月別集計'
+                : viewMode === 'by-fiscal' ? '年度別集計（4月〜3月）'
+                : viewMode === 'by-country' ? '国別集計'
+                : '商品別集計'}
+              <span className="ml-2 text-sm font-normal text-[#68756c]">({filteredSales.length}件)</span>
+            </h2>
             <div className="flex flex-wrap gap-3">
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   value={search}
                   onChange={event => setSearch(event.target.value)}
-                  placeholder="商品名・購入者で検索"
+                  placeholder="商品名・購入者・国で検索"
                   className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-56"
                 />
               </div>
-              <select
-                value={statusFilter}
-                onChange={event => setStatusFilter(event.target.value as 'all' | SaleStatus)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-auto"
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(prev => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
               >
-                <option value="all">すべて</option>
-                <option value="negotiating">商談中</option>
-                <option value="confirmed">確定</option>
-                <option value="cancelled">取消</option>
-              </select>
+                詳細フィルタ
+                {activeFilterCount > 0 && (
+                  <span className="rounded-full bg-[#174c33] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-xl px-3 py-2 text-sm text-[#68756c] underline-offset-2 hover:underline"
+                >
+                  リセット
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="mt-5 space-y-3 md:hidden">
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(['negotiating', 'confirmed', 'cancelled'] as SaleStatus[]).map(status => {
+              const active = statusFilters.has(status)
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => toggleSetItem(setStatusFilters, statusFilters, status)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? 'bg-[#174c33] text-white'
+                      : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                  }`}
+                >
+                  {getStatusLabel(status)}
+                </button>
+              )
+            })}
+            <span className="self-center text-[11px] text-[#68756c]">
+              {statusFilters.size === 0 ? '全ステータス表示中' : `${statusFilters.size} ステータス選択中`}
+            </span>
+          </div>
+
+          {filtersOpen && (
+            <div className="mt-3 grid gap-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f1] p-4 lg:grid-cols-2">
+              <div>
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">期間（作成日）</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                  <span className="text-xs text-[#68756c]">〜</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+              </div>
+              <FilterMultiSelect
+                label="購入者"
+                options={filterOptions.buyers.map(name => ({ value: name, label: name }))}
+                selected={buyerFilters}
+                onToggle={value => toggleSetItem(setBuyerFilters, buyerFilters, value)}
+                onClear={() => setBuyerFilters(new Set())}
+              />
+              <FilterMultiSelect
+                label="国"
+                options={filterOptions.countries.map(name => ({ value: name, label: name }))}
+                selected={countryFilters}
+                onToggle={value => toggleSetItem(setCountryFilters, countryFilters, value)}
+                onClear={() => setCountryFilters(new Set())}
+              />
+              <FilterMultiSelect
+                label="商品"
+                options={filterOptions.products.map(p => ({ value: p.key, label: p.label }))}
+                selected={productFilters}
+                onToggle={value => toggleSetItem(setProductFilters, productFilters, value)}
+                onClear={() => setProductFilters(new Set())}
+              />
+            </div>
+          )}
+
+          {viewMode !== 'list' && (
+            <div className="mt-5 overflow-x-auto">
+              <AggregateTable
+                rows={
+                  viewMode === 'by-month' ? aggregations.monthly
+                    : viewMode === 'by-fiscal' ? aggregations.fiscal
+                    : viewMode === 'by-country' ? aggregations.country
+                    : aggregations.product
+                }
+                groupLabel={
+                  viewMode === 'by-month' ? '月'
+                    : viewMode === 'by-fiscal' ? '年度'
+                    : viewMode === 'by-country' ? '国'
+                    : '商品'
+                }
+              />
+            </div>
+          )}
+
+          <div className={`mt-5 space-y-3 ${viewMode === 'list' ? 'md:hidden' : 'hidden'}`}>
             {!loading && filteredSales.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
                 条件に合う販売案件はありません。
@@ -594,7 +960,11 @@ export default function SalesPage() {
                     <div className="font-medium text-[#173c2a]">{record.buyerName}</div>
                     <div className="mt-1 text-xs text-[#68756c]">{record.country} / 納期 {record.dueDate || '-'}</div>
                   </div>
-                  <SalesStatusBadge status={record.status} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <SalesStatusBadge status={record.status} />
+                    <PaymentBadge status={record.paymentStatus} />
+                    <ShippingBadge status={record.shippingStatus} />
+                  </div>
                 </div>
                 <div className="mt-3 rounded-xl bg-white p-3">
                   <div className="text-sm text-[#173c2a]">{record.productName}</div>
@@ -608,11 +978,17 @@ export default function SalesPage() {
                     <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
                   </div>
                   <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
-                    <div>条件 {record.terms || '-'}</div>
-                    <div className="mt-1">メモ {record.notes || '-'}</div>
+                    <div>メモ {record.notes || '-'}</div>
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => handleDuplicate(record)}
+                    aria-label="複製"
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Copy size={16} />
+                  </button>
                   <button
                     onClick={() => {
                       setEditingSale(record)
@@ -633,7 +1009,7 @@ export default function SalesPage() {
             ))}
           </div>
 
-          <div className="mt-5 hidden overflow-x-auto md:block">
+          <div className={`mt-5 overflow-x-auto ${viewMode === 'list' ? 'hidden md:block' : 'hidden'}`}>
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
@@ -646,21 +1022,26 @@ export default function SalesPage() {
                   <th className="px-3 py-3 font-medium">粗利</th>
                   <th className="px-3 py-3 font-medium">国</th>
                   <th className="px-3 py-3 font-medium">納期</th>
-                  <th className="px-3 py-3 font-medium">条件</th>
                   <th className="px-3 py-3 font-medium text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filteredSales.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       条件に合う販売案件はありません。
                     </td>
                   </tr>
                 )}
                 {filteredSales.map(record => (
                   <tr key={record.id} className="border-b border-[#f0ebdf] text-[#173c2a]">
-                    <td className="px-3 py-4"><SalesStatusBadge status={record.status} /></td>
+                    <td className="px-3 py-4">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <SalesStatusBadge status={record.status} />
+                        <PaymentBadge status={record.paymentStatus} />
+                        <ShippingBadge status={record.shippingStatus} />
+                      </div>
+                    </td>
                     <td className="px-3 py-4 font-medium">{record.buyerName}</td>
                     <td className="px-3 py-4">
                       <div>{record.productName}</div>
@@ -672,9 +1053,15 @@ export default function SalesPage() {
                     <td className="px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
                     <td className="px-3 py-4">{record.country}</td>
                     <td className="px-3 py-4">{record.dueDate || '-'}</td>
-                    <td className="px-3 py-4">{record.terms || '-'}</td>
                     <td className="px-3 py-4">
                       <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleDuplicate(record)}
+                          aria-label="複製"
+                          className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                        >
+                          <Copy size={16} />
+                        </button>
                         <button
                           onClick={() => {
                             setEditingSale(record)
@@ -702,15 +1089,138 @@ export default function SalesPage() {
         <SaleModal
           open={modalOpen}
           buyers={buyers}
+          masters={masters}
           products={products}
-          initial={editingSale}
+          initial={editingSale ?? prefillSale}
           onClose={() => {
             setModalOpen(false)
             setEditingSale(null)
+            setPrefillSale(null)
           }}
           onSave={handleSave}
         />
       </div>
     </AppLayout>
+  )
+}
+
+function FilterMultiSelect({
+  label,
+  options,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  label: string
+  options: { value: string; label: string }[]
+  selected: Set<string>
+  onToggle: (value: string) => void
+  onClear: () => void
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">
+          {label} <span className="ml-1 text-[10px] text-[#a59f8c]">({selected.size === 0 ? '全' : selected.size}/{options.length})</span>
+        </p>
+        {selected.size > 0 && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[11px] text-[#174c33] underline-offset-2 hover:underline"
+          >
+            クリア
+          </button>
+        )}
+      </div>
+      <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2">
+        {options.length === 0 ? (
+          <p className="px-1 py-2 text-xs text-[#a59f8c]">選択肢がありません</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {options.map(opt => {
+              const active = selected.has(opt.value)
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => onToggle(opt.value)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs transition ${
+                    active
+                      ? 'bg-[#174c33] text-white'
+                      : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                  }`}
+                  title={opt.label}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AggregateTable({ rows, groupLabel }: { rows: AggregateRow[]; groupLabel: string }) {
+  const totals = rows.reduce<AggregateRow>((acc, r) => ({
+    key: '',
+    label: '合計',
+    count: acc.count + r.count,
+    quantityKg: acc.quantityKg + r.quantityKg,
+    revenue: acc.revenue + r.revenue,
+    costAmount: acc.costAmount + r.costAmount,
+    grossProfit: acc.grossProfit + r.grossProfit,
+  }), { key: '', label: '合計', count: 0, quantityKg: 0, revenue: 0, costAmount: 0, grossProfit: 0 })
+  const totalMargin = totals.revenue > 0 ? (totals.grossProfit / totals.revenue) * 100 : 0
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+        集計対象の販売案件がありません。
+      </div>
+    )
+  }
+
+  return (
+    <table className="min-w-full text-sm">
+      <thead>
+        <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+          <th className="px-3 py-3 font-medium">{groupLabel}</th>
+          <th className="px-3 py-3 text-right font-medium">件数</th>
+          <th className="px-3 py-3 text-right font-medium">数量</th>
+          <th className="px-3 py-3 text-right font-medium">売上</th>
+          <th className="px-3 py-3 text-right font-medium">原価</th>
+          <th className="px-3 py-3 text-right font-medium">粗利</th>
+          <th className="px-3 py-3 text-right font-medium">粗利率</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(row => {
+          const margin = row.revenue > 0 ? (row.grossProfit / row.revenue) * 100 : 0
+          return (
+            <tr key={row.key} className="border-b border-[#f0ebdf] text-[#173c2a]">
+              <td className="px-3 py-3 font-medium">{row.label}</td>
+              <td className="px-3 py-3 text-right">{row.count}</td>
+              <td className="px-3 py-3 text-right">{formatKg(row.quantityKg)}</td>
+              <td className="px-3 py-3 text-right">{formatCurrency(row.revenue)}</td>
+              <td className="px-3 py-3 text-right text-[#68756c]">{formatCurrency(row.costAmount)}</td>
+              <td className="px-3 py-3 text-right font-semibold text-emerald-700">{formatCurrency(row.grossProfit)}</td>
+              <td className="px-3 py-3 text-right">{margin.toFixed(1)}%</td>
+            </tr>
+          )
+        })}
+        <tr className="bg-[#faf8f1] text-[#173c2a]">
+          <td className="px-3 py-3 font-semibold">合計</td>
+          <td className="px-3 py-3 text-right font-semibold">{totals.count}</td>
+          <td className="px-3 py-3 text-right font-semibold">{formatKg(totals.quantityKg)}</td>
+          <td className="px-3 py-3 text-right font-semibold">{formatCurrency(totals.revenue)}</td>
+          <td className="px-3 py-3 text-right font-semibold">{formatCurrency(totals.costAmount)}</td>
+          <td className="px-3 py-3 text-right font-semibold text-emerald-700">{formatCurrency(totals.grossProfit)}</td>
+          <td className="px-3 py-3 text-right font-semibold">{totalMargin.toFixed(1)}%</td>
+        </tr>
+      </tbody>
+    </table>
   )
 }

@@ -13,9 +13,9 @@ import type {
 import { Package2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 
 const usageLabels: Record<SelfConsumptionUsageType, string> = {
+  ingredient: '原料',
   retail: '小売',
-  sample_free: '無料サンプル',
-  sample_paid: '有償サンプル',
+  sample: 'サンプル',
 }
 
 function formatKg(value: number): string {
@@ -161,9 +161,9 @@ function SelfConsumptionModal({
                 onChange={event => setForm(prev => ({ ...prev, usageType: event.target.value as SelfConsumptionUsageType }))}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
               >
+                <option value="ingredient">原料</option>
                 <option value="retail">小売</option>
-                <option value="sample_free">無料サンプル</option>
-                <option value="sample_paid">有償サンプル</option>
+                <option value="sample">サンプル</option>
               </select>
             </div>
           </div>
@@ -250,11 +250,11 @@ export default function SelfConsumptionPage() {
   const retailKg = filteredRecords
     .filter(record => record.usageType === 'retail')
     .reduce((sum, record) => sum + record.quantityKg, 0)
-  const freeSampleKg = filteredRecords
-    .filter(record => record.usageType === 'sample_free')
+  const sampleKg = filteredRecords
+    .filter(record => record.usageType === 'sample')
     .reduce((sum, record) => sum + record.quantityKg, 0)
-  const paidSampleKg = filteredRecords
-    .filter(record => record.usageType === 'sample_paid')
+  const ingredientKg = filteredRecords
+    .filter(record => record.usageType === 'ingredient')
     .reduce((sum, record) => sum + record.quantityKg, 0)
 
   const handleSave = async (input: SelfConsumptionRecordInput) => {
@@ -285,7 +285,7 @@ export default function SelfConsumptionPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">自社消費</h1>
-            <p className="mt-2 text-sm text-[#68756c]">小売・無料サンプル・有償サンプルなどの社内利用分を記録して在庫へ反映します。</p>
+            <p className="mt-2 text-sm text-[#68756c]">原料・小売・サンプルなどの社内利用分を記録して在庫へ反映します。</p>
           </div>
           <button
             onClick={() => {
@@ -308,9 +308,9 @@ export default function SelfConsumptionPage() {
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <KPICard title="自社消費合計" value={formatKg(totalKg)} color="amber" icon={<Package2 size={18} />} />
+          <KPICard title="原料" value={formatKg(ingredientKg)} color="violet" icon={<Package2 size={18} />} />
           <KPICard title="小売向け" value={formatKg(retailKg)} color="default" icon={<Package2 size={18} />} />
-          <KPICard title="無料サンプル" value={formatKg(freeSampleKg)} color="green" icon={<Package2 size={18} />} />
-          <KPICard title="有償サンプル" value={formatKg(paidSampleKg)} color="violet" icon={<Package2 size={18} />} />
+          <KPICard title="サンプル" value={formatKg(sampleKg)} color="green" icon={<Package2 size={18} />} />
         </div>
 
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
@@ -337,9 +337,9 @@ export default function SelfConsumptionPage() {
                 className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-auto"
               >
                 <option value="all">すべての用途</option>
+                <option value="ingredient">原料</option>
                 <option value="retail">小売</option>
-                <option value="sample_free">無料サンプル</option>
-                <option value="sample_paid">有償サンプル</option>
+                <option value="sample">サンプル</option>
               </select>
             </div>
           </div>

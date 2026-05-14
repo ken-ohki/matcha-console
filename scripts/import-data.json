@@ -1,0 +1,1104 @@
+{
+  "groups": [
+    "Signature Collection",
+    "Original Collection",
+    "Single Origin Collection",
+    "Wholesale Exclusive",
+    "Non-Matcha"
+  ],
+  "products": [
+    {
+      "group": "Signature Collection",
+      "sku": "MT-AC-BLD-26H1",
+      "name": "SHIN",
+      "teaType": "Matcha",
+      "grade": "Specialty",
+      "origins": [
+        "Aichi"
+      ],
+      "cultivars": [
+        "Saemidori",
+        "Asahi",
+        "Asatsuyu"
+      ],
+      "pluckingMethods": [
+        "Hand pick"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": null,
+      "salesNote": "Wholesale not available"
+    },
+    {
+      "group": "Signature Collection",
+      "sku": "MT-NS-BLD-26H1",
+      "name": "HAKU",
+      "teaType": "Matcha",
+      "grade": "Specialty",
+      "origins": [
+        "Nishio"
+      ],
+      "cultivars": [
+        "Saemidori",
+        "Ujihikari",
+        "Samidori"
+      ],
+      "pluckingMethods": [
+        "Hand pick"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": null,
+      "salesNote": "Wholesale not available"
+    },
+    {
+      "group": "Signature Collection",
+      "sku": "MT-AC-BLD-26H1-02",
+      "name": "KOU",
+      "teaType": "Matcha",
+      "grade": "Specialty",
+      "origins": [
+        "Aichi"
+      ],
+      "cultivars": [
+        "Saemidori",
+        "Asahi",
+        "Asatsuyu"
+      ],
+      "pluckingMethods": [
+        "Hand pick",
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": null,
+      "salesNote": "Wholesale not available"
+    },
+    {
+      "group": "Signature Collection",
+      "sku": "MT-NS-OKM-26H1",
+      "name": "SOU",
+      "teaType": "Matcha",
+      "grade": "Specialty",
+      "origins": [
+        "Nishio"
+      ],
+      "cultivars": [
+        "Okumidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": null,
+      "salesNote": "Wholesale not available"
+    },
+    {
+      "group": "Signature Collection",
+      "sku": "MT-KG-OKM-25H1",
+      "name": "SOU (2025)",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Okumidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 50.0,
+      "standardWholesalePrice": 26000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Original Collection",
+      "sku": "MT-KG-BLD-26H1",
+      "name": "RIN",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Samemidori",
+        "Okumidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 50.0,
+      "standardWholesalePrice": 26000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Original Collection",
+      "sku": "MT-KG-BLD-26H1-02",
+      "name": "REN",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Samemidori",
+        "Okumidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 15.0,
+      "standardWholesalePrice": 25000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-NS-BLD-26H1-02",
+      "name": "Nishio Ujihikari",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Nishio"
+      ],
+      "cultivars": [
+        "Ujihikari"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 60000.0,
+      "salesNote": "Planned to be restocked in September 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-NS-SAM-26H1",
+      "name": "Nishio Samidori",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Nishio"
+      ],
+      "cultivars": [
+        "Samidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 58000.0,
+      "salesNote": "Planned to be restocked in September 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-NS-SEI-26H1",
+      "name": "Nishio Seimei",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Nishio"
+      ],
+      "cultivars": [
+        "Seimei"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 58000.0,
+      "salesNote": "Planned to be restocked in September 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-YM-TYH-26H1",
+      "name": "Yame Tsuyuhikari",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tsuyuhikari"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 44000.0,
+      "salesNote": "Planned to be restocked in September 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-YM-BLD-26H1",
+      "name": "Yame Kirari31",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Kirari31"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 44000.0,
+      "salesNote": "Planned to be restocked in September 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-YM-OKY-26H1",
+      "name": "Yame Okuyutaka",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Okuyutaka"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 8.0,
+      "standardWholesalePrice": 38000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-YM-YBK-26H1",
+      "name": "Yame Yabukita",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Yabukita"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 8.0,
+      "standardWholesalePrice": 36000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-SZ-TYH-26H1",
+      "name": "Shizuoka Tsuyuhikari",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Shizuoka"
+      ],
+      "cultivars": [
+        "Tsuyuhikari"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 32000.0,
+      "salesNote": "Planned to be restocked in August 2026"
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-SZ-AST-26H1",
+      "name": "Shizuoka Asatsuyu",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Shizuoka"
+      ],
+      "cultivars": [
+        "Asatsuyu"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 8.0,
+      "standardWholesalePrice": 32000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Single Origin Collection",
+      "sku": "MT-SZ-YBK-26H1",
+      "name": "Shizuoka Yabukita",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Shizuoka"
+      ],
+      "cultivars": [
+        "Yabukita"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 8.0,
+      "standardWholesalePrice": 34000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-KG-SAE-26H1",
+      "name": "MT-CHI01",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Saemidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 50.0,
+      "standardWholesalePrice": 26000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-KG-OKM-26H1",
+      "name": "MT-CHI02",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Okumidori"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 70.0,
+      "standardWholesalePrice": 26000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-KG-BLD-26H1-03",
+      "name": "MTO-CHI01",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [
+        "JAS Organic"
+      ],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 44000.0,
+      "salesNote": "Planned to be restocked in August 2026"
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-KG-BLD-26H1-04",
+      "name": "MTO-CHI02",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [
+        "JAS Organic"
+      ],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 36000.0,
+      "salesNote": "Planned to be restocked in August 2026"
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-SZ-BLD-26H1",
+      "name": "MT-STO01",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Shizuoka"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 25000.0,
+      "salesNote": "Planned to be restocked in July 2026"
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-UJ-BLD-26H1",
+      "name": "MT-YMCK01",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Uji"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 70000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-UJ-BLD-26H1-02",
+      "name": "MT-YMCK02",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Uji"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 60000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-UJ-BLD-26H1-03",
+      "name": "MT-YMCK03",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Uji"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 50000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-UJ-BLD-26H1-04",
+      "name": "MT-YMCK04",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Uji"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 40000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-UJ-BLD-26H1-05",
+      "name": "MT-YMCK05",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Uji"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 35000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-YM-BLD-26H1-02",
+      "name": "MT-YMCY01",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 50000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-YM-BLD-26H1-03",
+      "name": "MT-YMCY02",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 45000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-YM-BLD-26H1-04",
+      "name": "MT-YMCY03",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 40000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-YM-BLD-26H1-05",
+      "name": "MT-YMCY04",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 35000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-YM-BLD-26H1-06",
+      "name": "MT-YMCY05",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Yame"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": 0.0,
+      "standardWholesalePrice": 30000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1",
+      "name": "MT-YMC03",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 30000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1-02",
+      "name": "MT-YMC04",
+      "teaType": "Matcha",
+      "grade": "Premium",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 26000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1-03",
+      "name": "MT-YMC05",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 22000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-STD",
+      "name": "MT-YMC07",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "Blend"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 16000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-STD-02",
+      "name": "MT-YMC09",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "Blend"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 12000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-STD-03",
+      "name": "MT-YMC10",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "Blend"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 10000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1-04",
+      "name": "MT-YMC03N",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 34000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1-05",
+      "name": "MT-YMC04N",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 28000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-26H1-06",
+      "name": "MT-YMC05N",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 20000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-STD-04",
+      "name": "MT-YMC07N",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "Blend"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 15000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Wholesale Exclusive",
+      "sku": "MT-BLD-BLD-STD-05",
+      "name": "MT-YMC08N",
+      "teaType": "Matcha",
+      "grade": "Barista",
+      "origins": [
+        "Blend"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "Blend"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 11000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Non-Matcha",
+      "sku": "GY-MI-BLD-26H1-P",
+      "name": "GYP-MRNK",
+      "teaType": "Gyokuro Powder",
+      "grade": "Premium",
+      "origins": [
+        "Mie"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 24000.0,
+      "salesNote": null
+    },
+    {
+      "group": "Non-Matcha",
+      "sku": "HJ-KG-BLD-26H1-P",
+      "name": "HJP-DR01",
+      "teaType": "Hojicha Powder",
+      "grade": "Premium",
+      "origins": [
+        "Kagoshima"
+      ],
+      "cultivars": [
+        "Tea Master Blend"
+      ],
+      "pluckingMethods": [
+        "Machine"
+      ],
+      "harvestSeasons": [
+        "1st flush"
+      ],
+      "shadingMethods": [],
+      "certifications": [],
+      "currentStockKg": null,
+      "standardWholesalePrice": 10000.0,
+      "salesNote": null
+    }
+  ]
+}

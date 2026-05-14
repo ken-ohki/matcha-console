@@ -2,10 +2,15 @@ import type {
   AuthUser,
   InventoryGroup,
   InventoryGroupInput,
+  MasterEntry,
+  MasterEntryInput,
   Product,
   ProductInput,
   ProductWithInventory,
   Buyer,
+  BuyerDetailsInput,
+  EcSaleRecord,
+  EcSaleRecordInput,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
@@ -29,9 +34,17 @@ export interface IInventoryService {
 export interface ISalesService {
   getSaleRecords(): Promise<SaleRecord[]>
   getBuyers(): Promise<Buyer[]>
+  updateBuyer(id: string, input: BuyerDetailsInput): Promise<Buyer>
   createSaleRecord(input: SaleRecordInput): Promise<SaleRecord>
   updateSaleRecord(id: string, input: Partial<SaleRecordInput>): Promise<SaleRecord>
   deleteSaleRecord(id: string): Promise<void>
+}
+
+export interface IEcSalesService {
+  getEcSaleRecords(): Promise<EcSaleRecord[]>
+  createEcSaleRecord(input: EcSaleRecordInput): Promise<EcSaleRecord>
+  updateEcSaleRecord(id: string, input: Partial<EcSaleRecordInput>): Promise<EcSaleRecord>
+  deleteEcSaleRecord(id: string): Promise<void>
 }
 
 export interface ISelfConsumptionService {
@@ -46,6 +59,13 @@ export interface ISettingsService {
   updateSettings(input: Partial<Settings>): Promise<Settings>
 }
 
+export interface IMastersService {
+  listMasters(): Promise<MasterEntry[]>
+  createMaster(input: MasterEntryInput): Promise<MasterEntry>
+  updateMaster(id: string, input: Partial<MasterEntryInput>): Promise<MasterEntry>
+  deleteMaster(id: string): Promise<void>
+}
+
 export interface IAuthService {
   login(email: string, password: string): Promise<AuthUser>
   logout(): Promise<void>
@@ -57,7 +77,9 @@ export interface IServices {
   inventory: IInventoryService
   sales: ISalesService
   selfConsumption: ISelfConsumptionService
+  ecSales: IEcSalesService
   settings: ISettingsService
+  masters: IMastersService
   auth: IAuthService
 }
 

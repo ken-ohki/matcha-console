@@ -41,7 +41,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">Tea Ops</p>
-              <h1 className="text-base font-semibold text-[#173c2a]">ChaFlow</h1>
+              <h1 className="text-base font-semibold text-[#173c2a]">Matcha Console</h1>
             </div>
             <button
               type="button"

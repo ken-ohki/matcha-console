@@ -3,7 +3,7 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 
 export const metadata: Metadata = {
-  title: 'ChaFlow',
+  title: 'Matcha Console',
   description: 'お茶の在庫管理と販売管理を行うアプリケーション',
 }
 

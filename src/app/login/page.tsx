@@ -38,7 +38,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#174c33] rounded-2xl mb-4 shadow-lg">
             <Lock size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">ChaFlow</h1>
+          <h1 className="text-3xl font-bold text-white">Matcha Console</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">

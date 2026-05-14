@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -22,9 +23,13 @@ import type {
   ArrivalRecord,
   AuthUser,
   Buyer,
+  EcSaleRecord,
+  EcSaleRecordInput,
   InventoryCheckRecord,
   InventoryGroup,
   InventoryGroupInput,
+  MasterEntry,
+  MasterType,
   Product,
   ProductInput,
   ProductWithInventory,
@@ -38,7 +43,9 @@ import type {
 } from '@/types'
 import type {
   IAuthService,
+  IEcSalesService,
   IInventoryService,
+  IMastersService,
   ISelfConsumptionService,
   ISalesService,
   ISettingsService,
@@ -52,8 +59,10 @@ const COLLECTIONS = {
   sales: 'sales',
   buyers: 'buyers',
   selfConsumptions: 'self_consumptions',
+  ecSales: 'ec_sales',
   settings: 'settings',
   users: 'users',
+  masters: 'masters',
 } as const
 
 function toDate(value: unknown): Date {
@@ -160,6 +169,8 @@ function buildProductPayload(input: ProductInput) {
     purchaseUnitPrice: input.purchaseUnitPrice,
     adminNote: input.adminNote?.trim() || undefined,
     salesNote: input.salesNote?.trim() || undefined,
+    showInCatalog: input.showInCatalog ?? true,
+    inquireToOrder: input.inquireToOrder ?? false,
   })
 }
 
@@ -171,7 +182,7 @@ function getStockStatus(currentKg: number, initialKg: number, alertRatio: number
 
 function getDefaultSettings(): Settings {
   return {
-    appName: 'ChaFlow',
+    appName: 'Matcha Console',
     currency: 'JPY',
     stockAlertRatio: 0.2,
   }
@@ -225,6 +236,8 @@ function mapProduct(id: string, data: DocumentData): Product {
     salesNote: data.salesNote ? String(data.salesNote) : undefined,
     sortOrder: Number(data.sortOrder ?? 0),
     isActive: data.isActive !== false,
+    showInCatalog: data.showInCatalog !== false,
+    inquireToOrder: data.inquireToOrder === true,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -245,6 +258,12 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
   return {
     id,
     status: data.status,
+    paymentStatus: (data.paymentStatus === 'invoiced' || data.paymentStatus === 'paid')
+      ? data.paymentStatus
+      : 'uninvoiced',
+    shippingStatus: (data.shippingStatus === 'producing' || data.shippingStatus === 'shipped')
+      ? data.shippingStatus
+      : 'ordering',
     buyerName: String(data.buyerName ?? ''),
     productId: String(data.productId ?? ''),
     productSku: String(data.productSku ?? ''),
@@ -272,6 +291,12 @@ function mapBuyer(id: string, data: DocumentData): Buyer {
     country: data.country ? String(data.country) : undefined,
     terms: data.terms ? String(data.terms) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
+    email: data.email ? String(data.email) : undefined,
+    website: data.website ? String(data.website) : undefined,
+    phone: data.phone ? String(data.phone) : undefined,
+    shippingAddress: data.shippingAddress ? String(data.shippingAddress) : undefined,
+    shippingPostalCode: data.shippingPostalCode ? String(data.shippingPostalCode) : undefined,
+    contactPersonName: data.contactPersonName ? String(data.contactPersonName) : undefined,
     saleCount: Number(data.saleCount ?? 0),
     lastSoldAt: data.lastSoldAt ? toDate(data.lastSoldAt) : undefined,
     createdAt: toDate(data.createdAt),
@@ -280,7 +305,8 @@ function mapBuyer(id: string, data: DocumentData): Buyer {
 }
 
 function normalizeSelfConsumptionUsageType(value: unknown): SelfConsumptionUsageType {
-  if (value === 'sample_free' || value === 'sample_paid') return value
+  if (value === 'sample' || value === 'sample_free' || value === 'sample_paid') return 'sample'
+  if (value === 'ingredient') return 'ingredient'
   return 'retail'
 }
 
@@ -294,6 +320,39 @@ function mapSelfConsumption(id: string, data: DocumentData): SelfConsumptionReco
     usedOn: String(data.usedOn ?? ''),
     usageType: normalizeSelfConsumptionUsageType(data.usageType),
     notes: data.notes ? String(data.notes) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
+function mapEcSale(id: string, data: DocumentData): EcSaleRecord {
+  const quantityKg = Number(data.quantityKg ?? 0)
+  const unitPrice = data.unitPrice != null ? Number(data.unitPrice) : undefined
+  return {
+    id,
+    productId: String(data.productId ?? ''),
+    productSku: String(data.productSku ?? ''),
+    productName: String(data.productName ?? ''),
+    quantityKg,
+    soldOn: String(data.soldOn ?? ''),
+    orderNumber: data.orderNumber ? String(data.orderNumber) : undefined,
+    unitPrice,
+    revenue: unitPrice != null ? quantityKg * unitPrice : data.revenue != null ? Number(data.revenue) : undefined,
+    channel: data.channel ? String(data.channel) : undefined,
+    notes: data.notes ? String(data.notes) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
+function mapMaster(id: string, data: DocumentData): MasterEntry {
+  return {
+    id,
+    type: String(data.type ?? '') as MasterType,
+    englishName: String(data.englishName ?? ''),
+    japaneseName: String(data.japaneseName ?? ''),
+    sortOrder: Number(data.sortOrder ?? 0),
+    isActive: data.isActive !== false,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -386,6 +445,12 @@ async function getAllSelfConsumptions(): Promise<SelfConsumptionRecord[]> {
   return snap.docs.map(document => mapSelfConsumption(document.id, document.data()))
 }
 
+async function getAllEcSales(): Promise<EcSaleRecord[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.ecSales))
+  return snap.docs.map(document => mapEcSale(document.id, document.data()))
+}
+
 async function getSettings(): Promise<Settings> {
   const db = getFirebaseDb()
   const snap = await getDoc(doc(db, COLLECTIONS.settings, 'main'))
@@ -400,6 +465,7 @@ function computeInventory(
   products: Product[],
   sales: SaleRecord[],
   selfConsumptions: SelfConsumptionRecord[],
+  ecSales: EcSaleRecord[],
   settings: Settings,
 ): ProductWithInventory[] {
   const reservedByProduct = sales.reduce<Record<string, number>>((acc, sale) => {
@@ -411,6 +477,10 @@ function computeInventory(
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
+  const ecSoldByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
+    acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
+    return acc
+  }, {})
 
   return products
     .filter(product => product.isActive)
@@ -419,12 +489,14 @@ function computeInventory(
       const inventoryAdjustmentKg = deriveInventoryAdjustmentKg(product.inventoryChecks)
       const salesAllocatedKg = reservedByProduct[product.id] ?? 0
       const selfConsumedKg = selfConsumedByProduct[product.id] ?? 0
+      const ecSoldKg = ecSoldByProduct[product.id] ?? 0
       const effectiveInitialKg = product.initialStockKg + inventoryAdjustmentKg
-      const currentStockKg = effectiveInitialKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg
+      const currentStockKg = effectiveInitialKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg - ecSoldKg
       return {
         ...product,
         salesAllocatedKg,
         selfConsumedKg,
+        ecSoldKg,
         inventoryAdjustmentKg,
         latestInventoryCheck: getLatestInventoryCheck(product.inventoryChecks),
         currentStockKg,
@@ -437,10 +509,11 @@ async function assertSufficientStock(
   nextSale: SaleRecordInput,
   options?: { excludeSaleId?: string },
 ): Promise<{ product: Product; currentProductSales: SaleRecord[] }> {
-  const [products, sales, selfConsumptions] = await Promise.all([
+  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
     getAllProducts(),
     getAllSales(),
     getAllSelfConsumptions(),
+    getAllEcSales(),
   ])
   const product = products.find(item => item.id === nextSale.productId && item.isActive)
   if (!product) throw new Error('商品が見つかりません')
@@ -454,11 +527,15 @@ async function assertSufficientStock(
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === nextSale.productId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
+  const ecSoldKg = ecSales
+    .filter(record => record.productId === nextSale.productId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
     - product.haizUsedKg
     - reservedKg
     - selfConsumedKg
+    - ecSoldKg
 
   if (isReservedSale(nextSale.status) && nextSale.quantityKg > availableKg) {
     throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
@@ -471,10 +548,11 @@ async function assertSufficientSelfConsumptionStock(
   input: SelfConsumptionRecordInput,
   options?: { excludeSelfConsumptionId?: string },
 ): Promise<Product> {
-  const [products, sales, selfConsumptions] = await Promise.all([
+  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
     getAllProducts(),
     getAllSales(),
     getAllSelfConsumptions(),
+    getAllEcSales(),
   ])
   const product = products.find(item => item.id === input.productId && item.isActive)
   if (!product) throw new Error('商品が見つかりません')
@@ -485,11 +563,51 @@ async function assertSufficientSelfConsumptionStock(
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
+  const ecSoldKg = ecSales
+    .filter(record => record.productId === input.productId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
     - product.haizUsedKg
     - reservedKg
     - selfConsumedKg
+    - ecSoldKg
+
+  if (input.quantityKg > availableKg) {
+    throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
+  }
+
+  return product
+}
+
+async function assertSufficientEcSaleStock(
+  input: EcSaleRecordInput,
+  options?: { excludeEcSaleId?: string },
+): Promise<Product> {
+  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
+    getAllProducts(),
+    getAllSales(),
+    getAllSelfConsumptions(),
+    getAllEcSales(),
+  ])
+  const product = products.find(item => item.id === input.productId && item.isActive)
+  if (!product) throw new Error('商品が見つかりません')
+
+  const reservedKg = sales
+    .filter(sale => sale.productId === input.productId && isReservedSale(sale.status))
+    .reduce((sum, sale) => sum + sale.quantityKg, 0)
+  const selfConsumedKg = selfConsumptions
+    .filter(record => record.productId === input.productId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
+  const ecSoldKg = ecSales
+    .filter(record => record.productId === input.productId && record.id !== options?.excludeEcSaleId)
+    .reduce((sum, record) => sum + record.quantityKg, 0)
+  const availableKg = product.initialStockKg
+    + deriveInventoryAdjustmentKg(product.inventoryChecks)
+    - product.haizUsedKg
+    - reservedKg
+    - selfConsumedKg
+    - ecSoldKg
 
   if (input.quantityKg > availableKg) {
     throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
@@ -577,13 +695,14 @@ export function createFirebaseServices(): IServices {
     },
 
     async getProductsWithInventory() {
-      const [products, sales, selfConsumptions, settings] = await Promise.all([
+      const [products, sales, selfConsumptions, ecSales, settings] = await Promise.all([
         getAllProducts(),
         getAllSales(),
         getAllSelfConsumptions(),
+        getAllEcSales(),
         getSettings(),
       ])
-      return computeInventory(products, sales, selfConsumptions, settings)
+      return computeInventory(products, sales, selfConsumptions, ecSales, settings)
     },
 
     async createProduct(input) {
@@ -644,6 +763,8 @@ export function createFirebaseServices(): IServices {
         purchaseUnitPrice: input.purchaseUnitPrice ?? current.purchaseUnitPrice,
         adminNote: input.adminNote ?? current.adminNote,
         salesNote: input.salesNote ?? current.salesNote,
+        showInCatalog: input.showInCatalog ?? current.showInCatalog,
+        inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
       }
 
       const payload = {
@@ -751,6 +872,33 @@ export function createFirebaseServices(): IServices {
       })
     },
 
+    async updateBuyer(id, input) {
+      const ref = doc(db, COLLECTIONS.buyers, id)
+      const cleaned: Record<string, unknown> = {}
+      const optionalKeys = [
+        'email',
+        'website',
+        'phone',
+        'shippingAddress',
+        'shippingPostalCode',
+        'contactPersonName',
+        'notes',
+        'country',
+        'terms',
+      ] as const
+      for (const key of optionalKeys) {
+        const value = input[key]
+        if (value === undefined) continue
+        const trimmed = typeof value === 'string' ? value.trim() : value
+        cleaned[key] = trimmed ? trimmed : deleteField()
+      }
+      cleaned.updatedAt = serverTimestamp()
+      await updateDoc(ref, cleaned)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('販売先が見つかりません')
+      return mapBuyer(snap.id, snap.data() ?? {})
+    },
+
     async createSaleRecord(input) {
       const { product } = await assertSufficientStock(input)
 
@@ -797,6 +945,8 @@ export function createFirebaseServices(): IServices {
 
       const merged: SaleRecordInput = {
         status: input.status ?? current.status,
+        paymentStatus: input.paymentStatus ?? current.paymentStatus,
+        shippingStatus: input.shippingStatus ?? current.shippingStatus,
         buyerName: input.buyerName ?? current.buyerName,
         productId: input.productId ?? current.productId,
         quantityKg: input.quantityKg ?? current.quantityKg,
@@ -926,6 +1076,145 @@ export function createFirebaseServices(): IServices {
     },
   }
 
+  const ecSalesService: IEcSalesService = {
+    async getEcSaleRecords() {
+      const records = await getAllEcSales()
+      return records.sort((a, b) => {
+        const dateDiff = b.soldOn.localeCompare(a.soldOn)
+        if (dateDiff !== 0) return dateDiff
+        return b.updatedAt.getTime() - a.updatedAt.getTime()
+      })
+    },
+
+    async createEcSaleRecord(input) {
+      const product = await assertSufficientEcSaleStock(input)
+      const revenue = input.unitPrice != null ? input.quantityKg * input.unitPrice : undefined
+      const payload = sanitizeRecord({
+        ...input,
+        soldOn: input.soldOn.trim(),
+        orderNumber: input.orderNumber?.trim() || undefined,
+        channel: input.channel?.trim() || undefined,
+        notes: input.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        revenue,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      const ref = await addDoc(collection(db, COLLECTIONS.ecSales), payload)
+
+      return {
+        id: ref.id,
+        productId: input.productId,
+        quantityKg: input.quantityKg,
+        soldOn: input.soldOn.trim(),
+        orderNumber: input.orderNumber?.trim() || undefined,
+        unitPrice: input.unitPrice,
+        channel: input.channel?.trim() || undefined,
+        notes: input.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        revenue,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    },
+
+    async updateEcSaleRecord(id, input) {
+      const snap = await getDoc(doc(db, COLLECTIONS.ecSales, id))
+      if (!snap.exists()) throw new Error('EC販売の記録が見つかりません')
+      const current = mapEcSale(snap.id, snap.data() ?? {})
+
+      const merged: EcSaleRecordInput = {
+        productId: input.productId ?? current.productId,
+        quantityKg: input.quantityKg ?? current.quantityKg,
+        soldOn: input.soldOn ?? current.soldOn,
+        orderNumber: input.orderNumber ?? current.orderNumber,
+        unitPrice: input.unitPrice ?? current.unitPrice,
+        channel: input.channel ?? current.channel,
+        notes: input.notes ?? current.notes,
+      }
+
+      const product = await assertSufficientEcSaleStock(merged, { excludeEcSaleId: id })
+      const revenue = merged.unitPrice != null ? merged.quantityKg * merged.unitPrice : undefined
+
+      await updateDoc(doc(db, COLLECTIONS.ecSales, id), sanitizeRecord({
+        ...merged,
+        soldOn: merged.soldOn.trim(),
+        orderNumber: merged.orderNumber?.trim() || undefined,
+        channel: merged.channel?.trim() || undefined,
+        notes: merged.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        revenue,
+        updatedAt: serverTimestamp(),
+      }))
+
+      return {
+        id,
+        ...merged,
+        soldOn: merged.soldOn.trim(),
+        orderNumber: merged.orderNumber?.trim() || undefined,
+        channel: merged.channel?.trim() || undefined,
+        notes: merged.notes?.trim() || undefined,
+        productSku: product.sku,
+        productName: product.name,
+        revenue,
+        createdAt: current.createdAt,
+        updatedAt: new Date(),
+      }
+    },
+
+    async deleteEcSaleRecord(id) {
+      await deleteDoc(doc(db, COLLECTIONS.ecSales, id))
+    },
+  }
+
+  const mastersService: IMastersService = {
+    async listMasters() {
+      const snap = await getDocs(collection(db, COLLECTIONS.masters))
+      return snap.docs
+        .map(d => mapMaster(d.id, d.data()))
+        .filter(m => m.isActive)
+        .sort((a, b) => {
+          if (a.type !== b.type) return a.type.localeCompare(b.type)
+          return a.sortOrder - b.sortOrder
+        })
+    },
+
+    async createMaster(input) {
+      const ref = await addDoc(collection(db, COLLECTIONS.masters), {
+        type: input.type,
+        englishName: input.englishName.trim(),
+        japaneseName: input.japaneseName.trim(),
+        sortOrder: input.sortOrder ?? 0,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      const snap = await getDoc(ref)
+      return mapMaster(ref.id, snap.data() ?? {})
+    },
+
+    async updateMaster(id, input) {
+      const ref = doc(db, COLLECTIONS.masters, id)
+      const cleaned: Record<string, unknown> = {}
+      if (input.type !== undefined) cleaned.type = input.type
+      if (input.englishName !== undefined) cleaned.englishName = input.englishName.trim()
+      if (input.japaneseName !== undefined) cleaned.japaneseName = input.japaneseName.trim()
+      if (input.sortOrder !== undefined) cleaned.sortOrder = input.sortOrder
+      cleaned.updatedAt = serverTimestamp()
+      await updateDoc(ref, cleaned)
+      const snap = await getDoc(ref)
+      return mapMaster(snap.id, snap.data() ?? {})
+    },
+
+    async deleteMaster(id) {
+      await deleteDoc(doc(db, COLLECTIONS.masters, id))
+    },
+  }
+
   const settingsService: ISettingsService = {
     async getSettings() {
       return getSettings()
@@ -974,7 +1263,9 @@ export function createFirebaseServices(): IServices {
     inventory: inventoryService,
     sales: salesService,
     selfConsumption: selfConsumptionService,
+    ecSales: ecSalesService,
     settings: settingsService,
+    masters: mastersService,
     auth: authService,
   }
 }

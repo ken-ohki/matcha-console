@@ -4,27 +4,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { StockStatusBadge } from '@/components/ui/StatusBadge'
 import { useAuth } from '@/contexts/AuthContext'
-import {
-  CERTIFICATION_OPTIONS,
-  CULTIVAR_OPTIONS,
-  GRADE_OPTIONS,
-  HARVEST_SEASON_OPTIONS,
-  PLUCKING_METHOD_OPTIONS,
-  SHADING_METHOD_OPTIONS,
-  TEA_TYPE_OPTIONS,
-  formatCultivars,
-  formatOptionList,
-} from '@/lib/product-master'
+import { formatCultivars, formatOptionList } from '@/lib/product-master'
+import { optionsForType, translateValues, type MasterOption } from '@/lib/masters'
 import { getServices } from '@/lib/services'
 import type {
   ArrivalRecord,
   InventoryCheckRecord,
   InventoryGroup,
   InventoryGroupInput,
+  MasterEntry,
   ProductInput,
   ProductWithInventory,
 } from '@/types'
-import { GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Copy, Download, GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 function formatCurrency(value?: number): string {
   if (value == null) return '-'
@@ -101,6 +94,8 @@ function buildProductForm(
     purchaseUnitPrice: initial?.purchaseUnitPrice,
     adminNote: initial?.adminNote ?? '',
     salesNote: initial?.salesNote ?? '',
+    showInCatalog: initial?.showInCatalog ?? true,
+    inquireToOrder: initial?.inquireToOrder ?? false,
   }
 }
 
@@ -191,18 +186,21 @@ function MultiSelectChecklist({
   hint,
 }: {
   label: string
-  options: readonly string[]
+  options: MasterOption[]
   value: string[]
   onChange: (next: string[]) => void
   hint?: string
 }) {
-  const toggle = (option: string) => {
-    if (value.includes(option)) {
-      onChange(value.filter(item => item !== option))
+  const toggle = (optionValue: string) => {
+    if (value.includes(optionValue)) {
+      onChange(value.filter(item => item !== optionValue))
       return
     }
-    onChange([...value, option])
+    onChange([...value, optionValue])
   }
+
+  // Show selected values that are not in the master list as a notice
+  const orphanValues = value.filter(v => !options.some(o => o.value === v))
 
   return (
     <div>
@@ -210,23 +208,29 @@ function MultiSelectChecklist({
       {hint && <p className="mb-2 text-xs text-[#68756c]">{hint}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map(option => {
-          const checked = value.includes(option)
+          const checked = value.includes(option.value)
           return (
             <button
-              key={option}
+              key={option.value}
               type="button"
-              onClick={() => toggle(option)}
+              onClick={() => toggle(option.value)}
               className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
                 checked
                   ? 'border-[#174c33] bg-[#eef3eb] text-[#174c33]'
                   : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {option}
+              {option.label}
+              <span className="ml-1 text-[10px] text-gray-400">{option.value}</span>
             </button>
           )
         })}
       </div>
+      {orphanValues.length > 0 && (
+        <p className="mt-2 text-[11px] text-amber-700">
+          マスター未登録: {orphanValues.join(', ')}（設定画面で追加できます）
+        </p>
+      )}
     </div>
   )
 }
@@ -236,6 +240,7 @@ function ProductModal({
   initial,
   groups,
   defaultGroupId,
+  masters,
   onClose,
   onSave,
 }: {
@@ -243,6 +248,7 @@ function ProductModal({
   initial?: Partial<ProductWithInventory> & { id?: string }
   groups: InventoryGroup[]
   defaultGroupId: string
+  masters: MasterEntry[]
   onClose: () => void
   onSave: (input: ProductInput) => Promise<void>
 }) {
@@ -253,6 +259,14 @@ function ProductModal({
   const [form, setForm] = useState<ProductInput>(() => buildProductForm(initial, defaultGroupId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const teaTypeOptions = useMemo(() => optionsForType(masters, 'tea_type'), [masters])
+  const gradeOptions = useMemo(() => optionsForType(masters, 'grade'), [masters])
+  const originOptions = useMemo(() => optionsForType(masters, 'origin'), [masters])
+  const cultivarOptions = useMemo(() => optionsForType(masters, 'cultivar'), [masters])
+  const pluckingOptions = useMemo(() => optionsForType(masters, 'plucking'), [masters])
+  const harvestOptions = useMemo(() => optionsForType(masters, 'harvest'), [masters])
+  const shadingOptions = useMemo(() => optionsForType(masters, 'shading'), [masters])
+  const certificationOptions = useMemo(() => optionsForType(masters, 'certification'), [masters])
   const totalArrivalKg = useMemo(() => getArrivalRecordsTotal(form.arrivalRecords), [form.arrivalRecords])
   const totalInventoryAdjustmentKg = useMemo(() => getInventoryAdjustmentTotal(form.inventoryChecks), [form.inventoryChecks])
   const salesAllocatedKg = initial?.salesAllocatedKg ?? 0
@@ -334,6 +348,8 @@ function ProductModal({
         initialStockKg: totalArrivalKg,
         adminNote: form.adminNote?.trim() || undefined,
         salesNote: form.salesNote?.trim() || undefined,
+        showInCatalog: form.showInCatalog,
+        inquireToOrder: form.inquireToOrder,
       })
       onClose()
     } catch (err) {
@@ -373,10 +389,9 @@ function ProductModal({
                 <input
                   type="text"
                   required
-                  disabled={Boolean(initial?.id)}
                   value={form.sku}
                   onChange={event => setForm(prev => ({ ...prev, sku: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 />
               </div>
               <div>
@@ -644,9 +659,12 @@ function ProductModal({
                   className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 >
                   <option value="">未設定</option>
-                  {TEA_TYPE_OPTIONS.map(option => (
-                    <option key={option} value={option}>{option}</option>
+                  {teaTypeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}（{option.value}）</option>
                   ))}
+                  {form.teaType && !teaTypeOptions.some(o => o.value === form.teaType) && (
+                    <option value={form.teaType}>{form.teaType}（未登録）</option>
+                  )}
                 </select>
               </div>
               <div>
@@ -657,49 +675,52 @@ function ProductModal({
                   className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 >
                   <option value="">未設定</option>
-                  {GRADE_OPTIONS.map(option => (
-                    <option key={option} value={option}>{option}</option>
+                  {gradeOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}（{option.value}）</option>
                   ))}
+                  {form.grade && !gradeOptions.some(o => o.value === form.grade) && (
+                    <option value={form.grade}>{form.grade}（未登録）</option>
+                  )}
                 </select>
               </div>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <TagInput
+              <MultiSelectChecklist
                 label="産地"
+                options={originOptions}
                 value={form.origins}
                 onChange={origins => setForm(prev => ({ ...prev, origins }))}
-                placeholder="例: 京都府宇治市, 静岡県藤枝市"
-                hint="Enter またはカンマで追加"
+                hint="DBには英語名が保存されます。"
               />
               <MultiSelectChecklist
                 label="品種"
-                options={CULTIVAR_OPTIONS}
+                options={cultivarOptions}
                 value={form.cultivars}
                 onChange={cultivars => setForm(prev => ({ ...prev, cultivars }))}
                 hint="未選択の場合は一覧上で「ブレンド」と表示します。"
               />
               <MultiSelectChecklist
                 label="摘採方法"
-                options={PLUCKING_METHOD_OPTIONS}
+                options={pluckingOptions}
                 value={form.pluckingMethods}
                 onChange={pluckingMethods => setForm(prev => ({ ...prev, pluckingMethods }))}
               />
               <MultiSelectChecklist
                 label="摘採時期"
-                options={HARVEST_SEASON_OPTIONS}
+                options={harvestOptions}
                 value={form.harvestSeasons}
                 onChange={harvestSeasons => setForm(prev => ({ ...prev, harvestSeasons }))}
               />
               <MultiSelectChecklist
                 label="被覆方法"
-                options={SHADING_METHOD_OPTIONS}
+                options={shadingOptions}
                 value={form.shadingMethods}
                 onChange={shadingMethods => setForm(prev => ({ ...prev, shadingMethods }))}
               />
               <MultiSelectChecklist
                 label="認証"
-                options={CERTIFICATION_OPTIONS}
+                options={certificationOptions}
                 value={form.certifications}
                 onChange={certifications => setForm(prev => ({ ...prev, certifications }))}
               />
@@ -752,6 +773,50 @@ function ProductModal({
                   className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 />
               </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700">カタログに表示</p>
+                <p className="text-xs text-gray-500">オフにすると公開カタログから除外されます</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.showInCatalog ?? true}
+                onClick={() => setForm(prev => ({ ...prev, showInCatalog: !(prev.showInCatalog ?? true) }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  (form.showInCatalog ?? true) ? 'bg-[#174c33]' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    (form.showInCatalog ?? true) ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700">問い合わせを有効化</p>
+                <p className="text-xs text-gray-500">入荷予定品・受注生産品に使用。カタログで在庫が「ASK」と表示されます</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.inquireToOrder ?? false}
+                onClick={() => setForm(prev => ({ ...prev, inquireToOrder: !(prev.inquireToOrder ?? false) }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  (form.inquireToOrder ?? false) ? 'bg-amber-500' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    (form.inquireToOrder ?? false) ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
             </div>
           </div>
 
@@ -868,11 +933,35 @@ function GroupModal({
 export default function InventoryPage() {
   const [groups, setGroups] = useState<InventoryGroup[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
+  const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeGroupId, setActiveGroupId] = useState('')
+  const [activeGroupId, setActiveGroupId] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithInventory | null>(null)
+  const [prefillProduct, setPrefillProduct] = useState<Partial<ProductWithInventory> | null>(null)
+
+  const handleDuplicateProduct = (product: ProductWithInventory) => {
+    setEditingProduct(null)
+    setPrefillProduct({
+      ...product,
+      id: undefined,
+      sku: `${product.sku}-COPY`,
+      name: `${product.name} (コピー)`,
+      arrivalRecords: [],
+      inventoryChecks: [],
+      arrivalDate: '',
+      initialStockKg: 0,
+      haizUsedKg: 0,
+      salesAllocatedKg: 0,
+      selfConsumedKg: 0,
+      inventoryAdjustmentKg: 0,
+      currentStockKg: 0,
+      latestInventoryCheck: undefined,
+      isActive: true,
+    })
+    setModalOpen(true)
+  }
   const [groupModalOpen, setGroupModalOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<InventoryGroup | null>(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
@@ -886,18 +975,21 @@ export default function InventoryPage() {
   const load = async (preferredActiveGroupId?: string) => {
     setLoading(true)
     const services = await getServices()
-    const [nextGroups, nextProducts] = await Promise.all([
+    const [nextGroups, nextProducts, nextMasters] = await Promise.all([
       services.inventory.getInventoryGroups(),
       services.inventory.getProductsWithInventory(),
+      services.masters.listMasters(),
     ])
     setGroups(nextGroups)
     setProducts(nextProducts)
+    setMasters(nextMasters)
     setActiveGroupId(prev => {
       if (preferredActiveGroupId && nextGroups.some(group => group.id === preferredActiveGroupId)) {
         return preferredActiveGroupId
       }
+      if (prev === 'all') return 'all'
       if (prev && nextGroups.some(group => group.id === prev)) return prev
-      return nextGroups[0]?.id ?? ''
+      return 'all'
     })
     setLoading(false)
   }
@@ -906,11 +998,20 @@ export default function InventoryPage() {
     void load()
   }, [])
 
-  const groupProducts = useMemo(() => (
-    products
+  const groupProducts = useMemo(() => {
+    if (activeGroupId === 'all') {
+      const groupOrder = new Map(groups.map((group, index) => [group.id, index]))
+      return [...products].sort((a, b) => {
+        const ga = groupOrder.get(a.inventoryGroupId) ?? Number.MAX_SAFE_INTEGER
+        const gb = groupOrder.get(b.inventoryGroupId) ?? Number.MAX_SAFE_INTEGER
+        if (ga !== gb) return ga - gb
+        return a.sortOrder - b.sortOrder
+      })
+    }
+    return products
       .filter(product => product.inventoryGroupId === activeGroupId)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-  ), [products, activeGroupId])
+  }, [products, activeGroupId, groups])
 
   const filtered = useMemo(() => {
     if (!search) return groupProducts
@@ -939,7 +1040,63 @@ export default function InventoryPage() {
   const totalCurrentStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.currentStockKg, 0), [groupProducts])
   const totalAllocatedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.salesAllocatedKg, 0), [groupProducts])
   const totalSelfConsumedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.selfConsumedKg, 0), [groupProducts])
-  const isDraggable = !search && user?.role === 'admin'
+  const isDraggable = !search && user?.role === 'admin' && activeGroupId !== 'all'
+
+  const handleExportExcel = () => {
+    const groupName = (id: string) => groups.find(g => g.id === id)?.name ?? ''
+    const ja = (type: Parameters<typeof translateValues>[1], values: string[] | undefined) =>
+      translateValues(masters, type, values).join('、')
+    const jaOne = (type: Parameters<typeof translateValues>[1], value?: string) =>
+      value ? translateValues(masters, type, [value])[0] : ''
+
+    const rows = filtered.map(product => {
+      const wholesale = product.standardWholesalePrice ?? null
+      const cost = product.purchaseUnitPrice ?? null
+      const margin = wholesale != null && cost != null ? wholesale - cost : null
+      const marginRate = wholesale != null && cost != null && wholesale > 0
+        ? Math.round(((wholesale - cost) / wholesale) * 1000) / 10
+        : null
+      return {
+        SKU: product.sku,
+        '商品名': product.name,
+        '仕入れ商品名': product.purchaseProductName ?? '',
+        'グループ': groupName(product.inventoryGroupId),
+        '茶種': jaOne('tea_type', product.teaType),
+        'グレード': jaOne('grade', product.grade),
+        '産地': ja('origin', product.origins),
+        '品種': ja('cultivar', product.cultivars),
+        '摘採方法': ja('plucking', product.pluckingMethods),
+        '摘採時期': ja('harvest', product.harvestSeasons),
+        '被覆方法': ja('shading', product.shadingMethods),
+        '認証': ja('certification', product.certifications),
+        '仕入先': product.supplier ?? '',
+        '仕入単価 (JPY/kg)': cost,
+        '標準卸売単価 (JPY/kg)': wholesale,
+        '粗利 (JPY/kg)': margin,
+        '粗利率 (%)': marginRate,
+        '備考（管理）': product.adminNote ?? '',
+        '備考（販売）': product.salesNote ?? '',
+        'カタログ表示': product.showInCatalog === false ? '非表示' : '表示',
+        '問い合わせ (ASK)': product.inquireToOrder ? 'はい' : '',
+      }
+    })
+
+    const sheet = XLSX.utils.json_to_sheet(rows)
+    // Auto column widths
+    const headers = Object.keys(rows[0] ?? {})
+    sheet['!cols'] = headers.map(h => {
+      const maxLen = rows.reduce((m, r) => {
+        const v = (r as Record<string, unknown>)[h]
+        const s = v == null ? '' : String(v)
+        return Math.max(m, s.length)
+      }, h.length)
+      return { wch: Math.min(Math.max(maxLen + 2, 8), 40) }
+    })
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, sheet, '商品一覧')
+    const today = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `products_${today}.xlsx`)
+  }
 
   const handleSaveProduct = async (input: ProductInput) => {
     const services = await getServices()
@@ -956,6 +1113,7 @@ export default function InventoryPage() {
     }
     setModalOpen(false)
     setEditingProduct(null)
+    setPrefillProduct(null)
     await load(savedProduct.inventoryGroupId)
   }
 
@@ -1066,30 +1224,40 @@ export default function InventoryPage() {
             <h1 className="text-2xl font-bold text-[#173c2a]">在庫マスター</h1>
             <p className="mt-1 text-sm text-[#68756c]">全{products.length}件 / 茶葉マスターを画像定義に更新</p>
           </div>
-          {user?.role === 'admin' && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setEditingGroup(null)
-                  setGroupModalOpen(true)
-                }}
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-              >
-                <Plus size={16} />
-                グループ追加
-              </button>
-              <button
-                onClick={() => {
-                  setEditingProduct(null)
-                  setModalOpen(true)
-                }}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723]"
-              >
-                <Plus size={16} />
-                商品登録
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={filtered.length === 0}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            >
+              <Download size={16} />
+              Excel 書き出し
+            </button>
+            {user?.role === 'admin' && (
+              <>
+                <button
+                  onClick={() => {
+                    setEditingGroup(null)
+                    setGroupModalOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  <Plus size={16} />
+                  グループ追加
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingProduct(null)
+                    setModalOpen(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723]"
+                >
+                  <Plus size={16} />
+                  商品登録
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {feedbackMessage && (
@@ -1123,6 +1291,17 @@ export default function InventoryPage() {
         </div>
 
         <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-200">
+          <div
+            className={`flex shrink-0 items-center gap-1 border-b-2 px-4 py-2.5 text-sm font-medium -mb-px cursor-pointer transition-colors ${
+              activeGroupId === 'all'
+                ? 'border-[#174c33] text-[#174c33]'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveGroupId('all')}
+          >
+            All
+            <span className="ml-1 text-xs text-gray-400">({products.length})</span>
+          </div>
           {groups.map(group => (
             <div
               key={group.id}
@@ -1193,7 +1372,12 @@ export default function InventoryPage() {
             <div key={product.id} className="rounded-2xl border border-[#d9d1be] bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium text-[#173c2a]">{product.name}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-[#173c2a]">{product.name}</span>
+                    {product.inquireToOrder && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                    )}
+                  </div>
                   <div className="mt-1 font-mono text-xs text-[#68756c]">{product.sku}</div>
                   <div className="mt-2 text-xs text-[#68756c]">
                     最終入荷 {product.arrivalDate || '-'} / 棚卸 {product.latestInventoryCheck?.checkedDate || '未実施'}
@@ -1224,6 +1408,13 @@ export default function InventoryPage() {
 
               {user?.role === 'admin' && (
                 <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => handleDuplicateProduct(product)}
+                    aria-label="複製"
+                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <Copy size={16} />
+                  </button>
                   <button
                     onClick={() => {
                       setEditingProduct(product)
@@ -1261,7 +1452,7 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">茶種 / グレード / 品種</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">産地 / 仕入先 / 認証</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">在庫 / 入荷履歴</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">標準卸売単価</th>
+                  <th className="px-4 py-3 text-right font-medium text-[#68756c]">単価 (kg)</th>
                   <th className="px-4 py-3 text-left font-medium text-[#68756c]">状態</th>
                   {user?.role === 'admin' && <th className="px-4 py-3 text-right font-medium text-[#68756c]">操作</th>}
                 </tr>
@@ -1288,21 +1479,33 @@ export default function InventoryPage() {
                     )}
                     <td className="px-4 py-4 font-mono text-gray-700">{product.sku}</td>
                     <td className="px-4 py-4">
-                      <div className="font-medium text-[#173c2a]">{product.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-[#173c2a]">{product.name}</span>
+                        {product.inquireToOrder && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                        )}
+                      </div>
                       <div className="text-xs text-[#68756c]">{compactText(product.purchaseProductName)}</div>
                       <div className="mt-1 text-xs text-[#9a9a8f]">
                         最終入荷 {product.arrivalDate || '-'} / 履歴 {product.arrivalRecords.length} 件
                       </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
-                      <div>{[product.teaType, product.grade].filter(Boolean).join(' / ') || '-'}</div>
-                      <div className="text-xs text-[#68756c]">品種: {formatCultivars(product.cultivars)}</div>
-                      <div className="text-xs text-[#68756c]">摘採: {formatOptionList(product.pluckingMethods)}</div>
+                      <div>
+                        {[
+                          translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType,
+                          translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade,
+                        ]
+                          .filter(Boolean)
+                          .join(' / ') || '-'}
+                      </div>
+                      <div className="text-xs text-[#68756c]">品種: {formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</div>
+                      <div className="text-xs text-[#68756c]">摘採: {formatOptionList(translateValues(masters, 'plucking', product.pluckingMethods))}</div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
-                      <div>{formatOptionList(product.origins)}</div>
+                      <div>{formatOptionList(translateValues(masters, 'origin', product.origins))}</div>
                       <div className="text-xs text-[#68756c]">仕入先: {compactText(product.supplier)}</div>
-                      <div className="text-xs text-[#68756c]">認証: {formatOptionList(product.certifications)}</div>
+                      <div className="text-xs text-[#68756c]">認証: {formatOptionList(translateValues(masters, 'certification', product.certifications))}</div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
                       <div className="font-semibold text-[#173c2a]">{product.currentStockKg.toFixed(1)} kg</div>
@@ -1325,11 +1528,44 @@ export default function InventoryPage() {
                             : '入荷履歴なし'}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-gray-700">{formatCurrency(product.standardWholesalePrice)}</td>
+                    <td className="px-4 py-4 text-gray-700">
+                      {(() => {
+                        const wholesale = product.standardWholesalePrice
+                        const cost = product.purchaseUnitPrice
+                        const margin = wholesale != null && cost != null ? wholesale - cost : undefined
+                        const marginRate = wholesale != null && cost != null && wholesale > 0
+                          ? ((wholesale - cost) / wholesale) * 100
+                          : undefined
+                        return (
+                          <div className="text-right">
+                            <div>
+                              <span className="text-xs text-[#68756c]">卸 </span>
+                              <span className="font-semibold text-[#173c2a]">{formatCurrency(wholesale)}</span>
+                            </div>
+                            <div className="text-xs text-[#68756c]">
+                              仕入 <span className="text-[#173c2a]">{formatCurrency(cost)}</span>
+                            </div>
+                            <div className={`mt-0.5 text-xs ${margin == null ? 'text-[#68756c]' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                              粗利 {margin == null ? '-' : formatCurrency(margin)}
+                              {marginRate != null && (
+                                <span className="ml-1 text-[10px]">({marginRate.toFixed(1)}%)</span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </td>
                     <td className="px-4 py-4"><StockStatusBadge status={product.stockStatus} /></td>
                     {user?.role === 'admin' && (
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleDuplicateProduct(product)}
+                            aria-label="複製"
+                            className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                          >
+                            <Copy size={16} />
+                          </button>
                           <button
                             onClick={() => {
                               setEditingProduct(product)
@@ -1364,12 +1600,14 @@ export default function InventoryPage() {
 
         <ProductModal
           open={modalOpen}
-          initial={editingProduct ? { ...editingProduct, id: editingProduct.id } : undefined}
+          initial={editingProduct ? { ...editingProduct, id: editingProduct.id } : prefillProduct ?? undefined}
           groups={groups}
-          defaultGroupId={activeGroupId || groups[0]?.id || ''}
+          defaultGroupId={activeGroupId !== 'all' ? activeGroupId : groups[0]?.id || ''}
+          masters={masters}
           onClose={() => {
             setModalOpen(false)
             setEditingProduct(null)
+            setPrefillProduct(null)
           }}
           onSave={handleSaveProduct}
         />

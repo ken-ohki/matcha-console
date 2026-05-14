@@ -29,3 +29,6 @@ coverage/
 # firebase local artifacts
 .firebase/
 firebase-debug.log
+
+# typescript build info
+tsconfig.tsbuildinfo
