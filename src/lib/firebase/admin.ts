@@ -16,7 +16,7 @@ function tryLoadServiceAccount(): Record<string, unknown> | null {
   }
 }
 
-function getAdminApp(): App {
+export function getAdminApp(): App {
   if (adminApp) return adminApp
   const existing = getApps().find(app => app.name === ADMIN_APP_NAME)
   if (existing) {

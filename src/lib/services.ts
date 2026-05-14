@@ -66,11 +66,23 @@ export interface IMastersService {
   deleteMaster(id: string): Promise<void>
 }
 
+export interface UserProfile {
+  uid: string
+  email: string
+  role: 'admin' | 'viewer'
+  createdAt?: Date
+  updatedAt?: Date
+}
+
 export interface IAuthService {
   login(email: string, password: string): Promise<AuthUser>
+  loginWithGoogle(): Promise<AuthUser>
   logout(): Promise<void>
   getCurrentUser(): Promise<AuthUser | null>
   onAuthStateChanged(callback: (user: AuthUser | null) => void): () => void
+  listUsers(): Promise<UserProfile[]>
+  updateUserRole(uid: string, role: 'admin' | 'viewer'): Promise<void>
+  deleteUserProfile(uid: string): Promise<void>
 }
 
 export interface IServices {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
@@ -154,6 +155,23 @@ export default function SettingsMastersPage() {
           <p className="mt-2 text-sm text-[#68756c]">
             英語名（DB に保存される値）と日本語訳（管理画面の表示）を編集できます。カタログには英語名がそのまま使われます。
           </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/settings/masters"
+            className="rounded-full bg-[#174c33] px-3 py-1.5 text-white"
+          >
+            マスター管理
+          </Link>
+          {user?.role === 'admin' && (
+            <Link
+              href="/settings/users"
+              className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+            >
+              ユーザー管理
+            </Link>
+          )}
         </div>
 
         <div className="overflow-x-auto rounded-3xl border border-[#d9d1be] bg-white shadow-sm">

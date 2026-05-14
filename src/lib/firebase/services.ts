@@ -14,8 +14,10 @@ import {
   type DocumentData,
 } from 'firebase/firestore'
 import {
+  GoogleAuthProvider,
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   type User,
 } from 'firebase/auth'
@@ -50,6 +52,7 @@ import type {
   ISalesService,
   ISettingsService,
   IServices,
+  UserProfile,
 } from '../services'
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
 
@@ -1237,6 +1240,13 @@ export function createFirebaseServices(): IServices {
       return toAuthUser(credential.user, role)
     },
 
+    async loginWithGoogle() {
+      const provider = new GoogleAuthProvider()
+      const credential = await signInWithPopup(auth, provider)
+      const role = await ensureUserProfile(credential.user)
+      return toAuthUser(credential.user, role)
+    },
+
     async logout() {
       await signOut(auth)
     },
@@ -1256,6 +1266,31 @@ export function createFirebaseServices(): IServices {
         const role = await ensureUserProfile(user)
         callback(toAuthUser(user, role))
       })
+    },
+
+    async listUsers() {
+      const snap = await getDocs(collection(db, COLLECTIONS.users))
+      return snap.docs.map(d => {
+        const data = d.data()
+        return {
+          uid: d.id,
+          email: String(data.email ?? ''),
+          role: data.role === 'admin' ? 'admin' : 'viewer',
+          createdAt: data.createdAt ? toDate(data.createdAt) : undefined,
+          updatedAt: data.updatedAt ? toDate(data.updatedAt) : undefined,
+        } satisfies UserProfile
+      }).sort((a, b) => a.email.localeCompare(b.email))
+    },
+
+    async updateUserRole(uid, role) {
+      await updateDoc(doc(db, COLLECTIONS.users, uid), {
+        role,
+        updatedAt: serverTimestamp(),
+      })
+    },
+
+    async deleteUserProfile(uid) {
+      await deleteDoc(doc(db, COLLECTIONS.users, uid))
     },
   }
 
