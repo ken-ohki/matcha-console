@@ -240,7 +240,7 @@ export default function DocumentPage() {
                 English
               </button>
             </div>
-            {!isJa && type === 'invoice' && (
+            {!isJa && (type === 'invoice' || type === 'quotation') && (
               <label className="inline-flex items-center gap-1 text-xs text-[#68756c]">
                 <input
                   type="checkbox"
@@ -487,7 +487,7 @@ export default function DocumentPage() {
         </div>
 
         {/* English Terms & Conditions (appears as additional pages in print) */}
-        {!isJa && type === 'invoice' && includeTerms && (
+        {!isJa && (type === 'invoice' || type === 'quotation') && includeTerms && (
           <div className="terms-page mt-6 rounded-lg border border-gray-300 bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none print:mt-0">
             <h2 className="text-center text-2xl font-semibold tracking-[0.2em] text-[#173c2a]">TERMS &amp; CONDITIONS OF SALE</h2>
             <p className="mt-2 text-center text-xs text-[#68756c]">{ISSUER.companyEn}　·　{ISSUER.addressEn}</p>
@@ -508,13 +508,15 @@ export default function DocumentPage() {
                 <p className="text-xs text-[#68756c]">{ISSUER.addressEn}</p>
               </div>
               <div>
-                <p className="text-[#68756c]">Buyer (acknowledged by payment)</p>
+                <p className="text-[#68756c]">{type === 'quotation' ? 'Buyer (acknowledged upon order)' : 'Buyer (acknowledged by payment)'}</p>
                 <p className="mt-1 font-medium text-[#173c2a]">{doc.recipientName}</p>
               </div>
             </div>
 
             <p className="mt-12 text-center text-xs text-[#68756c]">
-              By making payment, the Buyer acknowledges and agrees to these Terms & Conditions of Sale.
+              {type === 'quotation'
+                ? 'By placing an order based on this quotation, the Buyer acknowledges and agrees to these Terms & Conditions of Sale.'
+                : 'By making payment, the Buyer acknowledges and agrees to these Terms & Conditions of Sale.'}
             </p>
           </div>
         )}
