@@ -59,11 +59,18 @@ export interface TermsSection {
   body: string
 }
 
+export interface BankAccounts {
+  ja: string
+  en: string
+}
+
 export interface ISettingsService {
   getSettings(): Promise<Settings>
   updateSettings(input: Partial<Settings>): Promise<Settings>
   getDocumentTermsEn(): Promise<TermsSection[]>
   updateDocumentTermsEn(sections: TermsSection[]): Promise<void>
+  getBankAccounts(): Promise<BankAccounts>
+  updateBankAccounts(input: BankAccounts): Promise<void>
 }
 
 export interface IMastersService {

@@ -281,6 +281,12 @@ export default function SettingsUsersPage() {
           >
             請求書 T&amp;C
           </Link>
+          <Link
+            href="/settings/bank-accounts"
+            className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+          >
+            入金口座
+          </Link>
         </div>
 
         {feedback && (

@@ -59,7 +59,7 @@ const EN_META_LABELS = {
   taxNote: '* Reduced-rate item',
 } as const
 
-function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sale: SaleRecord, buyer: Buyer | undefined): DocumentData {
+function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sale: SaleRecord, buyer: Buyer | undefined, overrideBankInfo?: string): DocumentData {
   const isJa = language === 'ja'
   const projectLabel = (() => {
     const d = sale.createdAt
@@ -98,7 +98,7 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     deliveryDate: sale.dueDate ?? '',
     deliveryPlace: buyer?.shippingAddress ?? '',
     paymentDueDate: isJa ? '発行日より2ヶ月' : 'Due upon receipt',
-    paymentDestination: isJa ? ISSUER.bankInfo : ISSUER.bankInfoEn,
+    paymentDestination: (overrideBankInfo && overrideBankInfo.trim()) || (isJa ? ISSUER.bankInfo : ISSUER.bankInfoEn),
     paymentTerms: isJa ? '' : DEFAULT_EN_PAYMENT_TERMS,
     lines,
     notes:
@@ -130,12 +130,14 @@ export default function DocumentPage() {
     ;(async () => {
       try {
         const services = await getServices()
-        const [sales, buyers, storedTerms] = await Promise.all([
+        const [sales, buyers, storedTerms, bankAccounts] = await Promise.all([
           services.sales.getSaleRecords(),
           services.sales.getBuyers(),
           services.settings.getDocumentTermsEn(),
+          services.settings.getBankAccounts(),
         ])
         setTerms(storedTerms.length > 0 ? storedTerms : TERMS_AND_CONDITIONS_EN.map(s => ({ heading: s.heading, body: s.body })))
+        if (cancelled) return
         if (cancelled) return
         const target = sales.find(s => s.id === params.id)
         if (!target) {
@@ -143,9 +145,10 @@ export default function DocumentPage() {
           return
         }
         const matchedBuyer = buyers.find(b => b.name === target.buyerName)
+        const overrideBank = language === 'ja' ? bankAccounts.ja : bankAccounts.en
         setSale(target)
         setBuyer(matchedBuyer)
-        setDoc(buildInitialDocument(type, language, target, matchedBuyer))
+        setDoc(buildInitialDocument(type, language, target, matchedBuyer, overrideBank))
       } catch (err) {
         setError(err instanceof Error ? err.message : '読み込みに失敗しました')
       } finally {

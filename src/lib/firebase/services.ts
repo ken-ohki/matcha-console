@@ -1264,6 +1264,23 @@ export function createFirebaseServices(): IServices {
         { merge: true },
       )
     },
+
+    async getBankAccounts() {
+      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'bank_accounts'))
+      const data = snap.data()
+      return {
+        ja: String(data?.ja ?? ''),
+        en: String(data?.en ?? ''),
+      }
+    },
+
+    async updateBankAccounts(input) {
+      await setDoc(
+        doc(db, COLLECTIONS.settings, 'bank_accounts'),
+        { ja: input.ja, en: input.en, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+    },
   }
 
   const authService: IAuthService = {
