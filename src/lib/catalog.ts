@@ -24,6 +24,8 @@ export interface CatalogProduct {
   stockStatus: StockStatus
   currentStockKg: number
   inquireToOrder: boolean
+  salesNote?: string
+  flavorNotes?: string
   sortOrder: number
 }
 

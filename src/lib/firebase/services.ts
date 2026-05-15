@@ -172,6 +172,7 @@ function buildProductPayload(input: ProductInput) {
     purchaseUnitPrice: input.purchaseUnitPrice,
     adminNote: input.adminNote?.trim() || undefined,
     salesNote: input.salesNote?.trim() || undefined,
+    flavorNotes: input.flavorNotes?.trim() || undefined,
     showInCatalog: input.showInCatalog ?? true,
     inquireToOrder: input.inquireToOrder ?? false,
   })
@@ -237,6 +238,7 @@ function mapProduct(id: string, data: DocumentData): Product {
         : undefined,
     adminNote: data.adminNote ? String(data.adminNote) : undefined,
     salesNote: data.salesNote ? String(data.salesNote) : undefined,
+    flavorNotes: data.flavorNotes ? String(data.flavorNotes) : undefined,
     sortOrder: Number(data.sortOrder ?? 0),
     isActive: data.isActive !== false,
     showInCatalog: data.showInCatalog !== false,
@@ -771,6 +773,7 @@ export function createFirebaseServices(): IServices {
         purchaseUnitPrice: input.purchaseUnitPrice ?? current.purchaseUnitPrice,
         adminNote: input.adminNote ?? current.adminNote,
         salesNote: input.salesNote ?? current.salesNote,
+        flavorNotes: input.flavorNotes ?? current.flavorNotes,
         showInCatalog: input.showInCatalog ?? current.showInCatalog,
         inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
       }

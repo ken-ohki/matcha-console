@@ -210,6 +210,8 @@ export async function POST(request: Request) {
         stockStatus: getStockStatus(currentKg, baseline, alertRatio),
         currentStockKg: Math.max(currentKg, 0),
         inquireToOrder: data.inquireToOrder === true,
+        salesNote: data.salesNote ? String(data.salesNote) : undefined,
+        flavorNotes: data.flavorNotes ? String(data.flavorNotes) : undefined,
         sortOrder: num(data.sortOrder),
         isActive: data.isActive !== false,
         showInCatalog: data.showInCatalog !== false,

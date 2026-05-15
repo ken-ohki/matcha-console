@@ -94,6 +94,7 @@ function buildProductForm(
     purchaseUnitPrice: initial?.purchaseUnitPrice,
     adminNote: initial?.adminNote ?? '',
     salesNote: initial?.salesNote ?? '',
+    flavorNotes: initial?.flavorNotes ?? '',
     showInCatalog: initial?.showInCatalog ?? true,
     inquireToOrder: initial?.inquireToOrder ?? false,
   }
@@ -348,6 +349,7 @@ function ProductModal({
         initialStockKg: totalArrivalKg,
         adminNote: form.adminNote?.trim() || undefined,
         salesNote: form.salesNote?.trim() || undefined,
+        flavorNotes: form.flavorNotes?.trim() || undefined,
         showInCatalog: form.showInCatalog,
         inquireToOrder: form.inquireToOrder,
       })
@@ -771,7 +773,19 @@ function ProductModal({
                   value={form.salesNote ?? ''}
                   onChange={event => setForm(prev => ({ ...prev, salesNote: event.target.value }))}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  placeholder="販売時の説明・補足"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">フレーバーノート</label>
+                <textarea
+                  rows={3}
+                  value={form.flavorNotes ?? ''}
+                  onChange={event => setForm(prev => ({ ...prev, flavorNotes: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  placeholder="例: 上品な甘み、栗のような香ばしさ、ミルキーな余韻"
+                />
+                <p className="mt-1 text-[11px] text-[#68756c]">カタログの商品詳細に表示されます</p>
               </div>
             </div>
 

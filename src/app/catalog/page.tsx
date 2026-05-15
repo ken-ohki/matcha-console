@@ -839,7 +839,7 @@ function ProductDetailModal({
             )}
           </div>
         </div>
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 space-y-5">
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DetailRow label="Type" value={product.teaType} />
             <DetailRow label="Grade" value={product.grade} />
@@ -851,6 +851,24 @@ function ProductDetailModal({
             <DetailRow label="Certification" value={product.certifications.join(', ')} />
             <DetailRow label="Latest arrival" value={product.arrivalDate} />
           </dl>
+
+          {product.flavorNotes && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">Flavor Notes</p>
+              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-[#faf8f1] p-3 text-sm leading-relaxed text-[#173c2a]">
+                {product.flavorNotes}
+              </p>
+            </div>
+          )}
+
+          {product.salesNote && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">Notes</p>
+              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-[#faf8f1] p-3 text-sm leading-relaxed text-[#173c2a]">
+                {product.salesNote}
+              </p>
+            </div>
+          )}
         </div>
         <div className="border-t border-[#ece8db] bg-[#faf8f1] px-6 py-4 rounded-b-2xl sm:rounded-b-2xl">
           <div className="flex items-center justify-between">
