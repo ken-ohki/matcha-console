@@ -47,6 +47,7 @@ const COLLECTIONS = {
   products: 'products',
   sales: 'sales',
   selfConsumptions: 'self_consumptions',
+  ecSales: 'ec_sales',
   settings: 'settings',
 } as const
 
@@ -126,11 +127,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const [groupsSnap, productsSnap, salesSnap, selfSnap, settingsSnap, ratesInfo] = await Promise.all([
+  const [groupsSnap, productsSnap, salesSnap, selfSnap, ecSnap, settingsSnap, ratesInfo] = await Promise.all([
     db.collection(COLLECTIONS.groups).get(),
     db.collection(COLLECTIONS.products).get(),
     db.collection(COLLECTIONS.sales).get(),
     db.collection(COLLECTIONS.selfConsumptions).get(),
+    db.collection(COLLECTIONS.ecSales).get(),
     db.collection(COLLECTIONS.settings).doc('main').get(),
     fetchExchangeRates(),
   ])
@@ -143,8 +145,18 @@ export async function POST(request: Request) {
   salesSnap.docs.forEach(doc => {
     const data = doc.data() as AnyRecord
     if (!isReservedSale(data.status)) return
-    const pid = String(data.productId ?? '')
-    reservedByProduct[pid] = (reservedByProduct[pid] ?? 0) + num(data.quantityKg)
+    const items = Array.isArray(data.items) ? data.items : null
+    if (items && items.length > 0) {
+      items.forEach(raw => {
+        const item = raw as AnyRecord
+        const pid = String(item.productId ?? '')
+        if (!pid) return
+        reservedByProduct[pid] = (reservedByProduct[pid] ?? 0) + num(item.quantityKg)
+      })
+    } else {
+      const pid = String(data.productId ?? '')
+      if (pid) reservedByProduct[pid] = (reservedByProduct[pid] ?? 0) + num(data.quantityKg)
+    }
   })
 
   const selfByProduct: Record<string, number> = {}
@@ -152,6 +164,13 @@ export async function POST(request: Request) {
     const data = doc.data() as AnyRecord
     const pid = String(data.productId ?? '')
     selfByProduct[pid] = (selfByProduct[pid] ?? 0) + num(data.quantityKg)
+  })
+
+  const ecByProduct: Record<string, number> = {}
+  ecSnap.docs.forEach(doc => {
+    const data = doc.data() as AnyRecord
+    const pid = String(data.productId ?? '')
+    ecByProduct[pid] = (ecByProduct[pid] ?? 0) + num(data.quantityKg)
   })
 
   const groups: CatalogGroup[] = groupsSnap.docs
@@ -185,8 +204,9 @@ export async function POST(request: Request) {
       const haizUsedKg = num(data.haizUsedKg)
       const reservedKg = reservedByProduct[doc.id] ?? 0
       const selfUsedKg = selfByProduct[doc.id] ?? 0
+      const ecSoldKg = ecByProduct[doc.id] ?? 0
       const baseline = Math.max(initialStockKg + adjustmentKg, 0)
-      const currentKg = initialStockKg + adjustmentKg - haizUsedKg - reservedKg - selfUsedKg
+      const currentKg = initialStockKg + adjustmentKg - haizUsedKg - reservedKg - selfUsedKg - ecSoldKg
 
       const product: CatalogProduct & { isActive: boolean; showInCatalog: boolean } = {
         id: doc.id,
