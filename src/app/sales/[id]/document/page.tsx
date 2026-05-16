@@ -72,17 +72,29 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     isReducedRate: false,
     quantity: 1,
     unit: isJa ? '式' : 'lot',
-    unitPrice: 0,
+    unitPrice: sale.shippingFee || 0,
   })
+  const otherFeesLine = (sale.otherFees || 0) > 0
+    ? createBlankLine({
+        description: sale.otherFeesNote
+          ? (isJa ? `諸費用（${sale.otherFeesNote}）` : `Other fees (${sale.otherFeesNote})`)
+          : (isJa ? '諸費用' : 'Other fees'),
+        isReducedRate: false,
+        quantity: 1,
+        unit: isJa ? '式' : 'lot',
+        unitPrice: sale.otherFees || 0,
+      })
+    : null
   const lines: DocumentLine[] = [
-    createBlankLine({
-      description: sale.productName + (sale.productSku ? ` (${sale.productSku})` : ''),
+    ...sale.items.map(item => createBlankLine({
+      description: item.productName + (item.productSku ? ` (${item.productSku})` : ''),
       isReducedRate: isJa,
-      quantity: sale.quantityKg,
+      quantity: item.quantityKg,
       unit: 'kg',
-      unitPrice: sale.unitPrice,
-    }),
+      unitPrice: item.unitPrice,
+    })),
     shippingLine,
+    ...(otherFeesLine ? [otherFeesLine] : []),
   ]
 
   return {

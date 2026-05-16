@@ -448,19 +448,19 @@ function BuyerDetailModal({
                       </tr>
                     </thead>
                     <tbody>
-                      {sales.map(sale => (
-                        <tr key={sale.id} className="border-t border-[#ece8db] text-[#173c2a]">
-                          <td className="px-3 py-2"><SalesStatusBadge status={sale.status} /></td>
-                          <td className="px-3 py-2 text-[#68756c]">{formatDate(sale.updatedAt)}</td>
+                      {sales.flatMap(sale => sale.items.map((item, idx) => (
+                        <tr key={`${sale.id}-${idx}`} className="border-t border-[#ece8db] text-[#173c2a]">
+                          <td className="px-3 py-2">{idx === 0 ? <SalesStatusBadge status={sale.status} /> : null}</td>
+                          <td className="px-3 py-2 text-[#68756c]">{idx === 0 ? formatDate(sale.updatedAt) : ''}</td>
                           <td className="px-3 py-2">
-                            <div className="font-medium">{sale.productName}</div>
-                            <div className="text-[11px] text-[#68756c]">{sale.productSku}</div>
+                            <div className="font-medium">{item.productName}</div>
+                            <div className="text-[11px] text-[#68756c]">{item.productSku}</div>
                           </td>
-                          <td className="px-3 py-2 text-right">{sale.quantityKg.toFixed(1)} kg</td>
-                          <td className="px-3 py-2 text-right">{formatCurrency(sale.unitPrice)}</td>
-                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(sale.revenue)}</td>
+                          <td className="px-3 py-2 text-right">{item.quantityKg.toFixed(1)} kg</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.revenue)}</td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>

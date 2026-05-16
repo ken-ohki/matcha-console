@@ -35,6 +35,7 @@ import type {
   Product,
   ProductInput,
   ProductWithInventory,
+  SaleLineItem,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
@@ -259,26 +260,119 @@ function mapGroup(id: string, data: DocumentData): InventoryGroup {
   }
 }
 
+function normalizeSaleItem(raw: unknown): SaleLineItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  const productId = String(obj.productId ?? '')
+  if (!productId) return null
+  const quantityKg = Number(obj.quantityKg ?? 0)
+  const unitPrice = Number(obj.unitPrice ?? 0)
+  const costPerKg = Number(obj.costPerKg ?? 0)
+  const revenue = obj.revenue != null ? Number(obj.revenue) : quantityKg * unitPrice
+  const costAmount = obj.costAmount != null ? Number(obj.costAmount) : quantityKg * costPerKg
+  const grossProfit = obj.grossProfit != null ? Number(obj.grossProfit) : revenue - costAmount
+  return {
+    productId,
+    productSku: String(obj.productSku ?? ''),
+    productName: String(obj.productName ?? ''),
+    quantityKg,
+    unitPrice,
+    costPerKg,
+    revenue,
+    costAmount,
+    grossProfit,
+  }
+}
+
+function aggregateItems(items: SaleLineItem[]): {
+  productId: string
+  productSku: string
+  productName: string
+  quantityKg: number
+  unitPrice: number
+  costPerKg: number
+  revenue: number
+  costAmount: number
+  grossProfit: number
+} {
+  const first = items[0]
+  const quantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
+  const revenue = items.reduce((s, i) => s + i.revenue, 0)
+  const costAmount = items.reduce((s, i) => s + i.costAmount, 0)
+  const grossProfit = revenue - costAmount
+  const unitPrice = quantityKg > 0 ? revenue / quantityKg : 0
+  const costPerKg = quantityKg > 0 ? costAmount / quantityKg : 0
+  return {
+    productId: first?.productId ?? '',
+    productSku: first?.productSku ?? '',
+    productName: first?.productName ?? '',
+    quantityKg,
+    unitPrice,
+    costPerKg,
+    revenue,
+    costAmount,
+    grossProfit,
+  }
+}
+
 function mapSale(id: string, data: DocumentData): SaleRecord {
+  const rawItems = Array.isArray(data.items) ? data.items : []
+  let items: SaleLineItem[] = rawItems
+    .map(normalizeSaleItem)
+    .filter((item): item is SaleLineItem => item !== null)
+  if (items.length === 0) {
+    const legacyProductId = String(data.productId ?? '')
+    if (legacyProductId) {
+      const quantityKg = Number(data.quantityKg ?? 0)
+      const unitPrice = Number(data.unitPrice ?? 0)
+      const costPerKg = Number(data.costPerKg ?? 0)
+      const revenue = data.revenue != null ? Number(data.revenue) : quantityKg * unitPrice
+      const costAmount = data.costAmount != null ? Number(data.costAmount) : quantityKg * costPerKg
+      items = [{
+        productId: legacyProductId,
+        productSku: String(data.productSku ?? ''),
+        productName: String(data.productName ?? ''),
+        quantityKg,
+        unitPrice,
+        costPerKg,
+        revenue,
+        costAmount,
+        grossProfit: data.grossProfit != null ? Number(data.grossProfit) : revenue - costAmount,
+      }]
+    }
+  }
+  const agg = aggregateItems(items)
+  const shippingFee = Number(data.shippingFee ?? 0)
+  const otherFees = Number(data.otherFees ?? 0)
+  const paymentFee = Number(data.paymentFee ?? 0)
+  const otherFeesNote = data.otherFeesNote ? String(data.otherFeesNote) : undefined
+  const invoiceAmount = agg.revenue + shippingFee + otherFees
+  const grossProfit = agg.revenue - agg.costAmount - paymentFee
   return {
     id,
     status: data.status,
     paymentStatus: (data.paymentStatus === 'invoiced' || data.paymentStatus === 'paid')
       ? data.paymentStatus
       : 'uninvoiced',
-    shippingStatus: (data.shippingStatus === 'producing' || data.shippingStatus === 'shipped')
+    shippingStatus: (data.shippingStatus === 'producing' || data.shippingStatus === 'ready_to_ship' || data.shippingStatus === 'shipped')
       ? data.shippingStatus
       : 'ordering',
     buyerName: String(data.buyerName ?? ''),
-    productId: String(data.productId ?? ''),
-    productSku: String(data.productSku ?? ''),
-    productName: String(data.productName ?? ''),
-    quantityKg: Number(data.quantityKg ?? 0),
-    unitPrice: Number(data.unitPrice ?? 0),
-    costPerKg: Number(data.costPerKg ?? 0),
-    revenue: Number(data.revenue ?? 0),
-    costAmount: Number(data.costAmount ?? 0),
-    grossProfit: Number(data.grossProfit ?? 0),
+    items,
+    productId: agg.productId,
+    productSku: agg.productSku,
+    productName: agg.productName,
+    quantityKg: agg.quantityKg,
+    unitPrice: agg.unitPrice,
+    costPerKg: agg.costPerKg,
+    revenue: agg.revenue,
+    costAmount: agg.costAmount,
+    grossProfit,
+    shippingFee,
+    otherFees,
+    otherFeesNote,
+    paymentFee,
+    invoiceAmount,
     country: String(data.country ?? ''),
     dueDate: data.dueDate ? String(data.dueDate) : undefined,
     terms: data.terms ? String(data.terms) : undefined,
@@ -480,7 +574,9 @@ function computeInventory(
 ): ProductWithInventory[] {
   const reservedByProduct = sales.reduce<Record<string, number>>((acc, sale) => {
     if (!isReservedSale(sale.status)) return acc
-    acc[sale.productId] = (acc[sale.productId] ?? 0) + sale.quantityKg
+    for (const item of sale.items) {
+      acc[item.productId] = (acc[item.productId] ?? 0) + item.quantityKg
+    }
     return acc
   }, {})
   const selfConsumedByProduct = selfConsumptions.reduce<Record<string, number>>((acc, record) => {
@@ -518,40 +614,60 @@ function computeInventory(
 async function assertSufficientStock(
   nextSale: SaleRecordInput,
   options?: { excludeSaleId?: string },
-): Promise<{ product: Product; currentProductSales: SaleRecord[] }> {
+): Promise<{ productMap: Map<string, Product> }> {
+  if (!Array.isArray(nextSale.items) || nextSale.items.length === 0) {
+    throw new Error('商品を1つ以上指定してください')
+  }
   const [products, sales, selfConsumptions, ecSales] = await Promise.all([
     getAllProducts(),
     getAllSales(),
     getAllSelfConsumptions(),
     getAllEcSales(),
   ])
-  const product = products.find(item => item.id === nextSale.productId && item.isActive)
-  if (!product) throw new Error('商品が見つかりません')
 
-  const currentProductSales = sales.filter(sale => (
-    sale.productId === nextSale.productId &&
-    sale.id !== options?.excludeSaleId &&
-    isReservedSale(sale.status)
-  ))
-  const reservedKg = currentProductSales.reduce((sum, sale) => sum + sale.quantityKg, 0)
-  const selfConsumedKg = selfConsumptions
-    .filter(record => record.productId === nextSale.productId)
-    .reduce((sum, record) => sum + record.quantityKg, 0)
-  const ecSoldKg = ecSales
-    .filter(record => record.productId === nextSale.productId)
-    .reduce((sum, record) => sum + record.quantityKg, 0)
-  const availableKg = product.initialStockKg
-    + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - product.haizUsedKg
-    - reservedKg
-    - selfConsumedKg
-    - ecSoldKg
+  // Sum quantity per productId within this sale (handles duplicate productIds)
+  const requestedByProduct = nextSale.items.reduce<Record<string, number>>((acc, item) => {
+    acc[item.productId] = (acc[item.productId] ?? 0) + Number(item.quantityKg ?? 0)
+    return acc
+  }, {})
 
-  if (isReservedSale(nextSale.status) && nextSale.quantityKg > availableKg) {
-    throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
+  const productMap = new Map<string, Product>()
+  for (const productId of Object.keys(requestedByProduct)) {
+    const product = products.find(item => item.id === productId && item.isActive)
+    if (!product) throw new Error('商品が見つかりません')
+    productMap.set(productId, product)
   }
 
-  return { product, currentProductSales }
+  const shouldValidate = isReservedSale(nextSale.status)
+  if (!shouldValidate) {
+    return { productMap }
+  }
+
+  for (const [productId, requestedKg] of Object.entries(requestedByProduct)) {
+    const product = productMap.get(productId)!
+    const reservedKg = sales
+      .filter(sale => sale.id !== options?.excludeSaleId && isReservedSale(sale.status))
+      .reduce((sum, sale) => sum + sale.items
+        .filter(item => item.productId === productId)
+        .reduce((s, item) => s + item.quantityKg, 0), 0)
+    const selfConsumedKg = selfConsumptions
+      .filter(record => record.productId === productId)
+      .reduce((sum, record) => sum + record.quantityKg, 0)
+    const ecSoldKg = ecSales
+      .filter(record => record.productId === productId)
+      .reduce((sum, record) => sum + record.quantityKg, 0)
+    const availableKg = product.initialStockKg
+      + deriveInventoryAdjustmentKg(product.inventoryChecks)
+      - product.haizUsedKg
+      - reservedKg
+      - selfConsumedKg
+      - ecSoldKg
+    if (requestedKg > availableKg) {
+      throw new Error(`「${product.name}」の在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
+    }
+  }
+
+  return { productMap }
 }
 
 async function assertSufficientSelfConsumptionStock(
@@ -568,8 +684,10 @@ async function assertSufficientSelfConsumptionStock(
   if (!product) throw new Error('商品が見つかりません')
 
   const reservedKg = sales
-    .filter(sale => sale.productId === input.productId && isReservedSale(sale.status))
-    .reduce((sum, sale) => sum + sale.quantityKg, 0)
+    .filter(sale => isReservedSale(sale.status))
+    .reduce((sum, sale) => sum + sale.items
+      .filter(item => item.productId === input.productId)
+      .reduce((s, item) => s + item.quantityKg, 0), 0)
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
@@ -604,8 +722,10 @@ async function assertSufficientEcSaleStock(
   if (!product) throw new Error('商品が見つかりません')
 
   const reservedKg = sales
-    .filter(sale => sale.productId === input.productId && isReservedSale(sale.status))
-    .reduce((sum, sale) => sum + sale.quantityKg, 0)
+    .filter(sale => isReservedSale(sale.status))
+    .reduce((sum, sale) => sum + sale.items
+      .filter(item => item.productId === input.productId)
+      .reduce((s, item) => s + item.quantityKg, 0), 0)
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
@@ -629,19 +749,39 @@ async function assertSufficientEcSaleStock(
 async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
   const db = getFirebaseDb()
   const sales = await getAllSales()
-  const related = sales.filter(sale => sale.productId === product.id)
+  const related = sales.filter(sale => sale.items.some(item => item.productId === product.id))
   if (related.length === 0) return
 
   const batch = writeBatch(db)
+  const newCostPerKg = product.purchaseUnitPrice ?? 0
   related.forEach(sale => {
-    const costPerKg = product.purchaseUnitPrice ?? 0
-    const costAmount = sale.quantityKg * costPerKg
+    const newItems: SaleLineItem[] = sale.items.map(item => {
+      if (item.productId !== product.id) return item
+      const costAmount = item.quantityKg * newCostPerKg
+      return {
+        ...item,
+        productSku: product.sku,
+        productName: product.name,
+        costPerKg: newCostPerKg,
+        costAmount,
+        grossProfit: item.revenue - costAmount,
+      }
+    })
+    const agg = aggregateItems(newItems)
+    const grossProfit = agg.revenue - agg.costAmount - (sale.paymentFee || 0)
+    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + (sale.otherFees || 0)
     batch.update(doc(db, COLLECTIONS.sales, sale.id), {
-      productSku: product.sku,
-      productName: product.name,
-      costPerKg,
-      costAmount,
-      grossProfit: sale.revenue - costAmount,
+      items: newItems,
+      productId: agg.productId,
+      productSku: agg.productSku,
+      productName: agg.productName,
+      quantityKg: agg.quantityKg,
+      unitPrice: agg.unitPrice,
+      costPerKg: agg.costPerKg,
+      revenue: agg.revenue,
+      costAmount: agg.costAmount,
+      grossProfit,
+      invoiceAmount,
       updatedAt: serverTimestamp(),
     })
   })
@@ -791,7 +931,7 @@ export function createFirebaseServices(): IServices {
 
     async deleteProduct(id) {
       const sales = await getAllSales()
-      if (sales.some(sale => sale.productId === id && isReservedSale(sale.status))) {
+      if (sales.some(sale => isReservedSale(sale.status) && sale.items.some(item => item.productId === id))) {
         throw new Error('有効な販売案件が残っている商品は削除できません')
       }
 
@@ -911,24 +1051,59 @@ export function createFirebaseServices(): IServices {
     },
 
     async createSaleRecord(input) {
-      const { product } = await assertSufficientStock(input)
+      const { productMap } = await assertSufficientStock(input)
 
-      const costPerKg = product.purchaseUnitPrice ?? 0
-      const revenue = input.quantityKg * input.unitPrice
-      const costAmount = input.quantityKg * costPerKg
+      const items: SaleLineItem[] = input.items.map(line => {
+        const product = productMap.get(line.productId)!
+        const quantityKg = Number(line.quantityKg) || 0
+        const unitPrice = Number(line.unitPrice) || 0
+        const costPerKg = product.purchaseUnitPrice ?? 0
+        const revenue = quantityKg * unitPrice
+        const costAmount = quantityKg * costPerKg
+        return {
+          productId: product.id,
+          productSku: product.sku,
+          productName: product.name,
+          quantityKg,
+          unitPrice,
+          costPerKg,
+          revenue,
+          costAmount,
+          grossProfit: revenue - costAmount,
+        }
+      })
+      const agg = aggregateItems(items)
+      const shippingFee = Number(input.shippingFee) || 0
+      const otherFees = Number(input.otherFees) || 0
+      const paymentFee = Number(input.paymentFee) || 0
+      const otherFeesNote = input.otherFeesNote?.trim() || undefined
+      const invoiceAmount = agg.revenue + shippingFee + otherFees
+      const grossProfit = agg.revenue - agg.costAmount - paymentFee
+
+      const { items: _ignoreItems, ...rest } = input
+      void _ignoreItems
       const payload = sanitizeRecord({
-        ...input,
+        ...rest,
         buyerName: input.buyerName.trim(),
         country: input.country.trim(),
         dueDate: input.dueDate?.trim() || undefined,
         terms: input.terms?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        costPerKg,
-        revenue,
-        costAmount,
-        grossProfit: revenue - costAmount,
+        items,
+        productId: agg.productId,
+        productSku: agg.productSku,
+        productName: agg.productName,
+        quantityKg: agg.quantityKg,
+        unitPrice: agg.unitPrice,
+        costPerKg: agg.costPerKg,
+        revenue: agg.revenue,
+        costAmount: agg.costAmount,
+        grossProfit,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
+        paymentFee,
+        invoiceAmount,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
@@ -937,13 +1112,34 @@ export function createFirebaseServices(): IServices {
       await syncBuyersCollection()
       return {
         id: ref.id,
-        ...input,
-        productSku: product.sku,
-        productName: product.name,
-        costPerKg,
-        revenue,
-        costAmount,
-        grossProfit: revenue - costAmount,
+        status: input.status,
+        paymentStatus: input.paymentStatus,
+        shippingStatus: input.shippingStatus,
+        buyerName: input.buyerName.trim(),
+        items,
+        productId: agg.productId,
+        productSku: agg.productSku,
+        productName: agg.productName,
+        quantityKg: agg.quantityKg,
+        unitPrice: agg.unitPrice,
+        costPerKg: agg.costPerKg,
+        revenue: agg.revenue,
+        costAmount: agg.costAmount,
+        grossProfit,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
+        paymentFee,
+        invoiceAmount,
+        country: input.country.trim(),
+        dueDate: input.dueDate,
+        terms: input.terms,
+        notes: input.notes,
+        paymentMethod: input.paymentMethod,
+        paymentDate: input.paymentDate,
+        shippingMethod: input.shippingMethod,
+        shippingDate: input.shippingDate,
+        trackingNumber: input.trackingNumber,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -954,14 +1150,22 @@ export function createFirebaseServices(): IServices {
       if (!snap.exists()) throw new Error('販売案件が見つかりません')
       const current = mapSale(snap.id, snap.data() ?? {})
 
+      const mergedItems = input.items ?? current.items.map(item => ({
+        productId: item.productId,
+        quantityKg: item.quantityKg,
+        unitPrice: item.unitPrice,
+      }))
+
       const merged: SaleRecordInput = {
         status: input.status ?? current.status,
         paymentStatus: input.paymentStatus ?? current.paymentStatus,
         shippingStatus: input.shippingStatus ?? current.shippingStatus,
         buyerName: input.buyerName ?? current.buyerName,
-        productId: input.productId ?? current.productId,
-        quantityKg: input.quantityKg ?? current.quantityKg,
-        unitPrice: input.unitPrice ?? current.unitPrice,
+        items: mergedItems,
+        shippingFee: input.shippingFee ?? current.shippingFee,
+        otherFees: input.otherFees ?? current.otherFees,
+        otherFeesNote: input.otherFeesNote ?? current.otherFeesNote,
+        paymentFee: input.paymentFee ?? current.paymentFee,
         country: input.country ?? current.country,
         dueDate: input.dueDate ?? current.dueDate,
         terms: input.terms ?? current.terms,
@@ -973,37 +1177,92 @@ export function createFirebaseServices(): IServices {
         trackingNumber: input.trackingNumber ?? current.trackingNumber,
       }
 
-      const { product } = await assertSufficientStock(merged, { excludeSaleId: id })
-      const costPerKg = product.purchaseUnitPrice ?? 0
-      const revenue = merged.quantityKg * merged.unitPrice
-      const costAmount = merged.quantityKg * costPerKg
+      const { productMap } = await assertSufficientStock(merged, { excludeSaleId: id })
+      const items: SaleLineItem[] = merged.items.map(line => {
+        const product = productMap.get(line.productId)!
+        const quantityKg = Number(line.quantityKg) || 0
+        const unitPrice = Number(line.unitPrice) || 0
+        const costPerKg = product.purchaseUnitPrice ?? 0
+        const revenue = quantityKg * unitPrice
+        const costAmount = quantityKg * costPerKg
+        return {
+          productId: product.id,
+          productSku: product.sku,
+          productName: product.name,
+          quantityKg,
+          unitPrice,
+          costPerKg,
+          revenue,
+          costAmount,
+          grossProfit: revenue - costAmount,
+        }
+      })
+      const agg = aggregateItems(items)
+      const shippingFee = Number(merged.shippingFee) || 0
+      const otherFees = Number(merged.otherFees) || 0
+      const paymentFee = Number(merged.paymentFee) || 0
+      const otherFeesNote = merged.otherFeesNote?.trim() || undefined
+      const invoiceAmount = agg.revenue + shippingFee + otherFees
+      const grossProfit = agg.revenue - agg.costAmount - paymentFee
 
+      const { items: _ignoreItems, ...rest } = merged
+      void _ignoreItems
       await updateDoc(doc(db, COLLECTIONS.sales, id), sanitizeRecord({
-        ...merged,
+        ...rest,
         buyerName: merged.buyerName.trim(),
         country: merged.country.trim(),
         dueDate: merged.dueDate?.trim() || undefined,
         terms: merged.terms?.trim() || undefined,
         notes: merged.notes?.trim() || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        costPerKg,
-        revenue,
-        costAmount,
-        grossProfit: revenue - costAmount,
+        items,
+        productId: agg.productId,
+        productSku: agg.productSku,
+        productName: agg.productName,
+        quantityKg: agg.quantityKg,
+        unitPrice: agg.unitPrice,
+        costPerKg: agg.costPerKg,
+        revenue: agg.revenue,
+        costAmount: agg.costAmount,
+        grossProfit,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
+        paymentFee,
+        invoiceAmount,
         updatedAt: serverTimestamp(),
       }))
       await syncBuyersCollection()
 
       return {
         id,
-        ...merged,
-        productSku: product.sku,
-        productName: product.name,
-        costPerKg,
-        revenue,
-        costAmount,
-        grossProfit: revenue - costAmount,
+        status: merged.status,
+        paymentStatus: merged.paymentStatus,
+        shippingStatus: merged.shippingStatus,
+        buyerName: merged.buyerName.trim(),
+        items,
+        productId: agg.productId,
+        productSku: agg.productSku,
+        productName: agg.productName,
+        quantityKg: agg.quantityKg,
+        unitPrice: agg.unitPrice,
+        costPerKg: agg.costPerKg,
+        revenue: agg.revenue,
+        costAmount: agg.costAmount,
+        grossProfit,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
+        paymentFee,
+        invoiceAmount,
+        country: merged.country.trim(),
+        dueDate: merged.dueDate,
+        terms: merged.terms,
+        notes: merged.notes,
+        paymentMethod: merged.paymentMethod,
+        paymentDate: merged.paymentDate,
+        shippingMethod: merged.shippingMethod,
+        shippingDate: merged.shippingDate,
+        trackingNumber: merged.trackingNumber,
         createdAt: current.createdAt,
         updatedAt: new Date(),
       }

@@ -2,7 +2,7 @@ export type UserRole = 'admin' | 'viewer'
 export type StockStatus = 'normal' | 'low' | 'out'
 export type SaleStatus = 'negotiating' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'uninvoiced' | 'invoiced' | 'paid'
-export type ShippingStatus = 'ordering' | 'producing' | 'shipped'
+export type ShippingStatus = 'ordering' | 'producing' | 'ready_to_ship' | 'shipped'
 export type SelfConsumptionUsageType = 'ingredient' | 'retail' | 'sample'
 
 export interface InventoryGroup {
@@ -71,12 +71,7 @@ export interface ProductWithInventory extends Product {
   stockStatus: StockStatus
 }
 
-export interface SaleRecord {
-  id: string
-  status: SaleStatus
-  paymentStatus: PaymentStatus
-  shippingStatus: ShippingStatus
-  buyerName: string
+export interface SaleLineItem {
   productId: string
   productSku: string
   productName: string
@@ -86,6 +81,35 @@ export interface SaleRecord {
   revenue: number
   costAmount: number
   grossProfit: number
+}
+
+export interface SaleLineInput {
+  productId: string
+  quantityKg: number
+  unitPrice: number
+}
+
+export interface SaleRecord {
+  id: string
+  status: SaleStatus
+  paymentStatus: PaymentStatus
+  shippingStatus: ShippingStatus
+  buyerName: string
+  items: SaleLineItem[]
+  productId: string
+  productSku: string
+  productName: string
+  quantityKg: number
+  unitPrice: number
+  costPerKg: number
+  revenue: number
+  costAmount: number
+  grossProfit: number
+  shippingFee: number
+  otherFees: number
+  otherFeesNote?: string
+  paymentFee: number
+  invoiceAmount: number
   country: string
   dueDate?: string
   terms?: string
@@ -206,9 +230,11 @@ export interface SaleRecordInput {
   paymentStatus: PaymentStatus
   shippingStatus: ShippingStatus
   buyerName: string
-  productId: string
-  quantityKg: number
-  unitPrice: number
+  items: SaleLineInput[]
+  shippingFee?: number
+  otherFees?: number
+  otherFeesNote?: string
+  paymentFee?: number
   country: string
   dueDate?: string
   terms?: string

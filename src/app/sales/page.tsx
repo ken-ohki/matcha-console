@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
-import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
+import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineInput, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
 import {
@@ -81,11 +81,13 @@ const PAYMENT_COLORS: Record<PaymentStatus, string> = {
 const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   ordering: '発注中',
   producing: '製造中',
+  ready_to_ship: '発送準備中',
   shipped: '発送完了',
 }
 const SHIPPING_COLORS: Record<ShippingStatus, string> = {
   ordering: 'bg-slate-100 text-slate-700',
   producing: 'bg-blue-100 text-blue-800',
+  ready_to_ship: 'bg-amber-100 text-amber-800',
   shipped: 'bg-emerald-100 text-emerald-800',
 }
 
@@ -141,9 +143,11 @@ function SaleModal({
     paymentStatus: 'uninvoiced',
     shippingStatus: 'ordering',
     buyerName: '',
-    productId: defaultProductId,
-    quantityKg: 0,
-    unitPrice: 0,
+    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0 }],
+    shippingFee: 0,
+    otherFees: 0,
+    otherFeesNote: '',
+    paymentFee: 0,
     country: '',
     dueDate: '',
     terms: '',
@@ -155,18 +159,29 @@ function SaleModal({
   useEffect(() => {
     if (!open) return
 
-    const nextProductId = initial?.productId ?? defaultProductId
-    const selectedProduct = products.find(product => product.id === nextProductId) ?? products[0]
     const matchedBuyer = buyers.find(buyer => buyer.name === (initial?.buyerName ?? ''))
+    const initialItems: SaleLineInput[] = initial && initial.items.length > 0
+      ? initial.items.map(item => ({
+          productId: item.productId,
+          quantityKg: item.quantityKg,
+          unitPrice: item.unitPrice,
+        }))
+      : [{
+          productId: defaultProductId,
+          quantityKg: 0,
+          unitPrice: products.find(p => p.id === defaultProductId)?.standardWholesalePrice ?? 0,
+        }]
 
     setForm({
       status: initial?.status ?? 'negotiating',
       paymentStatus: initial?.paymentStatus ?? 'uninvoiced',
       shippingStatus: initial?.shippingStatus ?? 'ordering',
       buyerName: initial?.buyerName ?? '',
-      productId: nextProductId,
-      quantityKg: initial?.quantityKg ?? 0,
-      unitPrice: initial?.unitPrice ?? selectedProduct?.standardWholesalePrice ?? 0,
+      items: initialItems,
+      shippingFee: initial?.shippingFee ?? 0,
+      otherFees: initial?.otherFees ?? 0,
+      otherFeesNote: initial?.otherFeesNote ?? '',
+      paymentFee: initial?.paymentFee ?? 0,
       country: initial?.country ?? matchedBuyer?.country ?? '',
       dueDate: initial?.dueDate ?? '',
       terms: initial?.terms ?? matchedBuyer?.terms ?? '',
@@ -175,11 +190,35 @@ function SaleModal({
     setError('')
   }, [open, initial, defaultProductId, products, buyers])
 
-  const selectedProduct = products.find(product => product.id === form.productId)
-  const revenue = form.quantityKg * form.unitPrice
-  const costAmount = form.quantityKg * (selectedProduct?.purchaseUnitPrice ?? initial?.costPerKg ?? 0)
-  const grossProfit = revenue - costAmount
-  const remainingStock = (selectedProduct?.currentStockKg ?? 0) + (initial?.productId === form.productId ? initial.quantityKg : 0) - form.quantityKg
+  const itemTotals = form.items.map(line => {
+    const product = products.find(p => p.id === line.productId)
+    const initialLine = initial?.items.find(i => i.productId === line.productId)
+    const revenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
+    const costPerKg = product?.purchaseUnitPrice ?? initialLine?.costPerKg ?? 0
+    const costAmount = (Number(line.quantityKg) || 0) * costPerKg
+    return { revenue, costAmount, product }
+  })
+  const revenue = itemTotals.reduce((s, t) => s + t.revenue, 0)
+  const costAmount = itemTotals.reduce((s, t) => s + t.costAmount, 0)
+  const shippingFeeNum = Number(form.shippingFee) || 0
+  const otherFeesNum = Number(form.otherFees) || 0
+  const paymentFeeNum = Number(form.paymentFee) || 0
+  const invoiceAmount = revenue + shippingFeeNum + otherFeesNum
+  const grossProfit = revenue - costAmount - paymentFeeNum
+  // Stock remaining: sum across distinct products
+  const distinctProductIds = Array.from(new Set(form.items.map(i => i.productId).filter(Boolean)))
+  const stockSummary = distinctProductIds.map(pid => {
+    const product = products.find(p => p.id === pid)
+    const requested = form.items
+      .filter(i => i.productId === pid)
+      .reduce((s, i) => s + (Number(i.quantityKg) || 0), 0)
+    const initialAllocated = initial
+      ? initial.items.filter(i => i.productId === pid).reduce((s, i) => s + i.quantityKg, 0)
+      : 0
+    const remaining = (product?.currentStockKg ?? 0) + initialAllocated - requested
+    return { productId: pid, name: product?.name ?? '', remaining }
+  })
+  const minRemaining = stockSummary.length === 0 ? 0 : Math.min(...stockSummary.map(s => s.remaining))
   const buyerSuggestions = useMemo(() => {
     const query = form.buyerName.trim().toLowerCase()
     const filtered = query
@@ -200,12 +239,35 @@ function SaleModal({
     setBuyerFocused(false)
   }
 
-  const handleProductChange = (productId: string) => {
+  const updateItem = (index: number, patch: Partial<SaleLineInput>) => {
+    setForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => i === index ? { ...item, ...patch } : item),
+    }))
+  }
+  const handleItemProductChange = (index: number, productId: string) => {
     const product = products.find(item => item.id === productId)
     setForm(prev => ({
       ...prev,
-      productId,
-      unitPrice: product?.standardWholesalePrice ?? prev.unitPrice,
+      items: prev.items.map((item, i) => i === index ? {
+        ...item,
+        productId,
+        unitPrice: product?.standardWholesalePrice ?? item.unitPrice,
+      } : item),
+    }))
+  }
+  const addItem = () => {
+    const defaultPid = products[0]?.id ?? ''
+    const defaultPrice = products[0]?.standardWholesalePrice ?? 0
+    setForm(prev => ({
+      ...prev,
+      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice }],
+    }))
+  }
+  const removeItem = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      items: prev.items.length <= 1 ? prev.items : prev.items.filter((_, i) => i !== index),
     }))
   }
 
@@ -221,6 +283,12 @@ function SaleModal({
     setError('')
 
     try {
+      if (form.items.length === 0 || form.items.some(item => !item.productId)) {
+        throw new Error('商品を選択してください')
+      }
+      if (form.items.some(item => !(Number(item.quantityKg) > 0))) {
+        throw new Error('各商品の数量を入力してください')
+      }
       await onSave(form)
       onClose()
     } catch (err) {
@@ -323,45 +391,72 @@ function SaleModal({
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-[1.2fr,0.8fr,0.8fr]">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">商品</label>
-              <select
-                value={form.productId}
-                onChange={event => handleProductChange(event.target.value)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                {products.map(product => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} ({product.sku})
-                  </option>
-                ))}
-              </select>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">商品</label>
+              <span className="text-xs text-[#68756c]">合計 {formatCurrency(revenue)}</span>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">数量 (kg)</label>
-              <input
-                required
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={form.quantityKg}
-                onChange={event => setForm(prev => ({ ...prev, quantityKg: Number(event.target.value) || 0 }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              />
+            <div className="space-y-2">
+              {form.items.map((line, index) => {
+                const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
+                return (
+                  <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.4fr,0.7fr,0.7fr,auto,auto]">
+                    <select
+                      value={line.productId}
+                      onChange={event => handleItemProductChange(index, event.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    >
+                      <option value="">選択してください</option>
+                      {products.map(product => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} ({product.sku})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      required
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={line.quantityKg}
+                      placeholder="数量 (kg)"
+                      onChange={event => updateItem(index, { quantityKg: Number(event.target.value) || 0 })}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                    <input
+                      required
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={line.unitPrice}
+                      placeholder="単価"
+                      onChange={event => updateItem(index, { unitPrice: Number(event.target.value) || 0 })}
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                    <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
+                      {formatCurrency(lineRevenue)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(index)}
+                      disabled={form.items.length <= 1}
+                      aria-label="削除"
+                      className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-red-600 disabled:opacity-30"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">単価 (円/kg)</label>
-              <input
-                required
-                type="number"
-                min="0"
-                step="1"
-                value={form.unitPrice}
-                onChange={event => setForm(prev => ({ ...prev, unitPrice: Number(event.target.value) || 0 }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={addItem}
+              className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]"
+            >
+              <Plus size={14} />
+              商品を追加
+            </button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -427,9 +522,65 @@ function SaleModal({
             />
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">費用・請求</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">送料</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.shippingFee ?? 0}
+                  onChange={event => setForm(prev => ({ ...prev, shippingFee: Number(event.target.value) || 0 }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">諸費用</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.otherFees ?? 0}
+                  onChange={event => setForm(prev => ({ ...prev, otherFees: Number(event.target.value) || 0 }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-700">諸費用メモ</label>
+                <input
+                  type="text"
+                  value={form.otherFeesNote ?? ''}
+                  onChange={event => setForm(prev => ({ ...prev, otherFeesNote: event.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  placeholder="例: 通関手数料、梱包資材費 など"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">支払手数料（粗利から差引）</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.paymentFee ?? 0}
+                  onChange={event => setForm(prev => ({ ...prev, paymentFee: Number(event.target.value) || 0 }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-gray-700">請求額（自動）</p>
+                <p className="mt-1 rounded-xl border border-dashed border-[#d9d1be] bg-[#f7f5ee] px-3 py-2 text-sm font-semibold text-[#173c2a]">
+                  {formatCurrency(invoiceAmount)}
+                </p>
+                <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料 + 諸費用</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-5">
             <div>
-              <p className="text-xs text-[#68756c]">売上高</p>
+              <p className="text-xs text-[#68756c]">商品代金</p>
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(revenue)}</p>
             </div>
             <div>
@@ -437,14 +588,23 @@ function SaleModal({
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(costAmount)}</p>
             </div>
             <div>
+              <p className="text-xs text-[#68756c]">請求額</p>
+              <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(invoiceAmount)}</p>
+            </div>
+            <div>
               <p className="text-xs text-[#68756c]">粗利</p>
               <p className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(grossProfit)}</p>
             </div>
             <div>
-              <p className="text-xs text-[#68756c]">登録後の残在庫</p>
-              <p className={`mt-1 text-lg font-semibold ${remainingStock < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>
-                {formatKg(remainingStock)}
+              <p className="text-xs text-[#68756c]">登録後の残在庫（最少）</p>
+              <p className={`mt-1 text-lg font-semibold ${minRemaining < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>
+                {formatKg(minRemaining)}
               </p>
+              {stockSummary.length > 1 && (
+                <p className="mt-1 text-[10px] text-[#68756c]">
+                  {stockSummary.map(s => `${s.name}: ${s.remaining.toFixed(1)}kg`).join(' / ')}
+                </p>
+              )}
             </div>
           </div>
 
@@ -534,8 +694,8 @@ export default function SalesPage() {
       if (buyerFilters.size > 0 && !buyerFilters.has(record.buyerName)) return false
       if (countryFilters.size > 0 && !countryFilters.has(record.country || '(未設定)')) return false
       if (productFilters.size > 0) {
-        const key = record.productSku || record.productId
-        if (!productFilters.has(key)) return false
+        const matched = record.items.some(item => productFilters.has(item.productSku || item.productId))
+        if (!matched) return false
       }
       const t = record.createdAt.getTime()
       if (fromTime != null && t < fromTime) return false
@@ -543,9 +703,11 @@ export default function SalesPage() {
       if (!q) return true
       return (
         record.buyerName.toLowerCase().includes(q) ||
-        record.productName.toLowerCase().includes(q) ||
-        record.productSku.toLowerCase().includes(q) ||
-        record.country.toLowerCase().includes(q)
+        record.country.toLowerCase().includes(q) ||
+        record.items.some(item =>
+          item.productName.toLowerCase().includes(q) ||
+          item.productSku.toLowerCase().includes(q)
+        )
       )
     })
   }, [sales, search, statusFilters, buyerFilters, countryFilters, productFilters, dateFrom, dateTo])
@@ -562,8 +724,28 @@ export default function SalesPage() {
     }).sort((a, b) => b.key.localeCompare(a.key)),
     country: aggregateSales(filteredSales, r => ({ key: r.country || '(未設定)', label: r.country || '(未設定)' }))
       .sort((a, b) => b.revenue - a.revenue),
-    product: aggregateSales(filteredSales, r => ({ key: `${r.productSku || r.productId}::${r.productName}`, label: r.productName }))
-      .sort((a, b) => b.revenue - a.revenue),
+    product: (() => {
+      const groups = new Map<string, AggregateRow>()
+      for (const sale of filteredSales) {
+        const seenInSale = new Set<string>()
+        for (const item of sale.items) {
+          const key = `${item.productSku || item.productId}::${item.productName}`
+          const label = item.productName
+          const existing = groups.get(key) ?? { key, label, count: 0, quantityKg: 0, revenue: 0, costAmount: 0, grossProfit: 0 }
+          // Count each sale once per product
+          if (!seenInSale.has(key)) {
+            existing.count += 1
+            seenInSale.add(key)
+          }
+          existing.quantityKg += item.quantityKg
+          existing.revenue += item.revenue
+          existing.costAmount += item.costAmount
+          existing.grossProfit += item.grossProfit
+          groups.set(key, existing)
+        }
+      }
+      return [...groups.values()].sort((a, b) => b.revenue - a.revenue)
+    })(),
   }), [filteredSales])
 
   const filterOptions = useMemo(() => {
@@ -573,8 +755,10 @@ export default function SalesPage() {
     for (const r of sales) {
       if (r.buyerName) buyers.add(r.buyerName)
       countries.add(r.country || '(未設定)')
-      const key = r.productSku || r.productId
-      products.set(key, `${r.productName}${r.productSku ? ` (${r.productSku})` : ''}`)
+      for (const item of r.items) {
+        const key = item.productSku || item.productId
+        products.set(key, `${item.productName}${item.productSku ? ` (${item.productSku})` : ''}`)
+      }
     }
     return {
       buyers: [...buyers].sort(),
@@ -947,8 +1131,13 @@ export default function SalesPage() {
                   </div>
                 </div>
                 <div className="mt-3 rounded-xl bg-white p-3">
-                  <div className="text-sm text-[#173c2a]">{record.productName}</div>
-                  <div className="mt-1 text-xs text-[#68756c]">{record.productSku}</div>
+                  <div className="text-sm text-[#173c2a]">
+                    {record.items[0]?.productName ?? record.productName}
+                    {record.items.length > 1 && (
+                      <span className="text-xs text-[#68756c]"> +他{record.items.length - 1}件</span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
@@ -1028,8 +1217,13 @@ export default function SalesPage() {
                     </td>
                     <td className="px-3 py-4 font-medium">{record.buyerName}</td>
                     <td className="px-3 py-4">
-                      <div>{record.productName}</div>
-                      <div className="text-xs text-[#68756c]">{record.productSku}</div>
+                      <div>
+                        {record.items[0]?.productName ?? record.productName}
+                        {record.items.length > 1 && (
+                          <span className="text-xs text-[#68756c]"> +他{record.items.length - 1}件</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
                     </td>
                     <td className="px-3 py-4">{formatKg(record.quantityKg)}</td>
                     <td className="px-3 py-4 font-medium">{formatCurrency(record.revenue)}</td>
@@ -1283,16 +1477,44 @@ function SaleDetailModal({
           {/* 注文内容 */}
           <Section title="注文内容" onEdit={onEdit}>
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-              <DetailField label="商品" value={record.productName + (record.productSku ? ` (${record.productSku})` : '')} />
               <DetailField label="国" value={record.country || '-'} />
               <DetailField label="納期" value={record.dueDate || '-'} />
-              <DetailField label="数量" value={formatKg(record.quantityKg)} />
-              <DetailField label="単価" value={formatCurrency(record.unitPrice)} />
-              <DetailField label="売上" value={formatCurrency(record.revenue)} />
-              <DetailField label="原価" value={formatCurrency(record.costAmount)} />
-              <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
               <DetailField label="取引条件" value={record.terms || '-'} />
               <DetailField label="作成日" value={record.createdAt.toLocaleDateString('ja-JP')} />
+              <DetailField label="商品代金" value={formatCurrency(record.revenue)} />
+              <DetailField label="送料" value={formatCurrency(record.shippingFee || 0)} />
+              <DetailField
+                label="諸費用"
+                value={`${formatCurrency(record.otherFees || 0)}${record.otherFeesNote ? ` (${record.otherFeesNote})` : ''}`}
+              />
+              <DetailField label="請求額" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
+              <DetailField label="支払手数料" value={formatCurrency(record.paymentFee || 0)} />
+              <DetailField label="原価" value={formatCurrency(record.costAmount)} />
+              <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
+            </div>
+            <div className="mt-3 overflow-hidden rounded-xl border border-[#ece8db]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">商品</th>
+                    <th className="px-3 py-2 font-medium">SKU</th>
+                    <th className="px-3 py-2 font-medium text-right">数量</th>
+                    <th className="px-3 py-2 font-medium text-right">単価</th>
+                    <th className="px-3 py-2 font-medium text-right">小計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {record.items.map((item, i) => (
+                    <tr key={i} className="border-t border-[#ece8db] text-[#173c2a]">
+                      <td className="px-3 py-2">{item.productName}</td>
+                      <td className="px-3 py-2 text-[#68756c]">{item.productSku}</td>
+                      <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
             {record.notes && (
               <div className="mt-3">
@@ -1369,6 +1591,7 @@ function SaleDetailModal({
                 >
                   <option value="ordering">発注中</option>
                   <option value="producing">製造中</option>
+                  <option value="ready_to_ship">発送準備中</option>
                   <option value="shipped">発送完了</option>
                 </select>
               </div>
