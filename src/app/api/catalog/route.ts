@@ -88,9 +88,11 @@ function deriveAdjustmentKg(records: unknown): number {
   return records.reduce((sum, r) => sum + num((r as AnyRecord)?.adjustmentKg), 0)
 }
 
-function getStockStatus(currentKg: number, baselineKg: number, alertRatio: number): StockStatus {
+const LOW_STOCK_THRESHOLD_KG = 10
+
+function getStockStatus(currentKg: number): StockStatus {
   if (currentKg <= 0) return 'out'
-  if (currentKg <= baselineKg * alertRatio) return 'low'
+  if (currentKg <= LOW_STOCK_THRESHOLD_KG) return 'low'
   return 'normal'
 }
 
@@ -227,7 +229,7 @@ export async function POST(request: Request) {
             ? num(data.price, NaN)
             : undefined,
         arrivalDate: arrivalDate || undefined,
-        stockStatus: getStockStatus(currentKg, baseline, alertRatio),
+        stockStatus: getStockStatus(currentKg),
         currentStockKg: Math.max(currentKg, 0),
         inquireToOrder: data.inquireToOrder === true,
         salesNote: data.salesNote ? String(data.salesNote) : undefined,

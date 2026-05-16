@@ -180,9 +180,11 @@ function buildProductPayload(input: ProductInput) {
   })
 }
 
-function getStockStatus(currentKg: number, initialKg: number, alertRatio: number): StockStatus {
+const LOW_STOCK_THRESHOLD_KG = 10
+
+function getStockStatus(currentKg: number): StockStatus {
   if (currentKg <= 0) return 'out'
-  if (currentKg <= initialKg * alertRatio) return 'low'
+  if (currentKg <= LOW_STOCK_THRESHOLD_KG) return 'low'
   return 'normal'
 }
 
@@ -608,7 +610,7 @@ function computeInventory(
         inventoryAdjustmentKg,
         latestInventoryCheck: getLatestInventoryCheck(product.inventoryChecks),
         currentStockKg,
-        stockStatus: getStockStatus(currentStockKg, Math.max(effectiveInitialKg, 0), settings.stockAlertRatio),
+        stockStatus: getStockStatus(currentStockKg),
       }
     })
 }
