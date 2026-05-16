@@ -26,6 +26,7 @@ export interface CatalogProduct {
   inquireToOrder: boolean
   salesNote?: string
   flavorNotes?: string
+  imageUrl?: string
   sortOrder: number
 }
 

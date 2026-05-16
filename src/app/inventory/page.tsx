@@ -16,8 +16,9 @@ import type {
   ProductInput,
   ProductWithInventory,
 } from '@/types'
-import { Copy, Download, GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Copy, Download, GripVertical, ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { uploadProductImage } from '@/lib/firebase/storage'
 
 function formatCurrency(value?: number): string {
   if (value == null) return '-'
@@ -95,9 +96,97 @@ function buildProductForm(
     adminNote: initial?.adminNote ?? '',
     salesNote: initial?.salesNote ?? '',
     flavorNotes: initial?.flavorNotes ?? '',
+    imageUrl: initial?.imageUrl ?? '',
     showInCatalog: initial?.showInCatalog ?? true,
     inquireToOrder: initial?.inquireToOrder ?? false,
   }
+}
+
+function ImageUploader({
+  imageUrl,
+  productKey,
+  onChange,
+}: {
+  imageUrl: string
+  productKey: string
+  onChange: (url: string) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleFile = async (file: File) => {
+    setError('')
+    if (!file.type.startsWith('image/')) {
+      setError('画像ファイルを選択してください')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('画像サイズは 10MB 以下にしてください')
+      return
+    }
+    setUploading(true)
+    try {
+      const url = await uploadProductImage(file, productKey)
+      onChange(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'アップロードに失敗しました')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-3">
+      {imageUrl ? (
+        <div className="flex items-start gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt="商品画像" loading="lazy" decoding="async" className="h-28 w-28 rounded-lg object-cover" />
+          <div className="flex flex-col gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+              <ImagePlus size={12} />
+              {uploading ? 'アップロード中…' : '画像を差し替え'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleFile(file)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+            >
+              <Trash2 size={12} />
+              削除
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-[#faf8f1] px-6 py-8 text-sm text-[#68756c] transition hover:bg-[#f1ede0]">
+          <ImagePlus size={20} />
+          <span>{uploading ? 'アップロード中…' : '画像を選択 / ドロップ'}</span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) void handleFile(file)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      )}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
+  )
 }
 
 function TagInput({
@@ -350,6 +439,7 @@ function ProductModal({
         adminNote: form.adminNote?.trim() || undefined,
         salesNote: form.salesNote?.trim() || undefined,
         flavorNotes: form.flavorNotes?.trim() || undefined,
+        imageUrl: form.imageUrl?.trim() || undefined,
         showInCatalog: form.showInCatalog,
         inquireToOrder: form.inquireToOrder,
       })
@@ -787,6 +877,16 @@ function ProductModal({
                 />
                 <p className="mt-1 text-[11px] text-[#68756c]">カタログの商品詳細に表示されます</p>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700">商品画像</label>
+              <p className="mb-2 text-xs text-[#68756c]">JPG / PNG 推奨。カタログのカード・詳細に表示されます。</p>
+              <ImageUploader
+                imageUrl={form.imageUrl ?? ''}
+                productKey={initial?.id || form.sku || 'unsorted'}
+                onChange={url => setForm(prev => ({ ...prev, imageUrl: url }))}
+              />
             </div>
 
             <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">

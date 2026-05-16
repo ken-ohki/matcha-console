@@ -53,6 +53,7 @@ export interface Product {
   adminNote?: string
   salesNote?: string
   flavorNotes?: string
+  imageUrl?: string
   sortOrder: number
   isActive: boolean
   showInCatalog: boolean
@@ -217,6 +218,7 @@ export interface ProductInput {
   adminNote?: string
   salesNote?: string
   flavorNotes?: string
+  imageUrl?: string
   showInCatalog?: boolean
   inquireToOrder?: boolean
 }

@@ -634,8 +634,24 @@ export default function CatalogPage() {
               return (
                 <article
                   key={product.id}
-                  className="flex h-full flex-col rounded-2xl border border-[#e2dccc] bg-white p-5 shadow-sm transition hover:border-[#bcb39a] hover:shadow"
+                  onClick={() => setSelectedProductId(product.id)}
+                  className="flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#e2dccc] bg-white shadow-sm transition hover:border-[#bcb39a] hover:shadow"
                 >
+                  {product.imageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-44 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-44 w-full items-center justify-center bg-[#f7f5ee] text-xs text-[#a59f8c]">
+                      No image
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.16em] text-[#68756c]">
@@ -668,6 +684,7 @@ export default function CatalogPage() {
                       {formatCurrency(convertPrice(product.standardWholesalePrice, exchangeRate), displayCurrency)}
                       <span className="ml-1 text-xs font-normal text-[#68756c]">/ kg</span>
                     </span>
+                  </div>
                   </div>
                 </article>
               )
@@ -744,9 +761,25 @@ function ProductList({
               onClick={() => onSelect(product.id)}
               className={`grid w-full grid-cols-1 gap-2 px-4 py-3 text-left transition hover:bg-[#faf8f1] focus:bg-[#faf8f1] focus:outline-none md:items-center md:gap-3 ${gridCols}`}
             >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#173c2a]">{product.name}</p>
-                <p className="text-[11px] text-[#68756c]">{product.sku || '-'}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                {product.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-12 w-12 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#f0ecde] text-[9px] text-[#a59f8c]">
+                    No img
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[#173c2a]">{product.name}</p>
+                  <p className="text-[11px] text-[#68756c]">{product.sku || '-'}</p>
+                </div>
               </div>
               <div className="text-sm text-[#173c2a] md:truncate">
                 <span className="md:hidden text-[11px] text-[#68756c] mr-2">Type:</span>
@@ -819,10 +852,19 @@ function ProductDetailModal({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+          className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-1.5 text-[#68756c] backdrop-blur transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
         >
           <X size={18} />
         </button>
+        {product.imageUrl && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            decoding="async"
+            className="h-56 w-full rounded-t-2xl object-cover"
+          />
+        )}
         <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
           <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">
             {groupName ?? '-'} · {product.sku || '-'}

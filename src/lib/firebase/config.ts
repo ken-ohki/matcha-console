@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getStorage, type FirebaseStorage } from 'firebase/storage'
 
 const requiredEnvVars = {
   NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,6 +15,7 @@ const requiredEnvVars = {
 let firebaseApp: FirebaseApp | null = null
 let firestoreDb: Firestore | null = null
 let firebaseAuth: Auth | null = null
+let firebaseStorage: FirebaseStorage | null = null
 
 function getMissingEnvVars(): string[] {
   return Object.entries(requiredEnvVars)
@@ -55,4 +57,10 @@ export function getFirebaseAuthInstance(): Auth {
   if (firebaseAuth) return firebaseAuth
   firebaseAuth = getAuth(getFirebaseApp())
   return firebaseAuth
+}
+
+export function getFirebaseStorageInstance(): FirebaseStorage {
+  if (firebaseStorage) return firebaseStorage
+  firebaseStorage = getStorage(getFirebaseApp())
+  return firebaseStorage
 }
