@@ -845,7 +845,7 @@ function ProductDetailModal({
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        className="relative max-h-[100vh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl"
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -960,7 +960,7 @@ function StockInfoModal({ onClose }: { onClose: () => void }) {
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        className="relative max-h-[100vh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl"
         onClick={event => event.stopPropagation()}
       >
         <button
@@ -1005,7 +1005,7 @@ function GradeInfoModal({ onClose }: { onClose: () => void }) {
       aria-modal="true"
     >
       <div
-        className="relative w-full max-w-xl rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        className="relative max-h-[100vh] w-full max-w-xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl"
         onClick={event => event.stopPropagation()}
       >
         <button
