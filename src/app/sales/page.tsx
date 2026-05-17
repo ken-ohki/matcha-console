@@ -569,7 +569,7 @@ function SaleModal({
                 />
               </div>
               <div>
-                <p className="mb-1 text-xs font-medium text-gray-700">請求額（自動）</p>
+                <p className="mb-1 text-xs font-medium text-gray-700">請求額（税抜・自動）</p>
                 <p className="mt-1 rounded-xl border border-dashed border-[#d9d1be] bg-[#f7f5ee] px-3 py-2 text-sm font-semibold text-[#173c2a]">
                   {formatCurrency(invoiceAmount)}
                 </p>
@@ -588,7 +588,7 @@ function SaleModal({
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(costAmount)}</p>
             </div>
             <div>
-              <p className="text-xs text-[#68756c]">請求額</p>
+              <p className="text-xs text-[#68756c]">請求額（税抜）</p>
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(invoiceAmount)}</p>
             </div>
             <div>
@@ -1487,7 +1487,7 @@ function SaleDetailModal({
                 label="諸費用"
                 value={`${formatCurrency(record.otherFees || 0)}${record.otherFeesNote ? ` (${record.otherFeesNote})` : ''}`}
               />
-              <DetailField label="請求額" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
+              <DetailField label="請求額（税抜）" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
               <DetailField label="支払手数料" value={formatCurrency(record.paymentFee || 0)} />
               <DetailField label="原価" value={formatCurrency(record.costAmount)} />
               <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
