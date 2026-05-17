@@ -117,6 +117,7 @@ export interface SaleRecord {
   notes?: string
   paymentMethod?: string
   paymentDate?: string
+  shippingAddress?: string
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string
@@ -243,6 +244,7 @@ export interface SaleRecordInput {
   notes?: string
   paymentMethod?: string
   paymentDate?: string
+  shippingAddress?: string
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string

@@ -1281,9 +1281,11 @@ export default function SalesPage() {
         {detailSaleId && (() => {
           const detailRecord = sales.find(s => s.id === detailSaleId)
           if (!detailRecord) return null
+          const detailBuyer = buyers.find(b => b.name === detailRecord.buyerName)
           return (
             <SaleDetailModal
               record={detailRecord}
+              buyerShippingAddress={detailBuyer?.shippingAddress ?? ''}
               onClose={() => setDetailSaleId(null)}
               onEdit={() => {
                 setEditingSale(detailRecord)
@@ -1364,11 +1366,13 @@ function FilterMultiSelect({
 
 function SaleDetailModal({
   record,
+  buyerShippingAddress,
   onClose,
   onEdit,
   onUpdate,
 }: {
   record: SaleRecord
+  buyerShippingAddress: string
   onClose: () => void
   onEdit: () => void
   onUpdate: (input: Partial<SaleRecordInput>) => Promise<void>
@@ -1380,6 +1384,7 @@ function SaleDetailModal({
   })
   const [shipping, setShipping] = useState({
     shippingStatus: record.shippingStatus,
+    shippingAddress: record.shippingAddress ?? buyerShippingAddress ?? '',
     shippingMethod: record.shippingMethod ?? '',
     shippingDate: record.shippingDate ?? '',
     trackingNumber: record.trackingNumber ?? '',
@@ -1402,6 +1407,7 @@ function SaleDetailModal({
 
   const shippingDirty =
     shipping.shippingStatus !== record.shippingStatus ||
+    (shipping.shippingAddress || '') !== (record.shippingAddress ?? '') ||
     (shipping.shippingMethod || '') !== (record.shippingMethod ?? '') ||
     (shipping.shippingDate || '') !== (record.shippingDate ?? '') ||
     (shipping.trackingNumber || '') !== (record.trackingNumber ?? '')
@@ -1429,6 +1435,7 @@ function SaleDetailModal({
     try {
       await onUpdate({
         shippingStatus: shipping.shippingStatus,
+        shippingAddress: shipping.shippingAddress.trim() || undefined,
         shippingMethod: shipping.shippingMethod.trim() || undefined,
         shippingDate: shipping.shippingDate || undefined,
         trackingNumber: shipping.trackingNumber.trim() || undefined,
@@ -1632,6 +1639,27 @@ function SaleDetailModal({
                   value={shipping.trackingNumber}
                   onChange={e => setShipping(prev => ({ ...prev, trackingNumber: e.target.value }))}
                   className={fieldClass}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="text-[11px] uppercase tracking-wider text-[#68756c]">発送先</p>
+                  {buyerShippingAddress && shipping.shippingAddress !== buyerShippingAddress && (
+                    <button
+                      type="button"
+                      onClick={() => setShipping(prev => ({ ...prev, shippingAddress: buyerShippingAddress }))}
+                      className="text-[10px] text-[#174c33] underline hover:text-[#205f43]"
+                    >
+                      販売先の住所を使用
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  rows={2}
+                  value={shipping.shippingAddress}
+                  onChange={e => setShipping(prev => ({ ...prev, shippingAddress: e.target.value }))}
+                  placeholder={buyerShippingAddress || '発送先の住所'}
+                  className={`${fieldClass} resize-none`}
                 />
               </div>
             </div>
