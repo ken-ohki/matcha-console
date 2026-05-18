@@ -4,13 +4,34 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { getServices } from '@/lib/services'
+import { getServices, type IssuerInfo } from '@/lib/services'
 import { ISSUER } from '@/lib/invoice'
 import { Save, Settings } from 'lucide-react'
 
-export default function SettingsBankAccountsPage() {
-  const [ja, setJa] = useState('')
-  const [en, setEn] = useState('')
+const EMPTY: IssuerInfo = {
+  company: '',
+  companyEn: '',
+  postalCode: '',
+  address: '',
+  addressEn: '',
+  tel: '',
+  email: '',
+  registrationNumber: '',
+}
+
+const FIELDS: { key: keyof IssuerInfo; label: string; placeholder?: string; full?: boolean }[] = [
+  { key: 'company', label: '会社名（日本語）' },
+  { key: 'companyEn', label: '会社名（英語）' },
+  { key: 'postalCode', label: '郵便番号', placeholder: '〒000-0000' },
+  { key: 'tel', label: '電話番号' },
+  { key: 'address', label: '住所（日本語）', full: true },
+  { key: 'addressEn', label: '住所（英語）', full: true },
+  { key: 'email', label: 'Email' },
+  { key: 'registrationNumber', label: '適格請求書発行事業者 登録番号', placeholder: 'T0000000000000' },
+]
+
+export default function SettingsIssuerPage() {
+  const [form, setForm] = useState<IssuerInfo>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -20,9 +41,8 @@ export default function SettingsBankAccountsPage() {
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const stored = await services.settings.getBankAccounts()
-    setJa(stored.ja || ISSUER.bankInfo)
-    setEn(stored.en || ISSUER.bankInfoEn)
+    const stored = await services.settings.getIssuer()
+    setForm(stored)
     setLoading(false)
   }
 
@@ -35,8 +55,18 @@ export default function SettingsBankAccountsPage() {
     setFeedback(null)
     try {
       const services = await getServices()
-      await services.settings.updateBankAccounts({ ja: ja.trim(), en: en.trim() })
-      setFeedback({ tone: 'success', message: '入金口座情報を保存しました' })
+      const cleaned: IssuerInfo = {
+        company: form.company.trim(),
+        companyEn: form.companyEn.trim(),
+        postalCode: form.postalCode.trim(),
+        address: form.address.trim(),
+        addressEn: form.addressEn.trim(),
+        tel: form.tel.trim(),
+        email: form.email.trim(),
+        registrationNumber: form.registrationNumber.trim(),
+      }
+      await services.settings.updateIssuer(cleaned)
+      setFeedback({ tone: 'success', message: '自社情報を保存しました' })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
     } finally {
@@ -45,9 +75,17 @@ export default function SettingsBankAccountsPage() {
   }
 
   const handleResetDefaults = () => {
-    if (!confirm('デフォルトの口座情報で上書きします（保存はしません）。よろしいですか？')) return
-    setJa(ISSUER.bankInfo)
-    setEn(ISSUER.bankInfoEn)
+    if (!confirm('デフォルト値で上書きします（保存はしません）。よろしいですか？')) return
+    setForm({
+      company: ISSUER.company,
+      companyEn: ISSUER.companyEn,
+      postalCode: ISSUER.postalCode,
+      address: ISSUER.address,
+      addressEn: ISSUER.addressEn,
+      tel: ISSUER.tel,
+      email: ISSUER.email,
+      registrationNumber: ISSUER.registrationNumber,
+    })
   }
 
   if (!isAdmin) {
@@ -68,9 +106,9 @@ export default function SettingsBankAccountsPage() {
             <Settings size={15} />
             設定
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">請求書 入金口座</h1>
+          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">請求書 自社情報</h1>
           <p className="mt-2 text-sm text-[#68756c]">
-            請求書に記載される入金口座を、国内用（日本語）と海外用（英語）で個別に設定できます。
+            請求書・納品書・見積書に印字される自社の住所・連絡先・登録番号を設定します。
           </p>
         </div>
 
@@ -78,8 +116,8 @@ export default function SettingsBankAccountsPage() {
           <Link href="/settings/masters" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">マスター管理</Link>
           <Link href="/settings/users" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">ユーザー管理</Link>
           <Link href="/settings/terms" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
-          <Link href="/settings/bank-accounts" className="rounded-full bg-[#174c33] px-3 py-1.5 text-white">入金口座</Link>
-          <Link href="/settings/issuer" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">自社情報</Link>
+          <Link href="/settings/bank-accounts" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">入金口座</Link>
+          <Link href="/settings/issuer" className="rounded-full bg-[#174c33] px-3 py-1.5 text-white">自社情報</Link>
         </div>
 
         {feedback && (
@@ -95,30 +133,21 @@ export default function SettingsBankAccountsPage() {
         {loading ? (
           <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#173c2a]">国内用（日本語請求書）</h2>
-              <p className="mt-1 text-xs text-[#68756c]">日本語の請求書「振込先」欄に表示されます。</p>
-              <textarea
-                rows={6}
-                value={ja}
-                onChange={e => setJa(e.target.value)}
-                className="mt-3 w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 font-mono"
-                placeholder="銀行名 支店名 種別 口座番号&#10;口座名義"
-              />
-            </section>
-
-            <section className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold text-[#173c2a]">海外用（英語請求書）</h2>
-              <p className="mt-1 text-xs text-[#68756c]">英語請求書の "Bank Information" 欄に表示されます。SWIFT コードも記載してください。</p>
-              <textarea
-                rows={6}
-                value={en}
-                onChange={e => setEn(e.target.value)}
-                className="mt-3 w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 font-mono"
-                placeholder="Account Name: ...&#10;Bank Name: ...&#10;Account Number: ...&#10;SWIFT Code: ..."
-              />
-            </section>
+          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-2">
+              {FIELDS.map(field => (
+                <div key={field.key} className={field.full ? 'md:col-span-2' : ''}>
+                  <label className="mb-1 block text-sm font-medium text-[#173c2a]">{field.label}</label>
+                  <input
+                    type="text"
+                    value={form[field.key]}
+                    onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

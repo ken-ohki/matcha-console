@@ -64,6 +64,17 @@ export interface BankAccounts {
   en: string
 }
 
+export interface IssuerInfo {
+  company: string
+  companyEn: string
+  postalCode: string
+  address: string
+  addressEn: string
+  tel: string
+  email: string
+  registrationNumber: string
+}
+
 export interface ISettingsService {
   getSettings(): Promise<Settings>
   updateSettings(input: Partial<Settings>): Promise<Settings>
@@ -71,6 +82,8 @@ export interface ISettingsService {
   updateDocumentTermsEn(sections: TermsSection[]): Promise<void>
   getBankAccounts(): Promise<BankAccounts>
   updateBankAccounts(input: BankAccounts): Promise<void>
+  getIssuer(): Promise<IssuerInfo>
+  updateIssuer(input: IssuerInfo): Promise<void>
 }
 
 export interface IMastersService {

@@ -184,6 +184,12 @@ export default function SettingsMastersPage() {
               >
                 入金口座
               </Link>
+              <Link
+                href="/settings/issuer"
+                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+              >
+                自社情報
+              </Link>
             </>
           )}
         </div>

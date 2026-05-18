@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Printer, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type { Buyer, SaleRecord } from '@/types'
+import type { IssuerInfo } from '@/lib/services'
 import {
   computeTotals,
   createBlankLine,
@@ -135,6 +136,7 @@ export default function DocumentPage() {
   const [error, setError] = useState('')
   const [includeTerms, setIncludeTerms] = useState(true)
   const [terms, setTerms] = useState<{ heading: string; body: string }[]>([])
+  const [issuer, setIssuer] = useState<IssuerInfo>(ISSUER)
   const { user } = useAuth()
 
   useEffect(() => {
@@ -142,13 +144,15 @@ export default function DocumentPage() {
     ;(async () => {
       try {
         const services = await getServices()
-        const [sales, buyers, storedTerms, bankAccounts] = await Promise.all([
+        const [sales, buyers, storedTerms, bankAccounts, storedIssuer] = await Promise.all([
           services.sales.getSaleRecords(),
           services.sales.getBuyers(),
           services.settings.getDocumentTermsEn(),
           services.settings.getBankAccounts(),
+          services.settings.getIssuer(),
         ])
         setTerms(storedTerms.length > 0 ? storedTerms : TERMS_AND_CONDITIONS_EN.map(s => ({ heading: s.heading, body: s.body })))
+        setIssuer(storedIssuer)
         if (cancelled) return
         if (cancelled) return
         const target = sales.find(s => s.id === params.id)
@@ -311,13 +315,13 @@ export default function DocumentPage() {
                 />
               </div>
               <div className="mt-3 text-right">
-                <p className="font-medium text-[#173c2a]">{isJa ? ISSUER.company : ISSUER.companyEn}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? ISSUER.postalCode : ''}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? ISSUER.address : ISSUER.addressEn}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? 'TEL：' : 'TEL: '}{ISSUER.tel}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? 'E-Mail：' : 'Email: '}{ISSUER.email}</p>
+                <p className="font-medium text-[#173c2a]">{isJa ? issuer.company : issuer.companyEn}</p>
+                <p className="text-xs text-[#68756c]">{isJa ? issuer.postalCode : ''}</p>
+                <p className="text-xs text-[#68756c]">{isJa ? issuer.address : issuer.addressEn}</p>
+                <p className="text-xs text-[#68756c]">{isJa ? 'TEL：' : 'TEL: '}{issuer.tel}</p>
+                <p className="text-xs text-[#68756c]">{isJa ? 'E-Mail：' : 'Email: '}{issuer.email}</p>
                 {isJa && (
-                  <p className="text-xs text-[#68756c]">登録番号：{ISSUER.registrationNumber}</p>
+                  <p className="text-xs text-[#68756c]">登録番号：{issuer.registrationNumber}</p>
                 )}
               </div>
             </div>
@@ -502,7 +506,7 @@ export default function DocumentPage() {
         {!isJa && (type === 'invoice' || type === 'quotation') && includeTerms && (
           <div className="terms-page mt-6 rounded-lg border border-gray-300 bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none print:mt-0">
             <h2 className="text-center text-2xl font-semibold tracking-[0.2em] text-[#173c2a]">TERMS &amp; CONDITIONS OF SALE</h2>
-            <p className="mt-2 text-center text-xs text-[#68756c]">{ISSUER.companyEn}　·　{ISSUER.addressEn}</p>
+            <p className="mt-2 text-center text-xs text-[#68756c]">{issuer.companyEn}　·　{issuer.addressEn}</p>
 
             <div className="mt-8 space-y-4 text-sm leading-relaxed text-[#1f2a23]">
               {terms.map((section, i) => (
@@ -516,8 +520,8 @@ export default function DocumentPage() {
             <div className="mt-12 grid grid-cols-2 gap-8 text-sm">
               <div>
                 <p className="text-[#68756c]">Seller</p>
-                <p className="mt-1 font-medium text-[#173c2a]">{ISSUER.companyEn}</p>
-                <p className="text-xs text-[#68756c]">{ISSUER.addressEn}</p>
+                <p className="mt-1 font-medium text-[#173c2a]">{issuer.companyEn}</p>
+                <p className="text-xs text-[#68756c]">{issuer.addressEn}</p>
               </div>
               <div>
                 <p className="text-[#68756c]">{type === 'quotation' ? 'Buyer (acknowledged upon order)' : 'Buyer (acknowledged by payment)'}</p>

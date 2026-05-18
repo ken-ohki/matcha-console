@@ -56,6 +56,7 @@ import type {
   UserProfile,
 } from '../services'
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
+import { ISSUER } from '../invoice'
 
 const COLLECTIONS = {
   groups: 'inventory_groups',
@@ -1546,6 +1547,29 @@ export function createFirebaseServices(): IServices {
       await setDoc(
         doc(db, COLLECTIONS.settings, 'bank_accounts'),
         { ja: input.ja, en: input.en, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+    },
+
+    async getIssuer() {
+      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'issuer'))
+      const data = snap.data() ?? {}
+      return {
+        company: String(data.company ?? ISSUER.company),
+        companyEn: String(data.companyEn ?? ISSUER.companyEn),
+        postalCode: String(data.postalCode ?? ISSUER.postalCode),
+        address: String(data.address ?? ISSUER.address),
+        addressEn: String(data.addressEn ?? ISSUER.addressEn),
+        tel: String(data.tel ?? ISSUER.tel),
+        email: String(data.email ?? ISSUER.email),
+        registrationNumber: String(data.registrationNumber ?? ISSUER.registrationNumber),
+      }
+    },
+
+    async updateIssuer(input) {
+      await setDoc(
+        doc(db, COLLECTIONS.settings, 'issuer'),
+        { ...input, updatedAt: serverTimestamp() },
         { merge: true },
       )
     },
