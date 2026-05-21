@@ -88,11 +88,33 @@ function toStringArray(value: unknown): string[] {
   return []
 }
 
+function toIsoDate(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  // YYYY/MM/DD or YYYY.MM.DD
+  const m = trimmed.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/)
+  if (m) {
+    const [, y, mo, d] = m
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  // Fallback: try Date parsing
+  const dt = new Date(trimmed)
+  if (!Number.isNaN(dt.getTime())) {
+    const y = dt.getFullYear()
+    const mo = String(dt.getMonth() + 1).padStart(2, '0')
+    const da = String(dt.getDate()).padStart(2, '0')
+    return `${y}-${mo}-${da}`
+  }
+  return trimmed
+}
+
 function normalizeArrivalRecords(records: ArrivalRecord[]): ArrivalRecord[] {
   return records
     .map(record => ({
       id: String(record.id ?? '').trim(),
-      arrivalDate: String(record.arrivalDate ?? '').trim(),
+      arrivalDate: toIsoDate(String(record.arrivalDate ?? '')),
       quantityKg: Number(record.quantityKg ?? 0),
     }))
     .filter(record => record.arrivalDate || record.quantityKg > 0)
@@ -102,7 +124,7 @@ function normalizeInventoryChecks(records: InventoryCheckRecord[]): InventoryChe
   return records
     .map(record => ({
       id: String(record.id ?? '').trim(),
-      checkedDate: String(record.checkedDate ?? '').trim(),
+      checkedDate: toIsoDate(String(record.checkedDate ?? '')),
       countedQuantityKg: Number(record.countedQuantityKg ?? 0),
       expectedQuantityKg: Number(record.expectedQuantityKg ?? 0),
       adjustmentKg: Number(record.adjustmentKg ?? 0),

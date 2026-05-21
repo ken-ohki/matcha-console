@@ -16,7 +16,7 @@ import type {
   ProductInput,
   ProductWithInventory,
 } from '@/types'
-import { Copy, Download, GripVertical, ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Download, GripVertical, ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { uploadProductImage } from '@/lib/firebase/storage'
 
@@ -35,6 +35,19 @@ function compactText(value?: string): string {
 
 function formatKg(value: number): string {
   return `${value.toFixed(1)} kg`
+}
+
+function toIsoDateInput(value: string): string {
+  const v = value?.trim()
+  if (!v) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  const m = v.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/)
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+  const d = new Date(v)
+  if (!Number.isNaN(d.getTime())) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  return ''
 }
 
 function formatSignedKg(value: number): string {
@@ -100,6 +113,39 @@ function buildProductForm(
     showInCatalog: initial?.showInCatalog ?? true,
     inquireToOrder: initial?.inquireToOrder ?? false,
   }
+}
+
+type InventorySortKey = 'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'
+
+function SortableTh({
+  label,
+  sortKey,
+  current,
+  dir,
+  onSort,
+  align = 'left',
+}: {
+  label: string
+  sortKey: Exclude<InventorySortKey, 'manual'>
+  current: InventorySortKey
+  dir: 'asc' | 'desc'
+  onSort: (key: InventorySortKey) => void
+  align?: 'left' | 'right'
+}) {
+  const active = current === sortKey
+  const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+  return (
+    <th className={`px-4 py-3 font-medium text-[#68756c] ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 transition hover:text-[#173c2a] ${active ? 'text-[#173c2a]' : ''}`}
+      >
+        <span>{label}</span>
+        <Icon size={11} className={active ? '' : 'opacity-40'} />
+      </button>
+    </th>
+  )
 }
 
 function ImageUploader({
@@ -544,9 +590,8 @@ function ProductModal({
                     <div>
                       <label className="mb-1 block text-xs font-medium text-gray-600">入荷日</label>
                       <input
-                        type="text"
-                        placeholder="2026/04/13"
-                        value={record.arrivalDate}
+                        type="date"
+                        value={toIsoDateInput(record.arrivalDate)}
                         onChange={event => setForm(prev => ({
                           ...prev,
                           arrivalRecords: prev.arrivalRecords.map(item => (
@@ -1051,6 +1096,8 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [activeGroupId, setActiveGroupId] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const [sortKey, setSortKey] = useState<'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'>('manual')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithInventory | null>(null)
   const [prefillProduct, setPrefillProduct] = useState<Partial<ProductWithInventory> | null>(null)
@@ -1112,6 +1159,22 @@ export default function InventoryPage() {
     void load()
   }, [])
 
+  // Re-fetch when the tab regains focus / becomes visible, so changes made
+  // on other pages (e.g. a new sale) are reflected without a manual reload.
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        void load()
+      }
+    }
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('focus', handler)
+    return () => {
+      document.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('focus', handler)
+    }
+  }, [])
+
   const groupProducts = useMemo(() => {
     if (activeGroupId === 'all') {
       const groupOrder = new Map(groups.map((group, index) => [group.id, index]))
@@ -1128,9 +1191,7 @@ export default function InventoryPage() {
   }, [products, activeGroupId, groups])
 
   const filtered = useMemo(() => {
-    if (!search) return groupProducts
-    const query = search.toLowerCase()
-    return groupProducts.filter(product => {
+    const searched = !search ? groupProducts : groupProducts.filter(product => {
       const searchText = [
         product.sku,
         product.name,
@@ -1145,16 +1206,48 @@ export default function InventoryPage() {
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-
-      return searchText.includes(query)
+      return searchText.includes(search.toLowerCase())
     })
-  }, [groupProducts, search])
+
+    if (sortKey === 'manual') return searched
+
+    const STATUS_RANK: Record<string, number> = { out: 0, low: 1, normal: 2 }
+    const sorted = [...searched].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1
+      switch (sortKey) {
+        case 'sku': return a.sku.localeCompare(b.sku) * dir
+        case 'name': return a.name.localeCompare(b.name) * dir
+        case 'tea': return ((a.teaType ?? '') + (a.grade ?? '')).localeCompare((b.teaType ?? '') + (b.grade ?? '')) * dir
+        case 'origin': return (a.origins[0] ?? '').localeCompare(b.origins[0] ?? '') * dir
+        case 'stock': return (a.currentStockKg - b.currentStockKg) * dir
+        case 'price': return ((a.standardWholesalePrice ?? 0) - (b.standardWholesalePrice ?? 0)) * dir
+        case 'status': return ((STATUS_RANK[a.stockStatus] ?? 99) - (STATUS_RANK[b.stockStatus] ?? 99)) * dir
+        default: return 0
+      }
+    })
+    return sorted
+  }, [groupProducts, search, sortKey, sortDir])
+
+  const handleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') {
+        setSortDir('desc')
+      } else {
+        // 3rd click returns to manual (drag) order
+        setSortKey('manual')
+        setSortDir('asc')
+      }
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
 
   const totalInitialStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.initialStockKg, 0), [groupProducts])
   const totalCurrentStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.currentStockKg, 0), [groupProducts])
   const totalAllocatedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.salesAllocatedKg, 0), [groupProducts])
   const totalSelfConsumedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.selfConsumedKg, 0), [groupProducts])
-  const isDraggable = !search && user?.role === 'admin' && activeGroupId !== 'all'
+  const isDraggable = !search && sortKey === 'manual' && user?.role === 'admin' && activeGroupId !== 'all'
 
   const handleExportExcel = () => {
     const groupName = (id: string) => groups.find(g => g.id === id)?.name ?? ''
@@ -1561,13 +1654,13 @@ export default function InventoryPage() {
               <thead className="bg-[#f7f5ee]">
                 <tr>
                   {user?.role === 'admin' && <th className="w-10 px-4 py-3 text-left font-medium text-[#68756c]" />}
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">SKU</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">商品名</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">茶種 / グレード / 品種</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">産地 / 仕入先 / 認証</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">在庫 / 入荷履歴</th>
-                  <th className="px-4 py-3 text-right font-medium text-[#68756c]">単価 (kg)</th>
-                  <th className="px-4 py-3 text-left font-medium text-[#68756c]">状態</th>
+                  <SortableTh label="SKU" sortKey="sku" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="茶種 / グレード / 品種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="産地 / 仕入先 / 認証" sortKey="origin" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="在庫 / 入荷履歴" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="単価 (kg)" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                  <SortableTh label="状態" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
                   {user?.role === 'admin' && <th className="px-4 py-3 text-right font-medium text-[#68756c]">操作</th>}
                 </tr>
               </thead>

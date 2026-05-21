@@ -58,6 +58,18 @@ export default function BuyersPage() {
     void load()
   }, [])
 
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('focus', handler)
+    return () => {
+      document.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('focus', handler)
+    }
+  }, [])
+
   const filtered = useMemo(() => {
     if (!search) return buyers
     const query = search.toLowerCase()

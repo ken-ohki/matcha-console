@@ -407,11 +407,13 @@ function SaleModal({
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
                       <option value="">選択してください</option>
-                      {products.map(product => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} ({product.sku})
-                        </option>
-                      ))}
+                      {[...products]
+                        .sort((a, b) => a.name.localeCompare(b.name, 'en'))
+                        .map(product => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} ({product.sku})
+                          </option>
+                        ))}
                     </select>
                     <input
                       required
@@ -683,6 +685,18 @@ export default function SalesPage() {
 
   useEffect(() => {
     load()
+  }, [])
+
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('focus', handler)
+    return () => {
+      document.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('focus', handler)
+    }
   }, [])
 
   const filteredSales = useMemo(() => {
