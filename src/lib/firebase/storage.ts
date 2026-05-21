@@ -45,6 +45,43 @@ export async function uploadProductImage(file: File, productKey: string): Promis
   return getDownloadURL(storageRef)
 }
 
+export async function uploadSupplierAttachment(file: File, supplierKey: string): Promise<string> {
+  const storage = getFirebaseStorageInstance()
+  const safeKey = supplierKey || 'unsorted'
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const path = `suppliers/${safeKey}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/pdf',
+    cacheControl: 'public, max-age=31536000, immutable',
+  })
+  return getDownloadURL(storageRef)
+}
+
+export async function uploadPurchaseOrderInvoice(file: File, orderKey: string): Promise<string> {
+  const storage = getFirebaseStorageInstance()
+  const safeKey = orderKey || 'unsorted'
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const path = `purchase-orders/${safeKey}/invoice-${Date.now()}.${ext}`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/pdf',
+    cacheControl: 'public, max-age=31536000, immutable',
+  })
+  return getDownloadURL(storageRef)
+}
+
+export async function deleteStorageObjectByUrl(url: string): Promise<void> {
+  if (!url) return
+  try {
+    const storage = getFirebaseStorageInstance()
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch {
+    // ignore
+  }
+}
+
 export async function deleteProductImageByUrl(url: string): Promise<void> {
   if (!url) return
   try {

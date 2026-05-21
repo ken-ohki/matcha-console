@@ -904,6 +904,18 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     ? Number(data.totalAmount)
     : items.reduce((sum, item) => sum + item.lineTotal, 0)
   const status = isValidPurchaseOrderStatus(data.status) ? data.status : 'placed'
+  const paymentStatus = (data.paymentStatus === 'unpaid' || data.paymentStatus === 'paid')
+    ? data.paymentStatus
+    : 'uninvoiced'
+  const invoiceRaw = data.invoice as Record<string, unknown> | undefined
+  const invoice = invoiceRaw && invoiceRaw.url
+    ? {
+        name: String(invoiceRaw.name ?? '請求書'),
+        url: String(invoiceRaw.url),
+        uploadedAt: String(invoiceRaw.uploadedAt ?? ''),
+        size: invoiceRaw.size != null ? Number(invoiceRaw.size) : undefined,
+      }
+    : undefined
   return {
     id,
     supplierName: String(data.supplierName ?? ''),
@@ -914,6 +926,10 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     expectedDeliveryDate: data.expectedDeliveryDate ? String(data.expectedDeliveryDate) : undefined,
     actualDeliveryDate: data.actualDeliveryDate ? String(data.actualDeliveryDate) : undefined,
     status,
+    paymentStatus,
+    paymentDueDate: data.paymentDueDate ? String(data.paymentDueDate) : undefined,
+    paidDate: data.paidDate ? String(data.paidDate) : undefined,
+    invoice,
     notes: data.notes ? String(data.notes) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
@@ -933,6 +949,21 @@ function mapSupplier(id: string, data: DocumentData): Supplier {
     postalCode: data.postalCode ? String(data.postalCode) : undefined,
     country: data.country ? String(data.country) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
+    attachments: Array.isArray(data.attachments)
+      ? data.attachments
+          .map(raw => {
+            const obj = raw as Record<string, unknown>
+            if (!obj?.url) return null
+            return {
+              id: String(obj.id ?? obj.url),
+              name: String(obj.name ?? 'attachment'),
+              url: String(obj.url),
+              uploadedAt: String(obj.uploadedAt ?? ''),
+              size: obj.size != null ? Number(obj.size) : undefined,
+            }
+          })
+          .filter((a): a is NonNullable<typeof a> => a !== null)
+      : [],
     orderCount: Number(data.orderCount ?? 0),
     lastOrderedAt: data.lastOrderedAt ? toDate(data.lastOrderedAt) : undefined,
     createdAt: toDate(data.createdAt),
@@ -1727,6 +1758,9 @@ export function createFirebaseServices(): IServices {
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
       const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
 
+      const paymentStatus = input.paymentStatus ?? 'uninvoiced'
+      const invoice = input.invoice && input.invoice.url ? input.invoice : undefined
+
       const payload = sanitizeRecord({
         supplierName: input.supplierName.trim(),
         items,
@@ -1736,6 +1770,10 @@ export function createFirebaseServices(): IServices {
         expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
         status: input.status,
+        paymentStatus,
+        paymentDueDate: input.paymentDueDate?.trim() || undefined,
+        paidDate: input.paidDate?.trim() || undefined,
+        invoice,
         notes: input.notes?.trim() || undefined,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1757,6 +1795,10 @@ export function createFirebaseServices(): IServices {
         expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
         status: input.status,
+        paymentStatus,
+        paymentDueDate: input.paymentDueDate?.trim() || undefined,
+        paidDate: input.paidDate?.trim() || undefined,
+        invoice,
         notes: input.notes?.trim() || undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -1782,6 +1824,10 @@ export function createFirebaseServices(): IServices {
         expectedDeliveryDate: input.expectedDeliveryDate ?? current.expectedDeliveryDate,
         actualDeliveryDate: input.actualDeliveryDate ?? current.actualDeliveryDate,
         status: input.status ?? current.status,
+        paymentStatus: input.paymentStatus ?? current.paymentStatus,
+        paymentDueDate: input.paymentDueDate ?? current.paymentDueDate,
+        paidDate: input.paidDate ?? current.paidDate,
+        invoice: input.invoice === null ? null : (input.invoice ?? current.invoice),
         notes: input.notes ?? current.notes,
       }
 
@@ -1807,6 +1853,10 @@ export function createFirebaseServices(): IServices {
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
       const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
 
+      const invoiceToWrite = merged.invoice === null
+        ? deleteField()
+        : (merged.invoice && merged.invoice.url ? merged.invoice : undefined)
+
       await updateDoc(ref, sanitizeRecord({
         supplierName: merged.supplierName.trim(),
         items,
@@ -1816,6 +1866,10 @@ export function createFirebaseServices(): IServices {
         expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
         status: merged.status,
+        paymentStatus: merged.paymentStatus ?? 'uninvoiced',
+        paymentDueDate: merged.paymentDueDate?.trim() || undefined,
+        paidDate: merged.paidDate?.trim() || undefined,
+        invoice: invoiceToWrite,
         notes: merged.notes?.trim() || undefined,
         updatedAt: serverTimestamp(),
       }))
@@ -1834,6 +1888,10 @@ export function createFirebaseServices(): IServices {
         expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
         status: merged.status,
+        paymentStatus: merged.paymentStatus ?? 'uninvoiced',
+        paymentDueDate: merged.paymentDueDate?.trim() || undefined,
+        paidDate: merged.paidDate?.trim() || undefined,
+        invoice: merged.invoice === null ? undefined : merged.invoice,
         notes: merged.notes?.trim() || undefined,
         createdAt: current.createdAt,
         updatedAt: new Date(),
@@ -1882,6 +1940,9 @@ export function createFirebaseServices(): IServices {
         if (value === undefined) continue
         const trimmed = typeof value === 'string' ? value.trim() : value
         cleaned[key] = trimmed ? trimmed : deleteField()
+      }
+      if (input.attachments !== undefined) {
+        cleaned.attachments = input.attachments
       }
       cleaned.updatedAt = serverTimestamp()
       await updateDoc(ref, cleaned)

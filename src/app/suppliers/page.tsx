@@ -6,8 +6,10 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type { PurchaseOrder, Supplier, SupplierDetailsInput } from '@/types'
-import { COUNTRY_OPTIONS } from '@/lib/countries'
-import { ExternalLink, Mail, MapPin, Phone, Save, Search, Truck, User2, X } from 'lucide-react'
+import { JAPAN_PREFECTURES } from '@/lib/prefectures'
+import { ExternalLink, FileText, Mail, MapPin, Phone, Save, Search, Trash2, Truck, Upload, User2, X } from 'lucide-react'
+import { uploadSupplierAttachment, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
+import type { SupplierAttachment } from '@/types'
 
 function formatDate(date?: Date): string {
   if (!date) return '-'
@@ -121,7 +123,7 @@ export default function SuppliersPage() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="仕入先・国・担当者で検索"
+                placeholder="仕入先・県・担当者で検索"
                 className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-64"
               />
             </div>
@@ -133,7 +135,7 @@ export default function SuppliersPage() {
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
                   <th className="px-3 py-3 font-medium">仕入先</th>
                   <th className="px-3 py-3 font-medium">担当者</th>
-                  <th className="px-3 py-3 font-medium">国</th>
+                  <th className="px-3 py-3 font-medium">県</th>
                   <th className="px-3 py-3 font-medium">発注回数</th>
                   <th className="px-3 py-3 font-medium">最終発注日</th>
                 </tr>
@@ -200,7 +202,10 @@ function SupplierDetailModal({
     postalCode: supplier.postalCode ?? '',
     country: supplier.country ?? '',
     notes: supplier.notes ?? '',
+    attachments: supplier.attachments ?? [],
   })
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
 
@@ -328,7 +333,7 @@ function SupplierDetailModal({
                     />
                   </Field>
                 </div>
-                <Field label="国">
+                <Field label="県">
                   <select
                     value={form.country ?? ''}
                     onChange={e => setForm(prev => ({ ...prev, country: e.target.value }))}
@@ -336,12 +341,10 @@ function SupplierDetailModal({
                     disabled={!canEdit}
                   >
                     <option value="">未設定</option>
-                    {COUNTRY_OPTIONS.map(option => (
-                      <option key={option.code} value={option.name}>
-                        {option.name}
-                      </option>
+                    {JAPAN_PREFECTURES.map(pref => (
+                      <option key={pref} value={pref}>{pref}</option>
                     ))}
-                    {form.country && !COUNTRY_OPTIONS.some(o => o.name === form.country) && (
+                    {form.country && !JAPAN_PREFECTURES.includes(form.country) && (
                       <option value={form.country}>{form.country}（未登録）</option>
                     )}
                   </select>
@@ -356,6 +359,96 @@ function SupplierDetailModal({
                       disabled={!canEdit}
                     />
                   </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[#68756c]">料金表など添付ファイル（PDF）</p>
+                  <div className="space-y-2">
+                    {(form.attachments ?? []).length === 0 && (
+                      <p className="text-xs text-[#a59f8c]">添付ファイルなし</p>
+                    )}
+                    {(form.attachments ?? []).map(att => (
+                      <div key={att.id} className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-white px-3 py-2 text-sm">
+                        <FileText size={14} className="shrink-0 text-[#174c33]" />
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 truncate text-[#173c2a] hover:underline"
+                          title={att.name}
+                        >
+                          {att.name}
+                        </a>
+                        {att.uploadedAt && (
+                          <span className="text-[10px] text-[#a59f8c]">{att.uploadedAt}</span>
+                        )}
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!confirm(`「${att.name}」を削除しますか？`)) return
+                              await deleteStorageObjectByUrl(att.url)
+                              setForm(prev => ({
+                                ...prev,
+                                attachments: (prev.attachments ?? []).filter(a => a.id !== att.id),
+                              }))
+                            }}
+                            className="rounded-lg p-1 text-red-500 hover:bg-red-50"
+                            aria-label="削除"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {canEdit && (
+                    <div className="mt-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-3 py-2 text-xs font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+                        <Upload size={12} />
+                        {uploading ? 'アップロード中…' : 'PDFを添付（複数可）'}
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          multiple
+                          className="hidden"
+                          disabled={uploading}
+                          onChange={async e => {
+                            const files = Array.from(e.target.files ?? [])
+                            e.target.value = ''
+                            if (files.length === 0) return
+                            setUploadError('')
+                            setUploading(true)
+                            try {
+                              const newAttachments: SupplierAttachment[] = []
+                              for (const file of files) {
+                                if (file.size > 30 * 1024 * 1024) {
+                                  throw new Error(`${file.name} は 30MB を超えています`)
+                                }
+                                const url = await uploadSupplierAttachment(file, supplier.id)
+                                newAttachments.push({
+                                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                  name: file.name,
+                                  url,
+                                  uploadedAt: new Date().toISOString().slice(0, 10),
+                                  size: file.size,
+                                })
+                              }
+                              setForm(prev => ({
+                                ...prev,
+                                attachments: [...(prev.attachments ?? []), ...newAttachments],
+                              }))
+                            } catch (err) {
+                              setUploadError(err instanceof Error ? err.message : 'アップロードに失敗しました')
+                            } finally {
+                              setUploading(false)
+                            }
+                          }}
+                        />
+                      </label>
+                      {uploadError && <p className="mt-2 text-xs text-red-600">{uploadError}</p>}
+                      <p className="mt-1 text-[10px] text-[#a59f8c]">アップロード後は「保存」を押して確定してください。1ファイル最大 30MB。</p>
+                    </div>
+                  )}
                 </div>
               </div>
               {feedback && (

@@ -300,6 +300,14 @@ export interface AuthUser {
 }
 
 export type PurchaseOrderStatus = 'placed' | 'shipped' | 'received' | 'cancelled'
+export type PurchaseOrderPaymentStatus = 'uninvoiced' | 'unpaid' | 'paid'
+
+export interface PurchaseOrderInvoice {
+  name: string
+  url: string
+  uploadedAt: string
+  size?: number
+}
 
 export interface PurchaseOrderLineItem {
   productId: string
@@ -326,6 +334,10 @@ export interface PurchaseOrder {
   expectedDeliveryDate?: string
   actualDeliveryDate?: string
   status: PurchaseOrderStatus
+  paymentStatus: PurchaseOrderPaymentStatus
+  paymentDueDate?: string
+  paidDate?: string
+  invoice?: PurchaseOrderInvoice
   notes?: string
   createdAt: Date
   updatedAt: Date
@@ -337,8 +349,20 @@ export interface PurchaseOrderInput {
   orderDate: string
   expectedDeliveryDate?: string
   actualDeliveryDate?: string
+  paymentStatus?: PurchaseOrderPaymentStatus
+  paymentDueDate?: string
+  paidDate?: string
+  invoice?: PurchaseOrderInvoice | null
   status: PurchaseOrderStatus
   notes?: string
+}
+
+export interface SupplierAttachment {
+  id: string
+  name: string
+  url: string
+  uploadedAt: string
+  size?: number
 }
 
 export interface Supplier {
@@ -353,6 +377,7 @@ export interface Supplier {
   postalCode?: string
   country?: string
   notes?: string
+  attachments: SupplierAttachment[]
   orderCount: number
   lastOrderedAt?: Date
   createdAt: Date
@@ -368,4 +393,5 @@ export interface SupplierDetailsInput {
   postalCode?: string
   country?: string
   notes?: string
+  attachments?: SupplierAttachment[]
 }

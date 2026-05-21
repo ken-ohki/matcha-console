@@ -14,6 +14,7 @@ import type {
 } from '@/types'
 import Link from 'next/link'
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 
 function formatDate(value?: string): string {
   if (!value) return '-'
@@ -44,6 +45,21 @@ const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
   shipped: 'bg-blue-100 text-blue-800',
   received: 'bg-emerald-100 text-emerald-800',
   cancelled: 'bg-gray-100 text-gray-500',
+}
+
+function PaymentStatusBadge({ status, hasInvoice }: { status: 'uninvoiced' | 'unpaid' | 'paid'; hasInvoice: boolean }) {
+  const map = {
+    uninvoiced: { label: '未請求', cls: 'bg-slate-100 text-slate-700' },
+    unpaid: { label: '未払', cls: 'bg-amber-100 text-amber-800' },
+    paid: { label: '支払済', cls: 'bg-emerald-100 text-emerald-800' },
+  } as const
+  const m = map[status]
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${m.cls}`}>
+      {m.label}
+      {hasInvoice && <FileText size={9} />}
+    </span>
+  )
 }
 
 function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
@@ -86,8 +102,14 @@ function PurchaseOrderModal({
     expectedDeliveryDate: '',
     actualDeliveryDate: '',
     status: 'placed',
+    paymentStatus: 'uninvoiced',
+    paymentDueDate: '',
+    paidDate: '',
+    invoice: undefined,
     notes: '',
   })
+  const [uploadingInvoice, setUploadingInvoice] = useState(false)
+  const [invoiceError, setInvoiceError] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -111,6 +133,10 @@ function PurchaseOrderModal({
       expectedDeliveryDate: initial?.expectedDeliveryDate ?? '',
       actualDeliveryDate: initial?.actualDeliveryDate ?? '',
       status: initial?.status ?? 'placed',
+      paymentStatus: initial?.paymentStatus ?? 'uninvoiced',
+      paymentDueDate: initial?.paymentDueDate ?? '',
+      paidDate: initial?.paidDate ?? '',
+      invoice: initial?.invoice,
       notes: initial?.notes ?? '',
     })
     setError('')
@@ -354,6 +380,104 @@ function PurchaseOrderModal({
             </div>
           </div>
 
+          <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・支払い</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">支払いステータス</label>
+                <select
+                  value={form.paymentStatus ?? 'uninvoiced'}
+                  onChange={e => setForm(prev => ({ ...prev, paymentStatus: e.target.value as 'uninvoiced' | 'unpaid' | 'paid' }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                >
+                  <option value="uninvoiced">未請求</option>
+                  <option value="unpaid">未払</option>
+                  <option value="paid">支払済</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">支払い期日</label>
+                <input
+                  type="date"
+                  value={form.paymentDueDate ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, paymentDueDate: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">支払日</label>
+                <input
+                  type="date"
+                  value={form.paidDate ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, paidDate: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              <div className="md:col-span-3">
+                <label className="mb-1 block text-xs font-medium text-gray-700">請求書（PDF）</label>
+                {form.invoice ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f1] px-3 py-2 text-sm">
+                    <a href={form.invoice.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-[#173c2a] hover:underline">
+                      {form.invoice.name}
+                    </a>
+                    {form.invoice.uploadedAt && <span className="text-[10px] text-[#a59f8c]">{form.invoice.uploadedAt}</span>}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm('請求書を削除しますか？')) return
+                        if (form.invoice?.url) await deleteStorageObjectByUrl(form.invoice.url)
+                        setForm(prev => ({ ...prev, invoice: null }))
+                      }}
+                      className="rounded-lg p-1 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-3 py-2 text-xs font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+                    <FileText size={12} />
+                    {uploadingInvoice ? 'アップロード中…' : '請求書PDFを添付'}
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      disabled={uploadingInvoice}
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        e.target.value = ''
+                        if (!file) return
+                        setInvoiceError('')
+                        if (file.size > 30 * 1024 * 1024) {
+                          setInvoiceError('30MBを超えるファイルはアップロードできません')
+                          return
+                        }
+                        setUploadingInvoice(true)
+                        try {
+                          const url = await uploadPurchaseOrderInvoice(file, initial?.id || 'new')
+                          setForm(prev => ({
+                            ...prev,
+                            invoice: {
+                              name: file.name,
+                              url,
+                              uploadedAt: new Date().toISOString().slice(0, 10),
+                              size: file.size,
+                            },
+                            paymentStatus: prev.paymentStatus === 'uninvoiced' ? 'unpaid' : prev.paymentStatus,
+                          }))
+                        } catch (err) {
+                          setInvoiceError(err instanceof Error ? err.message : 'アップロードに失敗しました')
+                        } finally {
+                          setUploadingInvoice(false)
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+                {invoiceError && <p className="mt-1 text-xs text-red-600">{invoiceError}</p>}
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">メモ</label>
             <textarea
@@ -542,13 +666,15 @@ export default function PurchaseOrdersPage() {
                   <th className="px-3 py-3 font-medium text-right">金額</th>
                   <th className="px-3 py-3 font-medium">発注日</th>
                   <th className="px-3 py-3 font-medium">入荷予定</th>
+                  <th className="px-3 py-3 font-medium">支払い</th>
+                  <th className="px-3 py-3 font-medium">支払期日</th>
                   <th className="px-3 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       発注はまだ登録されていません。
                     </td>
                   </tr>
@@ -570,6 +696,10 @@ export default function PurchaseOrdersPage() {
                       <td className="px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
                       <td className="px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
                       <td className="px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
+                      <td className="px-3 py-3">
+                        <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
+                      </td>
+                      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.paymentDueDate)}</td>
                       <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           <Link
