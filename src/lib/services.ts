@@ -11,11 +11,15 @@ import type {
   BuyerDetailsInput,
   EcSaleRecord,
   EcSaleRecordInput,
+  PurchaseOrder,
+  PurchaseOrderInput,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
   SelfConsumptionRecordInput,
   Settings,
+  Supplier,
+  SupplierDetailsInput,
 } from '@/types'
 
 export interface IInventoryService {
@@ -112,11 +116,25 @@ export interface IAuthService {
   deleteUserProfile(uid: string): Promise<void>
 }
 
+export interface IPurchaseOrdersService {
+  getPurchaseOrders(): Promise<PurchaseOrder[]>
+  createPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrder>
+  updatePurchaseOrder(id: string, input: Partial<PurchaseOrderInput>): Promise<PurchaseOrder>
+  deletePurchaseOrder(id: string): Promise<void>
+}
+
+export interface ISuppliersService {
+  getSuppliers(): Promise<Supplier[]>
+  updateSupplier(id: string, input: SupplierDetailsInput): Promise<Supplier>
+}
+
 export interface IServices {
   inventory: IInventoryService
   sales: ISalesService
   selfConsumption: ISelfConsumptionService
   ecSales: IEcSalesService
+  purchaseOrders: IPurchaseOrdersService
+  suppliers: ISuppliersService
   settings: ISettingsService
   masters: IMastersService
   auth: IAuthService

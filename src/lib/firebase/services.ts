@@ -35,6 +35,10 @@ import type {
   Product,
   ProductInput,
   ProductWithInventory,
+  PurchaseOrder,
+  PurchaseOrderInput,
+  PurchaseOrderLineItem,
+  PurchaseOrderStatus,
   SaleLineItem,
   SaleRecord,
   SaleRecordInput,
@@ -43,15 +47,19 @@ import type {
   SelfConsumptionUsageType,
   Settings,
   StockStatus,
+  Supplier,
+  SupplierDetailsInput,
 } from '@/types'
 import type {
   IAuthService,
   IEcSalesService,
   IInventoryService,
   IMastersService,
+  IPurchaseOrdersService,
   ISelfConsumptionService,
   ISalesService,
   ISettingsService,
+  ISuppliersService,
   IServices,
   UserProfile,
 } from '../services'
@@ -68,6 +76,8 @@ const COLLECTIONS = {
   settings: 'settings',
   users: 'users',
   masters: 'masters',
+  purchaseOrders: 'purchase_orders',
+  suppliers: 'suppliers',
 } as const
 
 function toDate(value: unknown): Date {
@@ -860,6 +870,217 @@ async function syncBuyersCollection(): Promise<void> {
   await batch.commit()
 }
 
+function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  const productId = String(obj.productId ?? '')
+  if (!productId) return null
+  const quantityKg = Number(obj.quantityKg ?? 0)
+  const unitPrice = Number(obj.unitPrice ?? 0)
+  const lineTotal = obj.lineTotal != null ? Number(obj.lineTotal) : quantityKg * unitPrice
+  return {
+    productId,
+    productSku: String(obj.productSku ?? ''),
+    productName: String(obj.productName ?? ''),
+    quantityKg,
+    unitPrice,
+    lineTotal,
+  }
+}
+
+function isValidPurchaseOrderStatus(value: unknown): value is PurchaseOrderStatus {
+  return value === 'placed' || value === 'shipped' || value === 'received' || value === 'cancelled'
+}
+
+function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
+  const rawItems = Array.isArray(data.items) ? data.items : []
+  const items: PurchaseOrderLineItem[] = rawItems
+    .map(normalizePurchaseOrderItem)
+    .filter((item): item is PurchaseOrderLineItem => item !== null)
+  const totalQuantityKg = data.totalQuantityKg != null
+    ? Number(data.totalQuantityKg)
+    : items.reduce((sum, item) => sum + item.quantityKg, 0)
+  const totalAmount = data.totalAmount != null
+    ? Number(data.totalAmount)
+    : items.reduce((sum, item) => sum + item.lineTotal, 0)
+  const status = isValidPurchaseOrderStatus(data.status) ? data.status : 'placed'
+  return {
+    id,
+    supplierName: String(data.supplierName ?? ''),
+    items,
+    totalQuantityKg,
+    totalAmount,
+    orderDate: String(data.orderDate ?? ''),
+    expectedDeliveryDate: data.expectedDeliveryDate ? String(data.expectedDeliveryDate) : undefined,
+    actualDeliveryDate: data.actualDeliveryDate ? String(data.actualDeliveryDate) : undefined,
+    status,
+    notes: data.notes ? String(data.notes) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
+function mapSupplier(id: string, data: DocumentData): Supplier {
+  return {
+    id,
+    name: String(data.name ?? ''),
+    normalizedName: String(data.normalizedName ?? ''),
+    contactPersonName: data.contactPersonName ? String(data.contactPersonName) : undefined,
+    email: data.email ? String(data.email) : undefined,
+    phone: data.phone ? String(data.phone) : undefined,
+    website: data.website ? String(data.website) : undefined,
+    address: data.address ? String(data.address) : undefined,
+    postalCode: data.postalCode ? String(data.postalCode) : undefined,
+    country: data.country ? String(data.country) : undefined,
+    notes: data.notes ? String(data.notes) : undefined,
+    orderCount: Number(data.orderCount ?? 0),
+    lastOrderedAt: data.lastOrderedAt ? toDate(data.lastOrderedAt) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+}
+
+async function getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.purchaseOrders))
+  return snap.docs.map(document => mapPurchaseOrder(document.id, document.data()))
+}
+
+async function getAllSuppliers(): Promise<Supplier[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.suppliers))
+  return snap.docs.map(document => mapSupplier(document.id, document.data()))
+}
+
+async function syncSuppliersCollection(): Promise<void> {
+  const db = getFirebaseDb()
+  const orders = await getAllPurchaseOrders()
+  const suppliers = await getAllSuppliers()
+  const grouped = orders.reduce<Record<string, PurchaseOrder[]>>((acc, order) => {
+    const normalizedName = normalizeBuyerName(order.supplierName)
+    if (!normalizedName) return acc
+    acc[normalizedName] = [...(acc[normalizedName] ?? []), order]
+    return acc
+  }, {})
+
+  const existingByNormalized = new Map(suppliers.map(s => [s.normalizedName, s]))
+  const batch = writeBatch(db)
+
+  Object.entries(grouped).forEach(([normalizedName, records]) => {
+    const sorted = [...records].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const latest = sorted[0]
+    const existing = existingByNormalized.get(normalizedName)
+    const ref = existing
+      ? doc(db, COLLECTIONS.suppliers, existing.id)
+      : doc(collection(db, COLLECTIONS.suppliers))
+
+    batch.set(ref, sanitizeRecord({
+      name: latest.supplierName.trim(),
+      normalizedName,
+      orderCount: records.length,
+      lastOrderedAt: latest.updatedAt,
+      createdAt: existing?.createdAt ?? serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }), { merge: true })
+
+    existingByNormalized.delete(normalizedName)
+  })
+
+  // Note: do not delete suppliers with no orders — they may have manually edited details
+  await batch.commit()
+}
+
+async function applyPurchaseOrderArrivalEffects(
+  orderId: string,
+  prevStatus: PurchaseOrderStatus | null,
+  nextStatus: PurchaseOrderStatus,
+  items: PurchaseOrderLineItem[],
+  arrivalDate: string,
+): Promise<void> {
+  const wasReceived = prevStatus === 'received'
+  const isReceived = nextStatus === 'received'
+
+  if (wasReceived === isReceived) {
+    if (isReceived) {
+      await stripPurchaseOrderArrivalsFromProducts(orderId)
+      await appendPurchaseOrderArrivalsToProducts(orderId, items, arrivalDate)
+    }
+    return
+  }
+
+  if (isReceived) {
+    await appendPurchaseOrderArrivalsToProducts(orderId, items, arrivalDate)
+  } else {
+    await stripPurchaseOrderArrivalsFromProducts(orderId)
+  }
+}
+
+async function appendPurchaseOrderArrivalsToProducts(
+  orderId: string,
+  items: PurchaseOrderLineItem[],
+  arrivalDate: string,
+): Promise<void> {
+  if (items.length === 0) return
+  const db = getFirebaseDb()
+  const batch = writeBatch(db)
+  const productIds = Array.from(new Set(items.map(item => item.productId)))
+  const productSnaps = await Promise.all(
+    productIds.map(pid => getDoc(doc(db, COLLECTIONS.products, pid))),
+  )
+  const productMap = new Map<string, ArrivalRecord[]>()
+  productSnaps.forEach(snap => {
+    if (!snap.exists()) return
+    const data = snap.data()
+    const existing = Array.isArray(data.arrivalRecords)
+      ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
+      : []
+    productMap.set(snap.id, existing)
+  })
+
+  items.forEach((item, idx) => {
+    const existing = productMap.get(item.productId)
+    if (!existing) return
+    const newRecord: ArrivalRecord = {
+      id: `po:${orderId}:${idx}`,
+      arrivalDate: toIsoDate(arrivalDate),
+      quantityKg: item.quantityKg,
+    }
+    const next = [...existing.filter(r => r.id !== newRecord.id), newRecord]
+    productMap.set(item.productId, next)
+  })
+
+  productMap.forEach((records, productId) => {
+    batch.update(doc(db, COLLECTIONS.products, productId), {
+      arrivalRecords: records,
+      arrivalDate: deriveArrivalDate(records),
+      initialStockKg: deriveInitialStockKg(records),
+      updatedAt: serverTimestamp(),
+    })
+  })
+
+  await batch.commit()
+}
+
+async function stripPurchaseOrderArrivalsFromProducts(orderId: string): Promise<void> {
+  const db = getFirebaseDb()
+  const products = await getAllProducts()
+  const prefix = `po:${orderId}:`
+  const affected = products.filter(p => p.arrivalRecords.some(r => r.id.startsWith(prefix)))
+  if (affected.length === 0) return
+
+  const batch = writeBatch(db)
+  affected.forEach(product => {
+    const next = product.arrivalRecords.filter(r => !r.id.startsWith(prefix))
+    batch.update(doc(db, COLLECTIONS.products, product.id), {
+      arrivalRecords: next,
+      arrivalDate: deriveArrivalDate(next),
+      initialStockKg: deriveInitialStockKg(next),
+      updatedAt: serverTimestamp(),
+    })
+  })
+  await batch.commit()
+}
+
 export function createFirebaseServices(): IServices {
   const db = getFirebaseDb()
   const auth = getFirebaseAuthInstance()
@@ -1478,6 +1699,198 @@ export function createFirebaseServices(): IServices {
     },
   }
 
+  const purchaseOrdersService: IPurchaseOrdersService = {
+    async getPurchaseOrders() {
+      const orders = await getAllPurchaseOrders()
+      return orders.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    },
+
+    async createPurchaseOrder(input) {
+      if (!input.items || input.items.length === 0) {
+        throw new Error('商品を1つ以上指定してください')
+      }
+      const products = await getAllProducts()
+      const items: PurchaseOrderLineItem[] = input.items.map(line => {
+        const product = products.find(p => p.id === line.productId && p.isActive)
+        if (!product) throw new Error('商品が見つかりません')
+        const quantityKg = Number(line.quantityKg) || 0
+        const unitPrice = Number(line.unitPrice) || 0
+        return {
+          productId: product.id,
+          productSku: product.sku,
+          productName: product.purchaseProductName || product.name,
+          quantityKg,
+          unitPrice,
+          lineTotal: quantityKg * unitPrice,
+        }
+      })
+      const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
+      const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
+
+      const payload = sanitizeRecord({
+        supplierName: input.supplierName.trim(),
+        items,
+        totalQuantityKg,
+        totalAmount,
+        orderDate: input.orderDate.trim(),
+        expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
+        actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
+        status: input.status,
+        notes: input.notes?.trim() || undefined,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      const ref = await addDoc(collection(db, COLLECTIONS.purchaseOrders), payload)
+
+      const arrivalDate = input.actualDeliveryDate?.trim() || input.orderDate.trim() || new Date().toISOString().slice(0, 10)
+      await applyPurchaseOrderArrivalEffects(ref.id, null, input.status, items, arrivalDate)
+      await syncSuppliersCollection()
+
+      return {
+        id: ref.id,
+        supplierName: input.supplierName.trim(),
+        items,
+        totalQuantityKg,
+        totalAmount,
+        orderDate: input.orderDate.trim(),
+        expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
+        actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
+        status: input.status,
+        notes: input.notes?.trim() || undefined,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    },
+
+    async updatePurchaseOrder(id, input) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, id)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('発注が見つかりません')
+      const current = mapPurchaseOrder(snap.id, snap.data() ?? {})
+
+      const mergedInputItems = input.items ?? current.items.map(item => ({
+        productId: item.productId,
+        quantityKg: item.quantityKg,
+        unitPrice: item.unitPrice,
+      }))
+
+      const merged: PurchaseOrderInput = {
+        supplierName: input.supplierName ?? current.supplierName,
+        items: mergedInputItems,
+        orderDate: input.orderDate ?? current.orderDate,
+        expectedDeliveryDate: input.expectedDeliveryDate ?? current.expectedDeliveryDate,
+        actualDeliveryDate: input.actualDeliveryDate ?? current.actualDeliveryDate,
+        status: input.status ?? current.status,
+        notes: input.notes ?? current.notes,
+      }
+
+      if (!merged.items || merged.items.length === 0) {
+        throw new Error('商品を1つ以上指定してください')
+      }
+
+      const products = await getAllProducts()
+      const items: PurchaseOrderLineItem[] = merged.items.map(line => {
+        const product = products.find(p => p.id === line.productId && p.isActive)
+        if (!product) throw new Error('商品が見つかりません')
+        const quantityKg = Number(line.quantityKg) || 0
+        const unitPrice = Number(line.unitPrice) || 0
+        return {
+          productId: product.id,
+          productSku: product.sku,
+          productName: product.purchaseProductName || product.name,
+          quantityKg,
+          unitPrice,
+          lineTotal: quantityKg * unitPrice,
+        }
+      })
+      const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
+      const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
+
+      await updateDoc(ref, sanitizeRecord({
+        supplierName: merged.supplierName.trim(),
+        items,
+        totalQuantityKg,
+        totalAmount,
+        orderDate: merged.orderDate.trim(),
+        expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
+        actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
+        status: merged.status,
+        notes: merged.notes?.trim() || undefined,
+        updatedAt: serverTimestamp(),
+      }))
+
+      const arrivalDate = merged.actualDeliveryDate?.trim() || merged.orderDate.trim() || new Date().toISOString().slice(0, 10)
+      await applyPurchaseOrderArrivalEffects(id, current.status, merged.status, items, arrivalDate)
+      await syncSuppliersCollection()
+
+      return {
+        id,
+        supplierName: merged.supplierName.trim(),
+        items,
+        totalQuantityKg,
+        totalAmount,
+        orderDate: merged.orderDate.trim(),
+        expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
+        actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
+        status: merged.status,
+        notes: merged.notes?.trim() || undefined,
+        createdAt: current.createdAt,
+        updatedAt: new Date(),
+      }
+    },
+
+    async deletePurchaseOrder(id) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, id)
+      const snap = await getDoc(ref)
+      if (snap.exists()) {
+        const current = mapPurchaseOrder(snap.id, snap.data() ?? {})
+        if (current.status === 'received') {
+          await stripPurchaseOrderArrivalsFromProducts(id)
+        }
+      }
+      await deleteDoc(ref)
+      await syncSuppliersCollection()
+    },
+  }
+
+  const suppliersService: ISuppliersService = {
+    async getSuppliers() {
+      const suppliers = await getAllSuppliers()
+      return suppliers.sort((a, b) => {
+        const left = a.lastOrderedAt?.getTime() ?? a.updatedAt.getTime()
+        const right = b.lastOrderedAt?.getTime() ?? b.updatedAt.getTime()
+        return right - left
+      })
+    },
+
+    async updateSupplier(id, input) {
+      const ref = doc(db, COLLECTIONS.suppliers, id)
+      const cleaned: Record<string, unknown> = {}
+      const optionalKeys = [
+        'contactPersonName',
+        'email',
+        'phone',
+        'website',
+        'address',
+        'postalCode',
+        'country',
+        'notes',
+      ] as const
+      for (const key of optionalKeys) {
+        const value = input[key]
+        if (value === undefined) continue
+        const trimmed = typeof value === 'string' ? value.trim() : value
+        cleaned[key] = trimmed ? trimmed : deleteField()
+      }
+      cleaned.updatedAt = serverTimestamp()
+      await updateDoc(ref, cleaned)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('仕入先が見つかりません')
+      return mapSupplier(snap.id, snap.data() ?? {})
+    },
+  }
+
   const mastersService: IMastersService = {
     async listMasters() {
       const snap = await getDocs(collection(db, COLLECTIONS.masters))
@@ -1663,6 +2076,8 @@ export function createFirebaseServices(): IServices {
     sales: salesService,
     selfConsumption: selfConsumptionService,
     ecSales: ecSalesService,
+    purchaseOrders: purchaseOrdersService,
+    suppliers: suppliersService,
     settings: settingsService,
     masters: mastersService,
     auth: authService,

@@ -3,11 +3,13 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { Building2, ExternalLink, Leaf, Package, LogOut, PackageMinus, Settings, ShoppingBag, X } from 'lucide-react'
+import { Building2, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, Settings, ShoppingBag, Truck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
   { href: '/inventory', label: '在庫マスター', icon: Package },
+  { href: '/purchase-orders', label: '発注管理', icon: ClipboardList },
+  { href: '/suppliers', label: '仕入先一覧', icon: Truck },
   { href: '/sales', label: '販売管理', icon: Leaf },
   { href: '/ec-sales', label: '販売管理（EC）', icon: ShoppingBag },
   { href: '/buyers', label: '販売先一覧', icon: Building2 },

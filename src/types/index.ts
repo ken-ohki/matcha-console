@@ -298,3 +298,74 @@ export interface AuthUser {
   email: string
   role: UserRole
 }
+
+export type PurchaseOrderStatus = 'placed' | 'shipped' | 'received' | 'cancelled'
+
+export interface PurchaseOrderLineItem {
+  productId: string
+  productSku: string
+  productName: string
+  quantityKg: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export interface PurchaseOrderLineInput {
+  productId: string
+  quantityKg: number
+  unitPrice: number
+}
+
+export interface PurchaseOrder {
+  id: string
+  supplierName: string
+  items: PurchaseOrderLineItem[]
+  totalQuantityKg: number
+  totalAmount: number
+  orderDate: string
+  expectedDeliveryDate?: string
+  actualDeliveryDate?: string
+  status: PurchaseOrderStatus
+  notes?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface PurchaseOrderInput {
+  supplierName: string
+  items: PurchaseOrderLineInput[]
+  orderDate: string
+  expectedDeliveryDate?: string
+  actualDeliveryDate?: string
+  status: PurchaseOrderStatus
+  notes?: string
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  normalizedName: string
+  contactPersonName?: string
+  email?: string
+  phone?: string
+  website?: string
+  address?: string
+  postalCode?: string
+  country?: string
+  notes?: string
+  orderCount: number
+  lastOrderedAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface SupplierDetailsInput {
+  contactPersonName?: string
+  email?: string
+  phone?: string
+  website?: string
+  address?: string
+  postalCode?: string
+  country?: string
+  notes?: string
+}

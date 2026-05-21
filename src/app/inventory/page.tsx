@@ -115,6 +115,172 @@ function buildProductForm(
   }
 }
 
+function InventoryFilterBar({
+  groupProducts,
+  masters,
+  gradeFilters,
+  setGradeFilters,
+  originFilters,
+  setOriginFilters,
+  statusFilters,
+  setStatusFilters,
+  catalogFilter,
+  setCatalogFilter,
+  askFilter,
+  setAskFilter,
+}: {
+  groupProducts: ProductWithInventory[]
+  masters: MasterEntry[]
+  gradeFilters: Set<string>
+  setGradeFilters: (next: Set<string>) => void
+  originFilters: Set<string>
+  setOriginFilters: (next: Set<string>) => void
+  statusFilters: Set<'out' | 'low' | 'normal'>
+  setStatusFilters: (next: Set<'out' | 'low' | 'normal'>) => void
+  catalogFilter: 'all' | 'visible' | 'hidden'
+  setCatalogFilter: (next: 'all' | 'visible' | 'hidden') => void
+  askFilter: 'all' | 'ask' | 'normal'
+  setAskFilter: (next: 'all' | 'ask' | 'normal') => void
+}) {
+  const gradeOptions = useMemo(() => {
+    const all = new Set<string>()
+    groupProducts.forEach(p => { if (p.grade) all.add(p.grade) })
+    const ordered = optionsForType(masters, 'grade').map(o => o.value).filter(name => all.has(name))
+    const extras = Array.from(all).filter(name => !ordered.includes(name)).sort()
+    return [...ordered, ...extras]
+  }, [groupProducts, masters])
+
+  const originOptions = useMemo(() => {
+    const all = new Set<string>()
+    groupProducts.forEach(p => p.origins.forEach(o => all.add(o)))
+    const ordered = optionsForType(masters, 'origin').map(o => o.value).filter(name => all.has(name))
+    const extras = Array.from(all).filter(name => !ordered.includes(name)).sort()
+    return [...ordered, ...extras]
+  }, [groupProducts, masters])
+
+  const toggleSet = <T extends string>(set: Set<T>, value: T, setter: (next: Set<T>) => void) => {
+    const next = new Set(set)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    setter(next)
+  }
+
+  const anyActive =
+    gradeFilters.size > 0 ||
+    originFilters.size > 0 ||
+    statusFilters.size > 0 ||
+    catalogFilter !== 'all' ||
+    askFilter !== 'all'
+
+  const clearAll = () => {
+    setGradeFilters(new Set())
+    setOriginFilters(new Set())
+    setStatusFilters(new Set())
+    setCatalogFilter('all')
+    setAskFilter('all')
+  }
+
+  const pillBase = 'rounded-full border px-2.5 py-1 text-xs transition'
+  const pillOn = 'border-[#174c33] bg-[#174c33] text-white'
+  const pillOff = 'border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#f7f5ee]'
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-[#e6dfcf] bg-[#faf8f1] p-3 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">フィルター</span>
+        {anyActive && (
+          <button type="button" onClick={clearAll} className="text-xs text-[#174c33] underline hover:text-[#205f43]">
+            すべてクリア
+          </button>
+        )}
+      </div>
+
+      {gradeOptions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-[#68756c] mr-1">グレード:</span>
+          {gradeOptions.map(g => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => toggleSet(gradeFilters, g, setGradeFilters)}
+              className={`${pillBase} ${gradeFilters.has(g) ? pillOn : pillOff}`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {originOptions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-[#68756c] mr-1">産地:</span>
+          {originOptions.map(o => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => toggleSet(originFilters, o, setOriginFilters)}
+              className={`${pillBase} ${originFilters.has(o) ? pillOn : pillOff}`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-[#68756c] mr-1">状態:</span>
+        {([
+          ['normal', '在庫あり'],
+          ['low', '少'],
+          ['out', '在庫切れ'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => toggleSet(statusFilters, key, setStatusFilters)}
+            className={`${pillBase} ${statusFilters.has(key) ? pillOn : pillOff}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-[#68756c] mr-1">カタログ:</span>
+        {([
+          ['all', 'すべて'],
+          ['visible', '公開'],
+          ['hidden', '非公開'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setCatalogFilter(key)}
+            className={`${pillBase} ${catalogFilter === key ? pillOn : pillOff}`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="text-xs text-[#68756c] ml-3 mr-1">ASK:</span>
+        {([
+          ['all', 'すべて'],
+          ['ask', 'ASK'],
+          ['normal', '通常'],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setAskFilter(key)}
+            className={`${pillBase} ${askFilter === key ? pillOn : pillOff}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 type InventorySortKey = 'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'
 
 function SortableTh({
@@ -567,71 +733,29 @@ function ProductModal({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-gray-700">入荷記録</p>
-                  <p className="text-xs text-[#68756c]">入荷日と数量を追加していくと、その累計が在庫元帳になります。</p>
+                  <p className="text-xs text-[#68756c]">入荷は「発注管理」で発注を「入荷済」にすると自動で追加されます。</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setForm(prev => ({ ...prev, arrivalRecords: [...prev.arrivalRecords, createArrivalRecord()] }))}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                >
-                  <Plus size={14} />
-                  入荷記録を追加
-                </button>
+                <div className="rounded-xl bg-[#f7f5ee] px-3 py-2 text-xs text-[#68756c]">
+                  累計 <span className="font-semibold text-[#173c2a]">{totalArrivalKg.toFixed(1)} kg</span>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {form.arrivalRecords.length === 0 && (
+              <div className="space-y-2">
+                {form.arrivalRecords.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-[#68756c]">
-                    まだ入荷記録がありません。必要なタイミングで追加してください。
+                    まだ入荷記録がありません。
                   </div>
+                ) : (
+                  form.arrivalRecords
+                    .slice()
+                    .sort((a, b) => b.arrivalDate.localeCompare(a.arrivalDate))
+                    .map(record => (
+                      <div key={record.id} className="flex items-center justify-between rounded-xl border border-[#ece5d7] bg-[#faf8f2] px-3 py-2 text-sm">
+                        <span className="text-[#173c2a]">{toIsoDateInput(record.arrivalDate) || '日付未設定'}</span>
+                        <span className="font-medium text-[#173c2a]">{record.quantityKg.toFixed(1)} kg</span>
+                      </div>
+                    ))
                 )}
-                {form.arrivalRecords.map((record, index) => (
-                  <div key={record.id} className="grid gap-3 rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3 md:grid-cols-[1fr_160px_auto]">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">入荷日</label>
-                      <input
-                        type="date"
-                        value={toIsoDateInput(record.arrivalDate)}
-                        onChange={event => setForm(prev => ({
-                          ...prev,
-                          arrivalRecords: prev.arrivalRecords.map(item => (
-                            item.id === record.id ? { ...item, arrivalDate: event.target.value } : item
-                          )),
-                        }))}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-600">数量 (kg)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={record.quantityKg}
-                        onChange={event => setForm(prev => ({
-                          ...prev,
-                          arrivalRecords: prev.arrivalRecords.map(item => (
-                            item.id === record.id ? { ...item, quantityKg: Number(event.target.value) || 0 } : item
-                          )),
-                        }))}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                      />
-                    </div>
-                    <div className="flex items-end justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setForm(prev => ({
-                          ...prev,
-                          arrivalRecords: prev.arrivalRecords.filter(item => item.id !== record.id),
-                        }))}
-                        className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
-                        aria-label={`入荷記録 ${index + 1} を削除`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
 
@@ -1098,6 +1222,11 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'>('manual')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [gradeFilters, setGradeFilters] = useState<Set<string>>(new Set())
+  const [originFilters, setOriginFilters] = useState<Set<string>>(new Set())
+  const [statusFilters, setStatusFilters] = useState<Set<'out' | 'low' | 'normal'>>(new Set())
+  const [catalogFilter, setCatalogFilter] = useState<'all' | 'visible' | 'hidden'>('all')
+  const [askFilter, setAskFilter] = useState<'all' | 'ask' | 'normal'>('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithInventory | null>(null)
   const [prefillProduct, setPrefillProduct] = useState<Partial<ProductWithInventory> | null>(null)
@@ -1191,22 +1320,32 @@ export default function InventoryPage() {
   }, [products, activeGroupId, groups])
 
   const filtered = useMemo(() => {
-    const searched = !search ? groupProducts : groupProducts.filter(product => {
-      const searchText = [
-        product.sku,
-        product.name,
-        product.purchaseProductName,
-        product.supplier,
-        product.teaType,
-        product.grade,
-        ...product.origins,
-        ...product.cultivars,
-        ...product.certifications,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return searchText.includes(search.toLowerCase())
+    const searched = groupProducts.filter(product => {
+      if (search) {
+        const searchText = [
+          product.sku,
+          product.name,
+          product.purchaseProductName,
+          product.supplier,
+          product.teaType,
+          product.grade,
+          ...product.origins,
+          ...product.cultivars,
+          ...product.certifications,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!searchText.includes(search.toLowerCase())) return false
+      }
+      if (gradeFilters.size > 0 && !(product.grade && gradeFilters.has(product.grade))) return false
+      if (originFilters.size > 0 && !product.origins.some(o => originFilters.has(o))) return false
+      if (statusFilters.size > 0 && !statusFilters.has(product.stockStatus)) return false
+      if (catalogFilter === 'visible' && !product.showInCatalog) return false
+      if (catalogFilter === 'hidden' && product.showInCatalog) return false
+      if (askFilter === 'ask' && !product.inquireToOrder) return false
+      if (askFilter === 'normal' && product.inquireToOrder) return false
+      return true
     })
 
     if (sortKey === 'manual') return searched
@@ -1226,7 +1365,7 @@ export default function InventoryPage() {
       }
     })
     return sorted
-  }, [groupProducts, search, sortKey, sortDir])
+  }, [groupProducts, search, sortKey, sortDir, gradeFilters, originFilters, statusFilters, catalogFilter, askFilter])
 
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) {
@@ -1564,13 +1703,29 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder="SKU / 商品名 / 仕入商品名 / 仕入先 / 品種で検索..."
-            className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 md:w-[32rem]"
+        <div className="space-y-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder="SKU / 商品名 / 仕入商品名 / 仕入先 / 品種で検索..."
+              className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 md:w-[32rem]"
+            />
+          </div>
+          <InventoryFilterBar
+            groupProducts={groupProducts}
+            masters={masters}
+            gradeFilters={gradeFilters}
+            setGradeFilters={setGradeFilters}
+            originFilters={originFilters}
+            setOriginFilters={setOriginFilters}
+            statusFilters={statusFilters}
+            setStatusFilters={setStatusFilters}
+            catalogFilter={catalogFilter}
+            setCatalogFilter={setCatalogFilter}
+            askFilter={askFilter}
+            setAskFilter={setAskFilter}
           />
         </div>
 
