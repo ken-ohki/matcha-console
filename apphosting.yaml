@@ -11,37 +11,37 @@ runConfig:
 env:
   # Public (client-side) Firebase config — embedded in client bundle, not sensitive
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyAjwVm-tnjJUfWzBjv8Wh0oNZp-hEG4mr4
+    value: AIzaSyBjT4phid4PDzjJ9pR9D2jMF76h1sQhr1M
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: import-9b3ff.firebaseapp.com
+    value: sabo-matcha-1767687963419.firebaseapp.com
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: import-9b3ff
+    value: sabo-matcha-1767687963419
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: import-9b3ff.firebasestorage.app
+    value: sabo-matcha-1767687963419.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "39425858444"
+    value: "90428776712"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:39425858444:web:0389004f5e56d9d2b4d4a9"
+    value: "1:90428776712:web:5d6ab89f60815a9d638cbd"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIRESTORE_DATABASE_ID
-    value: chaflow
+    value: matcha-console
     availability:
       - BUILD
       - RUNTIME

@@ -32,3 +32,5 @@ firebase-debug.log
 
 # typescript build info
 tsconfig.tsbuildinfo
+.dest-sa-key.json
+.env.local.backup-*
