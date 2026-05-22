@@ -103,7 +103,6 @@ function buildProductForm(
     arrivalDate: initial?.arrivalDate ?? '',
     inventoryGroupId: initial?.inventoryGroupId ?? defaultGroupId,
     initialStockKg: initial?.initialStockKg ?? getArrivalRecordsTotal(initial?.arrivalRecords ?? []),
-    haizUsedKg: initial?.haizUsedKg ?? 0,
     standardWholesalePrice: initial?.standardWholesalePrice,
     purchaseUnitPrice: initial?.purchaseUnitPrice,
     adminNote: initial?.adminNote ?? '',
@@ -575,8 +574,8 @@ function ProductModal({
   const selfConsumedKg = initial?.selfConsumedKg ?? 0
   const currentStockKg = initial?.currentStockKg ?? 0
   const simulatedCurrentStockKg = useMemo(
-    () => totalArrivalKg + totalInventoryAdjustmentKg - form.haizUsedKg - salesAllocatedKg - selfConsumedKg,
-    [form.haizUsedKg, salesAllocatedKg, selfConsumedKg, totalArrivalKg, totalInventoryAdjustmentKg],
+    () => totalArrivalKg + totalInventoryAdjustmentKg - salesAllocatedKg - selfConsumedKg,
+    [salesAllocatedKg, selfConsumedKg, totalArrivalKg, totalInventoryAdjustmentKg],
   )
   const hasPendingInventoryCheckInput = pendingInventoryCheck.checkedDate.trim() !== '' || pendingInventoryCheck.countedQuantityKg.trim() !== ''
   const pendingCountedQuantityKg = pendingInventoryCheck.countedQuantityKg.trim() === ''
@@ -716,17 +715,6 @@ function ProductModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">shopify在庫分 (kg)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={form.haizUsedKg}
-                  onChange={event => setForm(prev => ({ ...prev, haizUsedKg: Number(event.target.value) || 0 }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
             </div>
 
             <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-white p-4">
@@ -804,7 +792,7 @@ function ProductModal({
                 <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
                   <p className="text-xs text-[#68756c]">保存後の見込み在庫</p>
                   <p className="mt-1 text-sm font-semibold text-[#173c2a]">{formatKg(simulatedCurrentStockKg)}</p>
-                  <p className="mt-1 text-[11px] text-[#68756c]">入荷・Shopify在庫分・棚卸履歴の変更を反映</p>
+                  <p className="mt-1 text-[11px] text-[#68756c]">入荷・棚卸履歴の変更を反映</p>
                 </div>
                 <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
                   <p className="text-xs text-[#68756c]">今回の棚卸差分</p>
@@ -1242,7 +1230,6 @@ export default function InventoryPage() {
       inventoryChecks: [],
       arrivalDate: '',
       initialStockKg: 0,
-      haizUsedKg: 0,
       salesAllocatedKg: 0,
       selfConsumedKg: 0,
       inventoryAdjustmentKg: 0,
@@ -1756,7 +1743,6 @@ export default function InventoryPage() {
                 <div className="rounded-xl bg-[#f7f5ee] p-3 text-xs text-[#68756c]">
                   <div>入荷 {formatKg(product.initialStockKg)}</div>
                   <div>棚卸 {formatSignedKg(product.inventoryAdjustmentKg)}</div>
-                  <div>Shopify {formatKg(product.haizUsedKg)}</div>
                   <div>引当 {formatKg(product.salesAllocatedKg)}</div>
                   <div>自社消費 {formatKg(product.selfConsumedKg)}</div>
                 </div>
@@ -1872,7 +1858,7 @@ export default function InventoryPage() {
                     <td className="px-4 py-4 text-gray-700">
                       <div className="font-semibold text-[#173c2a]">{product.currentStockKg.toFixed(1)} kg</div>
                       <div className="text-xs text-[#68756c]">
-                        入荷 {product.initialStockKg.toFixed(1)} / 棚卸 {formatSignedKg(product.inventoryAdjustmentKg)} / Shopify {product.haizUsedKg.toFixed(1)}
+                        入荷 {product.initialStockKg.toFixed(1)} / 棚卸 {formatSignedKg(product.inventoryAdjustmentKg)}
                       </div>
                       <div className="mt-1 text-xs text-[#68756c]">
                         引当 {product.salesAllocatedKg.toFixed(1)} / 自社消費 {product.selfConsumedKg.toFixed(1)}

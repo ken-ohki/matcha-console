@@ -129,7 +129,6 @@ function buildPayload(input, groupId, sortOrder) {
     inventoryChecks: [],
     arrivalDate: arrivalRecords[0]?.arrivalDate ?? '',
     initialStockKg: arrivalRecords.reduce((s, r) => s + r.quantityKg, 0),
-    haizUsedKg: 0,
     standardWholesalePrice: input.standardWholesalePrice ?? undefined,
     salesNote: input.salesNote || undefined,
     sortOrder,

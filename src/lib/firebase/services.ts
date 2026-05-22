@@ -262,7 +262,6 @@ function mapProduct(id: string, data: DocumentData): Product {
     arrivalDate,
     inventoryGroupId: String(data.inventoryGroupId ?? ''),
     initialStockKg,
-    haizUsedKg: Number(data.haizUsedKg ?? 0),
     standardWholesalePrice: data.standardWholesalePrice != null
       ? Number(data.standardWholesalePrice)
       : data.price != null
@@ -636,7 +635,7 @@ function computeInventory(
       const selfConsumedKg = selfConsumedByProduct[product.id] ?? 0
       const ecSoldKg = ecSoldByProduct[product.id] ?? 0
       const effectiveInitialKg = product.initialStockKg + inventoryAdjustmentKg
-      const currentStockKg = effectiveInitialKg - product.haizUsedKg - salesAllocatedKg - selfConsumedKg - ecSoldKg
+      const currentStockKg = effectiveInitialKg - salesAllocatedKg - selfConsumedKg - ecSoldKg
       return {
         ...product,
         salesAllocatedKg,
@@ -697,7 +696,6 @@ async function assertSufficientStock(
       .reduce((sum, record) => sum + record.quantityKg, 0)
     const availableKg = product.initialStockKg
       + deriveInventoryAdjustmentKg(product.inventoryChecks)
-      - product.haizUsedKg
       - reservedKg
       - selfConsumedKg
       - ecSoldKg
@@ -735,7 +733,6 @@ async function assertSufficientSelfConsumptionStock(
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - product.haizUsedKg
     - reservedKg
     - selfConsumedKg
     - ecSoldKg
@@ -773,7 +770,6 @@ async function assertSufficientEcSaleStock(
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - product.haizUsedKg
     - reservedKg
     - selfConsumedKg
     - ecSoldKg
@@ -1189,7 +1185,6 @@ export function createFirebaseServices(): IServices {
         arrivalDate: current.arrivalDate,
         inventoryGroupId: input.inventoryGroupId ?? current.inventoryGroupId,
         initialStockKg: current.initialStockKg,
-        haizUsedKg: input.haizUsedKg ?? current.haizUsedKg,
         standardWholesalePrice: input.standardWholesalePrice ?? current.standardWholesalePrice,
         purchaseUnitPrice: input.purchaseUnitPrice ?? current.purchaseUnitPrice,
         adminNote: input.adminNote ?? current.adminNote,

@@ -203,12 +203,11 @@ export async function POST(request: Request) {
         ? deriveArrivalDate(arrivalRecords)
         : String(data.arrivalDate ?? '')
       const adjustmentKg = deriveAdjustmentKg(inventoryChecks)
-      const haizUsedKg = num(data.haizUsedKg)
       const reservedKg = reservedByProduct[doc.id] ?? 0
       const selfUsedKg = selfByProduct[doc.id] ?? 0
       const ecSoldKg = ecByProduct[doc.id] ?? 0
       const baseline = Math.max(initialStockKg + adjustmentKg, 0)
-      const currentKg = initialStockKg + adjustmentKg - haizUsedKg - reservedKg - selfUsedKg - ecSoldKg
+      const currentKg = initialStockKg + adjustmentKg - reservedKg - selfUsedKg - ecSoldKg
 
       const product: CatalogProduct & { isActive: boolean; showInCatalog: boolean } = {
         id: doc.id,

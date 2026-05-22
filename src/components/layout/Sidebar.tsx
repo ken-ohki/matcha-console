@@ -31,7 +31,9 @@ export function Sidebar({
 
   useEffect(() => {
     onClose()
-  }, [pathname, onClose])
+    // Only auto-close on route change, NOT on onClose identity change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   return (
     <>

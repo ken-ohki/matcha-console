@@ -47,7 +47,6 @@ export interface Product {
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number
-  haizUsedKg: number
   standardWholesalePrice?: number
   purchaseUnitPrice?: number
   adminNote?: string
@@ -214,7 +213,6 @@ export interface ProductInput {
   arrivalDate: string
   inventoryGroupId: string
   initialStockKg: number
-  haizUsedKg: number
   standardWholesalePrice?: number
   purchaseUnitPrice?: number
   adminNote?: string
