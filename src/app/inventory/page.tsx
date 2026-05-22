@@ -1603,22 +1603,15 @@ export default function InventoryPage() {
           </div>
         )}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
             <p className="text-sm text-[#68756c]">総商品数</p>
             <p className="mt-1 text-3xl font-bold text-[#173c2a]">{groupProducts.length}</p>
           </div>
           <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <p className="text-sm text-[#68756c]">累計入荷量</p>
-            <p className="mt-1 text-3xl font-bold text-[#173c2a]">{totalInitialStockKg.toFixed(1)} kg</p>
-          </div>
-          <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <p className="text-sm text-[#68756c]">残在庫量 / 販売引当 / 自社消費</p>
+            <p className="text-sm text-[#68756c]">残在庫量</p>
             <p className={`mt-1 text-3xl font-bold ${totalCurrentStockKg <= totalInitialStockKg * 0.2 ? 'text-amber-600' : 'text-[#173c2a]'}`}>
               {totalCurrentStockKg.toFixed(1)} kg
-            </p>
-            <p className="mt-1 text-sm text-[#68756c]">
-              引当 {totalAllocatedKg.toFixed(1)} kg / 自社消費 {totalSelfConsumedKg.toFixed(1)} kg
             </p>
           </div>
         </div>
@@ -1728,30 +1721,13 @@ export default function InventoryPage() {
                     )}
                   </div>
                   <div className="mt-1 font-mono text-xs text-[#68756c]">{product.sku}</div>
-                  <div className="mt-2 text-xs text-[#68756c]">
-                    最終入荷 {product.arrivalDate || '-'} / 棚卸 {product.latestInventoryCheck?.checkedDate || '未実施'}
-                  </div>
                 </div>
                 <StockStatusBadge status={product.stockStatus} />
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-[#f7f5ee] p-3">
-                  <p className="text-xs text-[#68756c]">残在庫</p>
-                  <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatKg(product.currentStockKg)}</p>
-                </div>
-                <div className="rounded-xl bg-[#f7f5ee] p-3 text-xs text-[#68756c]">
-                  <div>入荷 {formatKg(product.initialStockKg)}</div>
-                  <div>棚卸 {formatSignedKg(product.inventoryAdjustmentKg)}</div>
-                  <div>引当 {formatKg(product.salesAllocatedKg)}</div>
-                  <div>自社消費 {formatKg(product.selfConsumedKg)}</div>
-                </div>
-              </div>
-
-              <div className="mt-3 text-xs text-[#68756c]">
-                {product.latestInventoryCheck
-                  ? `最新棚卸: ${product.latestInventoryCheck.checkedDate} / 実棚 ${formatKg(product.latestInventoryCheck.countedQuantityKg)}`
-                  : '棚卸記録なし'}
+              <div className="mt-4 rounded-xl bg-[#f7f5ee] p-3">
+                <p className="text-xs text-[#68756c]">残在庫</p>
+                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatKg(product.currentStockKg)}</p>
               </div>
 
               {user?.role === 'admin' && (
@@ -1799,7 +1775,7 @@ export default function InventoryPage() {
                   <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="茶種 / グレード / 品種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="産地 / 仕入先 / 認証" sortKey="origin" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="在庫 / 入荷履歴" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <SortableTh label="残在庫" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="単価 (kg)" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
                   <SortableTh label="状態" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
                   {user?.role === 'admin' && <th className="px-4 py-3 text-right font-medium text-[#68756c]">操作</th>}
@@ -1834,9 +1810,6 @@ export default function InventoryPage() {
                         )}
                       </div>
                       <div className="text-xs text-[#68756c]">{compactText(product.purchaseProductName)}</div>
-                      <div className="mt-1 text-xs text-[#9a9a8f]">
-                        最終入荷 {product.arrivalDate || '-'} / 履歴 {product.arrivalRecords.length} 件
-                      </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
                       <div>
@@ -1857,24 +1830,6 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-4 text-gray-700">
                       <div className="font-semibold text-[#173c2a]">{product.currentStockKg.toFixed(1)} kg</div>
-                      <div className="text-xs text-[#68756c]">
-                        入荷 {product.initialStockKg.toFixed(1)} / 棚卸 {formatSignedKg(product.inventoryAdjustmentKg)}
-                      </div>
-                      <div className="mt-1 text-xs text-[#68756c]">
-                        引当 {product.salesAllocatedKg.toFixed(1)} / 自社消費 {product.selfConsumedKg.toFixed(1)}
-                      </div>
-                      <div className="mt-1 text-xs text-[#68756c]">
-                        {product.latestInventoryCheck
-                          ? `棚卸 ${product.latestInventoryCheck.checkedDate} 実棚 ${product.latestInventoryCheck.countedQuantityKg.toFixed(1)}kg`
-                          : product.arrivalRecords.length > 0
-                            ? product.arrivalRecords
-                                .slice()
-                                .sort((left, right) => right.arrivalDate.localeCompare(left.arrivalDate))
-                                .slice(0, 2)
-                                .map(record => `${record.arrivalDate} ${record.quantityKg.toFixed(1)}kg`)
-                                .join(' / ')
-                            : '入荷履歴なし'}
-                      </div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
                       {(() => {
