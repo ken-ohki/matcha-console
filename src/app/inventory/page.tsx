@@ -1567,7 +1567,7 @@ export default function InventoryPage() {
       <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#173c2a]">在庫マスター</h1>
+            <h1 className="text-2xl font-bold text-[#173c2a]">在庫管理</h1>
             <p className="mt-1 text-sm text-[#68756c]">全{products.length}件 / 茶葉マスターを画像定義に更新</p>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -118,6 +118,7 @@ export interface SaleRecord {
   paymentMethod?: string
   paymentDate?: string
   shippingAddress?: string
+  shippingPostalCode?: string
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string
@@ -245,6 +246,7 @@ export interface SaleRecordInput {
   paymentMethod?: string
   paymentDate?: string
   shippingAddress?: string
+  shippingPostalCode?: string
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string

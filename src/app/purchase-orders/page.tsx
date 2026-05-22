@@ -381,37 +381,26 @@ function PurchaseOrderModal({
           </div>
 
           <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・支払い</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・支払い</p>
+              <Link href="/financials" className="text-[11px] font-medium text-[#174c33] hover:underline">
+                収支管理で編集 →
+              </Link>
+            </div>
             <div className="grid gap-3 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">支払いステータス</label>
-                <select
-                  value={form.paymentStatus ?? 'uninvoiced'}
-                  onChange={e => setForm(prev => ({ ...prev, paymentStatus: e.target.value as 'uninvoiced' | 'unpaid' | 'paid' }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                >
-                  <option value="uninvoiced">未請求</option>
-                  <option value="unpaid">未払</option>
-                  <option value="paid">支払済</option>
-                </select>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払いステータス</p>
+                <div className="py-1.5">
+                  <PaymentStatusBadge status={form.paymentStatus ?? 'uninvoiced'} hasInvoice={!!form.invoice} />
+                </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">支払い期日</label>
-                <input
-                  type="date"
-                  value={form.paymentDueDate ?? ''}
-                  onChange={e => setForm(prev => ({ ...prev, paymentDueDate: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い期日</p>
+                <p className="text-sm text-[#173c2a]">{form.paymentDueDate || '-'}</p>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">支払日</label>
-                <input
-                  type="date"
-                  value={form.paidDate ?? ''}
-                  onChange={e => setForm(prev => ({ ...prev, paidDate: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払日</p>
+                <p className="text-sm text-[#173c2a]">{form.paidDate || '-'}</p>
               </div>
               <div className="md:col-span-3">
                 <label className="mb-1 block text-xs font-medium text-gray-700">請求書（PDF）</label>

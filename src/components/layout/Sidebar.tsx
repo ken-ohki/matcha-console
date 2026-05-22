@@ -3,15 +3,17 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { Building2, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, Settings, ShoppingBag, Truck, X } from 'lucide-react'
+import { Building2, Calculator, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, Send, Settings, ShoppingBag, Truck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const navItems = [
-  { href: '/inventory', label: '在庫マスター', icon: Package },
+  { href: '/inventory', label: '在庫管理', icon: Package },
   { href: '/purchase-orders', label: '発注管理', icon: ClipboardList },
   { href: '/suppliers', label: '仕入先一覧', icon: Truck },
   { href: '/sales', label: '販売管理', icon: Leaf },
   { href: '/ec-sales', label: '販売管理（EC）', icon: ShoppingBag },
+  { href: '/shipping', label: '発送管理', icon: Send },
+  { href: '/financials', label: '収支管理', icon: Calculator },
   { href: '/buyers', label: '販売先一覧', icon: Building2 },
   { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
   { href: '/settings/masters', label: '設定', icon: Settings },
@@ -39,8 +41,8 @@ export function Sidebar({
         }`}
         onClick={onClose}
       />
-      <aside className={`fixed left-0 top-0 z-40 flex h-full w-72 max-w-[85vw] flex-col bg-[#173c2a] transition-transform md:w-60 md:max-w-none md:translate-x-0 ${
-        open ? 'translate-x-0' : '-translate-x-full'
+      <aside className={`fixed left-0 top-0 z-40 flex h-full w-72 max-w-[85vw] flex-col bg-[#173c2a] transition-transform md:w-60 md:max-w-none md:translate-x-0 md:pointer-events-auto ${
+        open ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:pointer-events-auto'
       }`}>
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
           <div>

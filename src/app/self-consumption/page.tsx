@@ -318,7 +318,7 @@ export default function SelfConsumptionPage() {
             <div>
               <h2 className="text-lg font-semibold text-[#173c2a]">自社消費一覧</h2>
               {products.length === 0 && (
-                <p className="mt-1 text-sm text-[#9d3d28]">先に在庫マスターで商品を登録してください。</p>
+                <p className="mt-1 text-sm text-[#9d3d28]">先に在庫管理で商品を登録してください。</p>
               )}
             </div>
             <div className="flex flex-wrap gap-3">

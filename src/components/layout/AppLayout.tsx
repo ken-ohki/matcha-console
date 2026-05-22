@@ -46,10 +46,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-xl border border-[#d9d1be] bg-white p-2 text-[#173c2a] shadow-sm"
+              className="relative z-30 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#d9d1be] bg-white text-[#173c2a] shadow-sm active:bg-gray-100"
               aria-label="メニューを開く"
             >
-              <Menu size={18} />
+              <Menu size={20} />
             </button>
           </div>
         </div>
