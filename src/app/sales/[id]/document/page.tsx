@@ -560,10 +560,40 @@ export default function DocumentPage() {
 
       <style jsx global>{`
         @media print {
-          @page { size: A4; margin: 12mm; }
-          body { background: white !important; }
+          @page { size: A4; margin: 14mm 12mm; }
+          html, body {
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color: #000 !important;
+          }
           .no-print { display: none !important; }
           .terms-page { page-break-before: always; break-before: page; }
+          /* Avoid splitting the document container across pages awkwardly */
+          main > div { page-break-inside: avoid; }
+          /* Inputs become flat text in print */
+          input, textarea, select {
+            border: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            outline: 0 !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            padding: 0 !important;
+            resize: none !important;
+            color: inherit !important;
+          }
+          input:focus, textarea:focus { background: transparent !important; }
+          /* Remove background hover/focus tints */
+          .bg-yellow-50, .focus\\:bg-yellow-50 { background: transparent !important; }
+          /* Hide the row-delete trash buttons cleanly */
+          table .no-print { display: none !important; }
+          /* Borders should be clear in print */
+          .shadow, .shadow-sm, .shadow-2xl { box-shadow: none !important; }
+          /* Tables: avoid orphan rows */
+          tr, td, th { page-break-inside: avoid !important; }
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
         }
         input[type="date"] { color-scheme: light; }
       `}</style>
