@@ -15,6 +15,8 @@ export interface DocumentData {
   language: DocumentLanguage
   recipientName: string
   recipientHonorific: string
+  recipientAddress: string
+  recipientPostalCode: string
   issueDate: string
   projectName: string
   taxExempt: boolean

@@ -103,6 +103,8 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     language,
     recipientName: sale.buyerName,
     recipientHonorific: isJa ? '御中' : '',
+    recipientAddress: buyer?.shippingAddress ?? '',
+    recipientPostalCode: buyer?.shippingPostalCode ?? '',
     issueDate: todayString(),
     projectName: projectLabel,
     taxExempt: !isJa, // English version defaults to tax-exempt (export)
@@ -302,6 +304,20 @@ export default function DocumentPage() {
                   />
                 )}
               </div>
+              <input
+                type="text"
+                value={doc.recipientPostalCode}
+                onChange={e => updateField('recipientPostalCode', e.target.value)}
+                placeholder={isJa ? '〒郵便番号' : 'Postal code'}
+                className="mt-2 w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
+              />
+              <textarea
+                rows={2}
+                value={doc.recipientAddress}
+                onChange={e => updateField('recipientAddress', e.target.value)}
+                placeholder={isJa ? '住所' : 'Address'}
+                className="w-full resize-none bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
+              />
               <p className="mt-6 text-sm">{labels.intro}</p>
             </div>
             <div className="text-sm space-y-1">
