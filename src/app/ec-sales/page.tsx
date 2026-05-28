@@ -342,7 +342,12 @@ export default function EcSalesPage() {
               <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-[#173c2a]">{record.productName}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-[#173c2a]">{record.productName}</span>
+                      {record.shopifyOrderId && (
+                        <span className="rounded-full bg-[#dcf0e4] px-2 py-0.5 text-[10px] font-medium text-[#1b6b41]">自動取込</span>
+                      )}
+                    </div>
                     <div className="mt-1 font-mono text-xs text-[#68756c]">{record.productSku}</div>
                     <div className="mt-2 text-xs text-[#68756c]">
                       {formatDate(record.soldOn)} / {record.channel || 'EC'}
@@ -406,7 +411,12 @@ export default function EcSalesPage() {
                   <tr key={record.id} className="border-b border-[#f0ebdf] text-[#173c2a]">
                     <td className="px-3 py-4">{formatDate(record.soldOn)}</td>
                     <td className="px-3 py-4">
-                      <div className="font-medium">{record.productName}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{record.productName}</span>
+                        {record.shopifyOrderId && (
+                          <span className="rounded-full bg-[#dcf0e4] px-2 py-0.5 text-[10px] font-medium text-[#1b6b41]">自動取込</span>
+                        )}
+                      </div>
                       <div className="text-xs text-[#68756c]">{record.productSku}</div>
                     </td>
                     <td className="px-3 py-4 text-right font-medium">{formatKg(record.quantityKg)}</td>
