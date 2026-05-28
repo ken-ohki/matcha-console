@@ -482,6 +482,7 @@ function mapEcSale(id: string, data: DocumentData): EcSaleRecord {
     revenue: unitPrice != null ? quantityKg * unitPrice : data.revenue != null ? Number(data.revenue) : undefined,
     channel: data.channel ? String(data.channel) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
+    shopifyOrderId: data.shopifyOrderId ? String(data.shopifyOrderId) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -1671,6 +1672,7 @@ export function createFirebaseServices(): IServices {
         unitPrice: input.unitPrice,
         channel: input.channel?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
+        shopifyOrderId: input.shopifyOrderId || undefined,
         productSku: product.sku,
         productName: product.name,
         revenue,

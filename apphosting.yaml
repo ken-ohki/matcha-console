@@ -55,3 +55,7 @@ env:
     secret: FIREBASE_SERVICE_ACCOUNT_KEY
     availability:
       - RUNTIME
+  - variable: SHOPIFY_WEBHOOK_SECRET
+    secret: SHOPIFY_WEBHOOK_SECRET
+    availability:
+      - RUNTIME

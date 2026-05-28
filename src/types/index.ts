@@ -168,6 +168,7 @@ export interface EcSaleRecord {
   revenue?: number
   channel?: string
   notes?: string
+  shopifyOrderId?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -180,6 +181,7 @@ export interface EcSaleRecordInput {
   unitPrice?: number
   channel?: string
   notes?: string
+  shopifyOrderId?: string
 }
 
 export interface SelfConsumptionRecord {
