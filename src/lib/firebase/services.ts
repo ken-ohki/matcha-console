@@ -483,6 +483,8 @@ function mapEcSale(id: string, data: DocumentData): EcSaleRecord {
     channel: data.channel ? String(data.channel) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
     shopifyOrderId: data.shopifyOrderId ? String(data.shopifyOrderId) : undefined,
+    status: data.status === 'cancelled' ? 'cancelled' : 'active',
+    cancelledAt: data.cancelledAt ? String(data.cancelledAt) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -623,6 +625,7 @@ function computeInventory(
     return acc
   }, {})
   const ecSoldByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
+    if (record.status === 'cancelled') return acc
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
@@ -693,7 +696,7 @@ async function assertSufficientStock(
       .filter(record => record.productId === productId)
       .reduce((sum, record) => sum + record.quantityKg, 0)
     const ecSoldKg = ecSales
-      .filter(record => record.productId === productId)
+      .filter(record => record.productId === productId && record.status !== 'cancelled')
       .reduce((sum, record) => sum + record.quantityKg, 0)
     const availableKg = product.initialStockKg
       + deriveInventoryAdjustmentKg(product.inventoryChecks)
@@ -730,7 +733,7 @@ async function assertSufficientSelfConsumptionStock(
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const ecSoldKg = ecSales
-    .filter(record => record.productId === input.productId)
+    .filter(record => record.productId === input.productId && record.status !== 'cancelled')
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
@@ -767,7 +770,7 @@ async function assertSufficientEcSaleStock(
     .filter(record => record.productId === input.productId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const ecSoldKg = ecSales
-    .filter(record => record.productId === input.productId && record.id !== options?.excludeEcSaleId)
+    .filter(record => record.productId === input.productId && record.id !== options?.excludeEcSaleId && record.status !== 'cancelled')
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)

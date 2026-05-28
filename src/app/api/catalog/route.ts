@@ -171,6 +171,7 @@ export async function POST(request: Request) {
   const ecByProduct: Record<string, number> = {}
   ecSnap.docs.forEach(doc => {
     const data = doc.data() as AnyRecord
+    if (data.status === 'cancelled') return
     const pid = String(data.productId ?? '')
     ecByProduct[pid] = (ecByProduct[pid] ?? 0) + num(data.quantityKg)
   })

@@ -65,24 +65,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'server_misconfigured', detail: err instanceof Error ? err.message : 'unknown' }, { status: 500 })
   }
 
-  // CANCELLATION / REFUND: remove ec_sales records tied to this order
-  if (topic === 'orders/cancelled' || topic.startsWith('refunds/')) {
+  // CANCELLATION / DELETION / REFUND: keep the records as history but mark them
+  // cancelled so they no longer deduct from inventory.
+  if (topic === 'orders/cancelled' || topic === 'orders/delete' || topic.startsWith('refunds/')) {
     const existing = await db.collection('ec_sales').where('shopifyOrderId', '==', shopifyOrderId).get()
+    const nowIso = new Date().toISOString().slice(0, 10)
     const batch = db.batch()
-    existing.docs.forEach(doc => batch.delete(doc.ref))
-    if (existing.size > 0) await batch.commit()
-    return NextResponse.json({ ok: true, action: 'cancelled', removed: existing.size })
+    let marked = 0
+    existing.docs.forEach(doc => {
+      if (doc.data().status === 'cancelled') return
+      batch.update(doc.ref, {
+        status: 'cancelled',
+        cancelledAt: nowIso,
+        notes: topic === 'orders/delete' ? 'Shopifyで注文削除' : 'Shopifyでキャンセル',
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+      marked++
+    })
+    if (marked > 0) await batch.commit()
+    return NextResponse.json({ ok: true, action: topic, cancelled: marked })
   }
 
-  // CREATION: only handle order creation topics
-  if (topic !== 'orders/create' && topic !== 'orders/paid' && topic !== 'orders/fulfilled') {
+  // CREATION / UPDATE / EDIT: re-sync the order's ec_sales from current line items.
+  // We delete the existing records for this order and recreate them, so edits
+  // (quantity changes, added/removed items) are always reflected.
+  const SYNC_TOPICS = ['orders/create', 'orders/updated', 'orders/edited', 'orders/paid', 'orders/fulfilled']
+  if (!SYNC_TOPICS.includes(topic)) {
     return NextResponse.json({ ok: true, note: `ignored topic ${topic}` })
-  }
-
-  // Idempotency: if we already recorded this order, skip
-  const already = await db.collection('ec_sales').where('shopifyOrderId', '==', shopifyOrderId).limit(1).get()
-  if (!already.empty) {
-    return NextResponse.json({ ok: true, action: 'skipped_duplicate' })
   }
 
   // Load all active products → SKU map
@@ -98,10 +107,9 @@ export async function POST(request: Request) {
   const soldOn = order.created_at ? order.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)
   const orderName = order.name || `#${shopifyOrderId}`
 
-  const created: string[] = []
+  // Compute desired records from current line items
+  const desired = []
   const skipped: string[] = []
-  const batch = db.batch()
-
   for (const item of order.line_items ?? []) {
     const sku = (item.sku ?? '').trim()
     if (!sku) continue
@@ -115,7 +123,6 @@ export async function POST(request: Request) {
     if (quantityKg <= 0) continue
     const unitPrice = item.price != null ? Number(item.price) : undefined
     const hasPrice = unitPrice != null && Number.isFinite(unitPrice)
-    const ref = db.collection('ec_sales').doc()
     const record: AnyRecord = {
       productId: product.id,
       productSku: product.sku,
@@ -125,6 +132,7 @@ export async function POST(request: Request) {
       orderNumber: orderName,
       channel: 'Shopify',
       shopifyOrderId,
+      status: 'active',
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }
@@ -132,11 +140,30 @@ export async function POST(request: Request) {
       record.unitPrice = unitPrice
       record.revenue = quantityKg * (unitPrice as number)
     }
-    batch.set(ref, record)
-    created.push(sku)
+    desired.push(record)
   }
 
-  if (created.length > 0) await batch.commit()
+  // Re-sync: delete only the ACTIVE records for this order (preserve cancelled
+  // history), then recreate the active set from the current line items.
+  const existing = await db.collection('ec_sales').where('shopifyOrderId', '==', shopifyOrderId).get()
+  const batch = db.batch()
+  let removed = 0
+  existing.docs.forEach(doc => {
+    if (doc.data().status === 'cancelled') return
+    batch.delete(doc.ref)
+    removed++
+  })
+  for (const record of desired) {
+    batch.set(db.collection('ec_sales').doc(), record)
+  }
+  await batch.commit()
 
-  return NextResponse.json({ ok: true, action: 'created', created, skipped, order: orderName })
+  return NextResponse.json({
+    ok: true,
+    action: topic === 'orders/create' ? 'created' : 'resynced',
+    items: desired.length,
+    removed: existing.size,
+    skipped,
+    order: orderName,
+  })
 }

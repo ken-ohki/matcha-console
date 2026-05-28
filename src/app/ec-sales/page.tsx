@@ -253,8 +253,8 @@ export default function EcSalesPage() {
     ))
   }, [records, search])
 
-  const totalKg = filteredRecords.reduce((sum, r) => sum + r.quantityKg, 0)
-  const totalRevenue = filteredRecords.reduce((sum, r) => sum + (r.revenue ?? 0), 0)
+  const totalKg = filteredRecords.reduce((sum, r) => sum + (r.status === 'cancelled' ? 0 : r.quantityKg), 0)
+  const totalRevenue = filteredRecords.reduce((sum, r) => sum + (r.status === 'cancelled' ? 0 : (r.revenue ?? 0)), 0)
 
   const handleSave = async (input: EcSaleRecordInput) => {
     const services = await getServices()
@@ -342,10 +342,13 @@ export default function EcSalesPage() {
               <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-[#173c2a]">{record.productName}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-medium text-[#173c2a] ${record.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>{record.productName}</span>
                       {record.shopifyOrderId && (
                         <span className="rounded-full bg-[#dcf0e4] px-2 py-0.5 text-[10px] font-medium text-[#1b6b41]">自動取込</span>
+                      )}
+                      {record.status === 'cancelled' && (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">キャンセル</span>
                       )}
                     </div>
                     <div className="mt-1 font-mono text-xs text-[#68756c]">{record.productSku}</div>
@@ -407,21 +410,26 @@ export default function EcSalesPage() {
                     </td>
                   </tr>
                 )}
-                {filteredRecords.map(record => (
-                  <tr key={record.id} className="border-b border-[#f0ebdf] text-[#173c2a]">
+                {filteredRecords.map(record => {
+                  const cancelled = record.status === 'cancelled'
+                  return (
+                  <tr key={record.id} className={`border-b border-[#f0ebdf] ${cancelled ? 'text-gray-400' : 'text-[#173c2a]'}`}>
                     <td className="px-3 py-4">{formatDate(record.soldOn)}</td>
                     <td className="px-3 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{record.productName}</span>
+                        <span className={`font-medium ${cancelled ? 'line-through' : ''}`}>{record.productName}</span>
                         {record.shopifyOrderId && (
                           <span className="rounded-full bg-[#dcf0e4] px-2 py-0.5 text-[10px] font-medium text-[#1b6b41]">自動取込</span>
                         )}
+                        {cancelled && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">キャンセル</span>
+                        )}
                       </div>
-                      <div className="text-xs text-[#68756c]">{record.productSku}</div>
+                      <div className="text-xs text-[#68756c]">{record.productSku}{cancelled && record.cancelledAt ? ` / ${record.cancelledAt} 取消` : ''}</div>
                     </td>
-                    <td className="px-3 py-4 text-right font-medium">{formatKg(record.quantityKg)}</td>
+                    <td className={`px-3 py-4 text-right font-medium ${cancelled ? 'line-through' : ''}`}>{formatKg(record.quantityKg)}</td>
                     <td className="px-3 py-4 text-right">{record.unitPrice != null ? formatCurrency(record.unitPrice) : '-'}</td>
-                    <td className="px-3 py-4 text-right font-semibold text-emerald-700">{record.revenue != null ? formatCurrency(record.revenue) : '-'}</td>
+                    <td className={`px-3 py-4 text-right font-semibold ${cancelled ? 'text-gray-400' : 'text-emerald-700'}`}>{record.revenue != null ? formatCurrency(record.revenue) : '-'}</td>
                     <td className="px-3 py-4">
                       <div>{record.channel || '-'}</div>
                       <div className="text-xs text-[#68756c]">{record.orderNumber || ''}</div>
@@ -449,7 +457,8 @@ export default function EcSalesPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

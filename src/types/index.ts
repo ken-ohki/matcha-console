@@ -169,6 +169,8 @@ export interface EcSaleRecord {
   channel?: string
   notes?: string
   shopifyOrderId?: string
+  status?: 'active' | 'cancelled'
+  cancelledAt?: string
   createdAt: Date
   updatedAt: Date
 }
