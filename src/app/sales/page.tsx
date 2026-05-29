@@ -727,21 +727,24 @@ export default function SalesPage() {
     })
   }, [sales, search, statusFilters, buyerFilters, countryFilters, productFilters, dateFrom, dateTo])
 
+  // Statistics exclude cancelled deals (取消)
+  const analyticsSales = useMemo(() => filteredSales.filter(s => s.status !== 'cancelled'), [filteredSales])
+
   const aggregations = useMemo(() => ({
-    monthly: aggregateSales(filteredSales, r => {
+    monthly: aggregateSales(analyticsSales, r => {
       const d = r.createdAt
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       return { key, label: key }
     }).sort((a, b) => b.key.localeCompare(a.key)),
-    fiscal: aggregateSales(filteredSales, r => {
+    fiscal: aggregateSales(analyticsSales, r => {
       const fy = fiscalYearOf(r.createdAt)
       return { key: String(fy), label: `FY${fy}（${fy}/4 - ${fy + 1}/3）` }
     }).sort((a, b) => b.key.localeCompare(a.key)),
-    country: aggregateSales(filteredSales, r => ({ key: r.country || '(未設定)', label: r.country || '(未設定)' }))
+    country: aggregateSales(analyticsSales, r => ({ key: r.country || '(未設定)', label: r.country || '(未設定)' }))
       .sort((a, b) => b.revenue - a.revenue),
     product: (() => {
       const groups = new Map<string, AggregateRow>()
-      for (const sale of filteredSales) {
+      for (const sale of analyticsSales) {
         const seenInSale = new Set<string>()
         for (const item of sale.items) {
           const key = `${item.productSku || item.productId}::${item.productName}`
@@ -761,7 +764,7 @@ export default function SalesPage() {
       }
       return [...groups.values()].sort((a, b) => b.revenue - a.revenue)
     })(),
-  }), [filteredSales])
+  }), [analyticsSales])
 
   const filterOptions = useMemo(() => {
     const buyers = new Set<string>()
@@ -803,9 +806,9 @@ export default function SalesPage() {
     setSearch('')
   }
 
-  const scopeRevenue = filteredSales.reduce((sum, record) => sum + record.revenue, 0)
-  const scopeQuantity = filteredSales.reduce((sum, record) => sum + record.quantityKg, 0)
-  const scopeProfit = filteredSales.reduce((sum, record) => sum + record.grossProfit, 0)
+  const scopeRevenue = analyticsSales.reduce((sum, record) => sum + record.revenue, 0)
+  const scopeQuantity = analyticsSales.reduce((sum, record) => sum + record.quantityKg, 0)
+  const scopeProfit = analyticsSales.reduce((sum, record) => sum + record.grossProfit, 0)
   const scopeMargin = scopeRevenue === 0 ? 0 : (scopeProfit / scopeRevenue) * 100
   const scopeAvgUnitPrice = scopeQuantity === 0 ? 0 : scopeRevenue / scopeQuantity
 
@@ -813,7 +816,7 @@ export default function SalesPage() {
     ? '全案件'
     : [...statusFilters].map(getStatusLabel).join(' + ')
 
-  const buyerSummary = Object.values(filteredSales.reduce<Record<string, {
+  const buyerSummary = Object.values(analyticsSales.reduce<Record<string, {
     buyerName: string
     revenue: number
     profit: number
@@ -903,17 +906,17 @@ export default function SalesPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KPICard title="案件数" value={`${filteredSales.length} 件`} color="default" icon={<ClipboardPenLine size={18} />} />
+          <KPICard title="案件数" value={`${analyticsSales.length} 件`} color="default" icon={<ClipboardPenLine size={18} />} />
           <KPICard title="平均単価 / kg" value={scopeAvgUnitPrice > 0 ? formatCurrency(scopeAvgUnitPrice) : '-'} color="default" icon={<CircleDollarSign size={18} />} />
           <KPICard
             title="未請求金額"
-            value={formatCurrency(filteredSales.filter(r => r.paymentStatus !== 'paid').reduce((s, r) => s + r.revenue, 0))}
+            value={formatCurrency(analyticsSales.filter(r => r.paymentStatus !== 'paid').reduce((s, r) => s + r.revenue, 0))}
             color="amber"
             icon={<CircleDollarSign size={18} />}
           />
           <KPICard
             title="未発送件数"
-            value={`${filteredSales.filter(r => r.shippingStatus !== 'shipped').length} 件`}
+            value={`${analyticsSales.filter(r => r.shippingStatus !== 'shipped').length} 件`}
             color="default"
             icon={<Package2 size={18} />}
           />

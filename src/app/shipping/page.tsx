@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
@@ -52,6 +52,9 @@ export default function ShippingPage() {
   const [filterChip, setFilterChip] = useState<FilterChip>('all')
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  // Holds the last server-saved text values so onBlur can detect real changes
+  // (local `sales` state is mutated by onChange, so we cannot compare against it).
+  const savedRef = useRef<Record<string, { shippingMethod: string; trackingNumber: string; shippingAddress: string; shippingPostalCode: string }>>({})
 
   const load = async () => {
     setLoading(true)
@@ -60,6 +63,18 @@ export default function ShippingPage() {
       services.sales.getSaleRecords(),
       services.sales.getBuyers(),
     ])
+    const buyerMap = new Map(nextBuyers.map(b => [b.name, b]))
+    const snapshot: typeof savedRef.current = {}
+    nextSales.forEach(s => {
+      const buyer = buyerMap.get(s.buyerName)
+      snapshot[s.id] = {
+        shippingMethod: s.shippingMethod ?? '',
+        trackingNumber: s.trackingNumber ?? '',
+        shippingAddress: s.shippingAddress ?? buyer?.shippingAddress ?? '',
+        shippingPostalCode: s.shippingPostalCode ?? buyer?.shippingPostalCode ?? '',
+      }
+    })
+    savedRef.current = snapshot
     setSales(nextSales)
     setBuyers(nextBuyers)
     setLoading(false)
@@ -126,6 +141,14 @@ export default function ShippingPage() {
       const services = await getServices()
       await services.sales.updateSaleRecord(id, patch)
       setSales(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
+      // Keep the saved snapshot in sync so subsequent blurs compare correctly
+      const snap = savedRef.current[id]
+      if (snap) {
+        if (patch.shippingMethod !== undefined) snap.shippingMethod = patch.shippingMethod ?? ''
+        if (patch.trackingNumber !== undefined) snap.trackingNumber = patch.trackingNumber ?? ''
+        if (patch.shippingAddress !== undefined) snap.shippingAddress = patch.shippingAddress ?? ''
+        if (patch.shippingPostalCode !== undefined) snap.shippingPostalCode = patch.shippingPostalCode ?? ''
+      }
       setFeedback({ tone: 'success', message: '発送情報を更新しました' })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
@@ -268,7 +291,7 @@ export default function ShippingPage() {
                           disabled={saving}
                           onBlur={e => {
                             const v = e.target.value.trim()
-                            if (v !== (sale.shippingMethod ?? '')) {
+                            if (v !== (savedRef.current[sale.id]?.shippingMethod ?? '')) {
                               void handlePatch(sale.id, { shippingMethod: v || undefined })
                             }
                           }}
@@ -293,7 +316,7 @@ export default function ShippingPage() {
                           disabled={saving}
                           onBlur={e => {
                             const v = e.target.value.trim()
-                            if (v !== (sale.trackingNumber ?? '')) {
+                            if (v !== (savedRef.current[sale.id]?.trackingNumber ?? '')) {
                               void handlePatch(sale.id, { trackingNumber: v || undefined })
                             }
                           }}
@@ -308,7 +331,7 @@ export default function ShippingPage() {
                           disabled={saving}
                           onBlur={e => {
                             const v = e.target.value.trim()
-                            if (v !== (sale.shippingPostalCode ?? '')) {
+                            if (v !== (savedRef.current[sale.id]?.shippingPostalCode ?? '')) {
                               void handlePatch(sale.id, { shippingPostalCode: v || undefined })
                             }
                           }}
@@ -324,7 +347,7 @@ export default function ShippingPage() {
                           disabled={saving}
                           onBlur={e => {
                             const v = e.target.value.trim()
-                            if (v !== (sale.shippingAddress ?? '')) {
+                            if (v !== (savedRef.current[sale.id]?.shippingAddress ?? '')) {
                               void handlePatch(sale.id, { shippingAddress: v || undefined })
                             }
                           }}

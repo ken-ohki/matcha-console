@@ -19,6 +19,7 @@ interface ShopifyOrder {
   id?: number
   name?: string
   created_at?: string
+  cancelled_at?: string | null
   line_items?: ShopifyLineItem[]
 }
 
@@ -65,9 +66,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'server_misconfigured', detail: err instanceof Error ? err.message : 'unknown' }, { status: 500 })
   }
 
-  // CANCELLATION / DELETION / REFUND: keep the records as history but mark them
-  // cancelled so they no longer deduct from inventory.
-  if (topic === 'orders/cancelled' || topic === 'orders/delete' || topic.startsWith('refunds/')) {
+  // Mark all existing records for this order as cancelled (kept as history).
+  const markCancelled = async (note: string) => {
     const existing = await db.collection('ec_sales').where('shopifyOrderId', '==', shopifyOrderId).get()
     const nowIso = new Date().toISOString().slice(0, 10)
     const batch = db.batch()
@@ -77,21 +77,33 @@ export async function POST(request: Request) {
       batch.update(doc.ref, {
         status: 'cancelled',
         cancelledAt: nowIso,
-        notes: topic === 'orders/delete' ? 'Shopifyで注文削除' : 'Shopifyでキャンセル',
+        notes: note,
         updatedAt: FieldValue.serverTimestamp(),
       })
       marked++
     })
     if (marked > 0) await batch.commit()
+    return marked
+  }
+
+  // CANCELLATION / DELETION / REFUND: keep the records as history but mark them
+  // cancelled so they no longer deduct from inventory.
+  if (topic === 'orders/cancelled' || topic === 'orders/delete' || topic.startsWith('refunds/')) {
+    const marked = await markCancelled(topic === 'orders/delete' ? 'Shopifyで注文削除' : 'Shopifyでキャンセル')
     return NextResponse.json({ ok: true, action: topic, cancelled: marked })
   }
 
   // CREATION / UPDATE / EDIT: re-sync the order's ec_sales from current line items.
-  // We delete the existing records for this order and recreate them, so edits
-  // (quantity changes, added/removed items) are always reflected.
   const SYNC_TOPICS = ['orders/create', 'orders/updated', 'orders/edited', 'orders/paid', 'orders/fulfilled']
   if (!SYNC_TOPICS.includes(topic)) {
     return NextResponse.json({ ok: true, note: `ignored topic ${topic}` })
+  }
+
+  // If this order is already cancelled in Shopify, an orders/updated may still
+  // arrive — treat it as a cancellation rather than recreating active records.
+  if (order.cancelled_at) {
+    const marked = await markCancelled('Shopifyでキャンセル')
+    return NextResponse.json({ ok: true, action: 'cancelled_via_update', cancelled: marked })
   }
 
   // Load all active products → SKU map
