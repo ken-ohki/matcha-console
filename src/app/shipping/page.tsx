@@ -54,7 +54,7 @@ export default function ShippingPage() {
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   // Holds the last server-saved text values so onBlur can detect real changes
   // (local `sales` state is mutated by onChange, so we cannot compare against it).
-  const savedRef = useRef<Record<string, { shippingMethod: string; trackingNumber: string; shippingAddress: string; shippingPostalCode: string }>>({})
+  const savedRef = useRef<Record<string, { shippingStatus: ShippingStatus; shippingDate: string; shippingMethod: string; trackingNumber: string; shippingAddress: string; shippingPostalCode: string }>>({})
 
   const load = async () => {
     setLoading(true)
@@ -68,6 +68,8 @@ export default function ShippingPage() {
     nextSales.forEach(s => {
       const buyer = buyerMap.get(s.buyerName)
       snapshot[s.id] = {
+        shippingStatus: s.shippingStatus,
+        shippingDate: s.shippingDate ?? '',
         shippingMethod: s.shippingMethod ?? '',
         trackingNumber: s.trackingNumber ?? '',
         shippingAddress: s.shippingAddress ?? buyer?.shippingAddress ?? '',
@@ -134,27 +136,52 @@ export default function ShippingPage() {
     })
   }, [targetSales, filterChip, search])
 
-  const handlePatch = async (id: string, patch: Partial<Pick<SaleRecord, 'shippingStatus' | 'shippingMethod' | 'shippingDate' | 'trackingNumber' | 'shippingAddress' | 'shippingPostalCode'>>) => {
-    setSavingId(id)
+  // Update only local edit state (no server write); committed via the 保存 button.
+  const updateLocal = (id: string, patch: Partial<SaleRecord>) => {
+    setSales(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
+  }
+
+  const saveRow = async (sale: SaleRecord, buyer?: Buyer) => {
+    setSavingId(sale.id)
     setFeedback(null)
     try {
       const services = await getServices()
-      await services.sales.updateSaleRecord(id, patch)
-      setSales(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
-      // Keep the saved snapshot in sync so subsequent blurs compare correctly
-      const snap = savedRef.current[id]
-      if (snap) {
-        if (patch.shippingMethod !== undefined) snap.shippingMethod = patch.shippingMethod ?? ''
-        if (patch.trackingNumber !== undefined) snap.trackingNumber = patch.trackingNumber ?? ''
-        if (patch.shippingAddress !== undefined) snap.shippingAddress = patch.shippingAddress ?? ''
-        if (patch.shippingPostalCode !== undefined) snap.shippingPostalCode = patch.shippingPostalCode ?? ''
+      const patch = {
+        shippingStatus: sale.shippingStatus,
+        shippingDate: sale.shippingDate?.trim() || undefined,
+        shippingMethod: sale.shippingMethod?.trim() || undefined,
+        trackingNumber: sale.trackingNumber?.trim() || undefined,
+        shippingAddress: (sale.shippingAddress ?? buyer?.shippingAddress)?.trim() || undefined,
+        shippingPostalCode: (sale.shippingPostalCode ?? buyer?.shippingPostalCode)?.trim() || undefined,
       }
-      setFeedback({ tone: 'success', message: '発送情報を更新しました' })
+      await services.sales.updateSaleRecord(sale.id, patch)
+      savedRef.current[sale.id] = {
+        shippingStatus: sale.shippingStatus,
+        shippingDate: sale.shippingDate ?? '',
+        shippingMethod: sale.shippingMethod ?? '',
+        trackingNumber: sale.trackingNumber ?? '',
+        shippingAddress: sale.shippingAddress ?? buyer?.shippingAddress ?? '',
+        shippingPostalCode: sale.shippingPostalCode ?? buyer?.shippingPostalCode ?? '',
+      }
+      setFeedback({ tone: 'success', message: `${sale.buyerName} の発送情報を保存しました` })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
     } finally {
       setSavingId(null)
     }
+  }
+
+  const isRowDirty = (sale: SaleRecord, buyer?: Buyer): boolean => {
+    const snap = savedRef.current[sale.id]
+    if (!snap) return false
+    return (
+      sale.shippingStatus !== snap.shippingStatus ||
+      (sale.shippingDate ?? '') !== snap.shippingDate ||
+      (sale.shippingMethod ?? '') !== snap.shippingMethod ||
+      (sale.trackingNumber ?? '') !== snap.trackingNumber ||
+      ((sale.shippingAddress ?? buyer?.shippingAddress ?? '')) !== snap.shippingAddress ||
+      ((sale.shippingPostalCode ?? buyer?.shippingPostalCode ?? '')) !== snap.shippingPostalCode
+    )
   }
 
   const buyerByName = useMemo(() => {
@@ -241,11 +268,12 @@ export default function ShippingPage() {
                   <th className="px-3 py-3 font-medium">追跡番号</th>
                   <th className="px-3 py-3 font-medium">郵便番号</th>
                   <th className="px-3 py-3 font-medium">発送先</th>
+                  <th className="px-3 py-3 font-medium text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
+                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
                 )}
                 {filtered.map(sale => {
                   const first = sale.items[0]
@@ -264,7 +292,7 @@ export default function ShippingPage() {
                         <select
                           value={sale.shippingStatus}
                           disabled={saving}
-                          onChange={e => handlePatch(sale.id, { shippingStatus: e.target.value as ShippingStatus })}
+                          onChange={e => updateLocal(sale.id, { shippingStatus: e.target.value as ShippingStatus })}
                           className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs"
                         >
                           {STATUS_OPTIONS.map(s => (
@@ -289,13 +317,7 @@ export default function ShippingPage() {
                           list="shipping-methods"
                           value={sale.shippingMethod ?? ''}
                           disabled={saving}
-                          onBlur={e => {
-                            const v = e.target.value.trim()
-                            if (v !== (savedRef.current[sale.id]?.shippingMethod ?? '')) {
-                              void handlePatch(sale.id, { shippingMethod: v || undefined })
-                            }
-                          }}
-                          onChange={e => setSales(prev => prev.map(s => s.id === sale.id ? { ...s, shippingMethod: e.target.value } : s))}
+                          onChange={e => updateLocal(sale.id, { shippingMethod: e.target.value })}
                           placeholder="ヤマト, EMS..."
                           className="w-32 rounded-lg border border-gray-200 px-2 py-1 text-xs"
                         />
@@ -305,7 +327,7 @@ export default function ShippingPage() {
                           type="date"
                           value={sale.shippingDate ?? ''}
                           disabled={saving}
-                          onChange={e => handlePatch(sale.id, { shippingDate: e.target.value || undefined })}
+                          onChange={e => updateLocal(sale.id, { shippingDate: e.target.value })}
                           className="rounded-lg border border-gray-200 px-2 py-1 text-xs"
                         />
                       </td>
@@ -314,13 +336,7 @@ export default function ShippingPage() {
                           type="text"
                           value={sale.trackingNumber ?? ''}
                           disabled={saving}
-                          onBlur={e => {
-                            const v = e.target.value.trim()
-                            if (v !== (savedRef.current[sale.id]?.trackingNumber ?? '')) {
-                              void handlePatch(sale.id, { trackingNumber: v || undefined })
-                            }
-                          }}
-                          onChange={e => setSales(prev => prev.map(s => s.id === sale.id ? { ...s, trackingNumber: e.target.value } : s))}
+                          onChange={e => updateLocal(sale.id, { trackingNumber: e.target.value })}
                           className="w-36 rounded-lg border border-gray-200 px-2 py-1 text-xs"
                         />
                       </td>
@@ -329,13 +345,7 @@ export default function ShippingPage() {
                           type="text"
                           value={effectiveZip}
                           disabled={saving}
-                          onBlur={e => {
-                            const v = e.target.value.trim()
-                            if (v !== (savedRef.current[sale.id]?.shippingPostalCode ?? '')) {
-                              void handlePatch(sale.id, { shippingPostalCode: v || undefined })
-                            }
-                          }}
-                          onChange={e => setSales(prev => prev.map(s => s.id === sale.id ? { ...s, shippingPostalCode: e.target.value } : s))}
+                          onChange={e => updateLocal(sale.id, { shippingPostalCode: e.target.value })}
                           placeholder={buyerZip || '〒'}
                           className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-xs"
                         />
@@ -345,25 +355,38 @@ export default function ShippingPage() {
                           rows={2}
                           value={effectiveAddr}
                           disabled={saving}
-                          onBlur={e => {
-                            const v = e.target.value.trim()
-                            if (v !== (savedRef.current[sale.id]?.shippingAddress ?? '')) {
-                              void handlePatch(sale.id, { shippingAddress: v || undefined })
-                            }
-                          }}
-                          onChange={e => setSales(prev => prev.map(s => s.id === sale.id ? { ...s, shippingAddress: e.target.value } : s))}
+                          onChange={e => updateLocal(sale.id, { shippingAddress: e.target.value })}
                           placeholder={buyerAddr || '住所'}
                           className="w-48 resize-none rounded-lg border border-gray-200 px-2 py-1 text-xs"
                         />
                         {buyerAddr && sale.shippingAddress && sale.shippingAddress !== buyerAddr && (
                           <button
                             type="button"
-                            onClick={() => handlePatch(sale.id, { shippingAddress: buyerAddr })}
+                            onClick={() => updateLocal(sale.id, { shippingAddress: buyerAddr })}
                             className="mt-1 text-[10px] text-[#174c33] underline"
                           >
                             販売先の住所を使用
                           </button>
                         )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {(() => {
+                          const dirty = isRowDirty(sale, buyer)
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => saveRow(sale, buyer)}
+                              disabled={saving || !dirty}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition ${
+                                dirty
+                                  ? 'bg-[#174c33] text-white hover:bg-[#205f43]'
+                                  : 'cursor-not-allowed bg-gray-100 text-gray-400'
+                              }`}
+                            >
+                              {saving ? '保存中…' : dirty ? '保存' : '保存済'}
+                            </button>
+                          )
+                        })()}
                       </td>
                     </tr>
                   )
