@@ -121,6 +121,17 @@ export interface IPurchaseOrdersService {
   createPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrder>
   updatePurchaseOrder(id: string, input: Partial<PurchaseOrderInput>): Promise<PurchaseOrder>
   deletePurchaseOrder(id: string): Promise<void>
+  receivePurchaseOrderLine(
+    orderId: string,
+    lineIndex: number,
+    opts: {
+      arrivalDate: string
+      mapping:
+        | { kind: 'existing'; productId: string }
+        | { kind: 'new'; product: ProductInput }
+    },
+  ): Promise<void>
+  unreceivePurchaseOrderLine(orderId: string, lineIndex: number): Promise<void>
 }
 
 export interface ISuppliersService {

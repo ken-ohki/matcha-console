@@ -78,6 +78,9 @@ function todayIso(): string {
   return `${y}-${m}-${day}`
 }
 
+// Sentinel value used in the per-line product <select> to mean "new/unlisted product".
+const NEW_PRODUCT_OPTION = '__new__'
+
 function PurchaseOrderModal({
   open,
   suppliers,
@@ -117,9 +120,13 @@ function PurchaseOrderModal({
     if (!open) return
     const initialItems: PurchaseOrderLineInput[] = initial && initial.items.length > 0
       ? initial.items.map(item => ({
-          productId: item.productId,
+          productId: item.productId || undefined,
+          // For unlisted lines (no productId) keep the free-text name so the
+          // editor reopens in "new product" mode with the name prefilled.
+          productName: item.productId ? undefined : item.productName,
           quantityKg: item.quantityKg,
           unitPrice: item.unitPrice,
+          receivedKg: item.receivedKg,
         }))
       : [{
           productId: defaultProductId,
@@ -161,13 +168,26 @@ function PurchaseOrderModal({
       items: prev.items.map((item, i) => i === index ? { ...item, ...patch } : item),
     }))
   }
-  const handleItemProductChange = (index: number, productId: string) => {
-    const product = products.find(item => item.id === productId)
+  const handleItemProductChange = (index: number, value: string) => {
+    if (value === NEW_PRODUCT_OPTION) {
+      // Unlisted / new product: clear productId and switch the line to free-text name input.
+      setForm(prev => ({
+        ...prev,
+        items: prev.items.map((item, i) => i === index ? {
+          ...item,
+          productId: '',
+          productName: item.productName ?? '',
+        } : item),
+      }))
+      return
+    }
+    const product = products.find(item => item.id === value)
     setForm(prev => ({
       ...prev,
       items: prev.items.map((item, i) => i === index ? {
         ...item,
-        productId,
+        productId: value,
+        productName: undefined,
         unitPrice: product?.purchaseUnitPrice ?? item.unitPrice,
       } : item),
     }))
@@ -193,8 +213,11 @@ function PurchaseOrderModal({
     setError('')
     try {
       if (!form.supplierName.trim()) throw new Error('発注先を入力してください')
-      if (form.items.length === 0 || form.items.some(i => !i.productId)) {
+      if (form.items.length === 0) {
         throw new Error('商品を選択してください')
+      }
+      if (form.items.some(i => !i.productId && !(i.productName ?? '').trim())) {
+        throw new Error('商品を選択するか、新規商品名を入力してください')
       }
       if (form.items.some(i => !(Number(i.quantityKg) > 0))) {
         throw new Error('各商品の数量を入力してください')
@@ -216,7 +239,7 @@ function PurchaseOrderModal({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '発注を編集' : '発注を登録'}</h2>
-            <p className="mt-1 text-sm text-[#68756c]">「入荷済」に変更すると入荷記録が自動追加されます。</p>
+            <p className="mt-1 text-sm text-[#68756c]">入荷の反映は「入荷管理」で行います。在庫未登録の商品も発注できます。</p>
           </div>
           <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
             <X size={18} />
@@ -285,24 +308,36 @@ function PurchaseOrderModal({
                 const lineTotal = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
                 return (
                   <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.4fr,0.7fr,0.7fr,auto,auto]">
-                    <select
-                      value={line.productId}
-                      onChange={e => handleItemProductChange(index, e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    >
-                      <option value="">選択してください</option>
-                      {[...products]
-                        .sort((a, b) => (a.purchaseProductName || a.name).localeCompare(b.purchaseProductName || b.name, 'en'))
-                        .map(p => {
-                          const label = p.purchaseProductName || p.name
-                          const suffix = p.purchaseProductName ? '' : ' ※販売名'
-                          return (
-                            <option key={p.id} value={p.id}>
-                              {label} ({p.sku}){suffix}
-                            </option>
-                          )
-                        })}
-                    </select>
+                    <div className="space-y-1.5">
+                      <select
+                        value={line.productId ? line.productId : (line.productName !== undefined ? NEW_PRODUCT_OPTION : '')}
+                        onChange={e => handleItemProductChange(index, e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      >
+                        <option value="">選択してください</option>
+                        <option value={NEW_PRODUCT_OPTION}>＋ 新規商品（在庫未登録）</option>
+                        {[...products]
+                          .sort((a, b) => (a.purchaseProductName || a.name).localeCompare(b.purchaseProductName || b.name, 'en'))
+                          .map(p => {
+                            const label = p.purchaseProductName || p.name
+                            const suffix = p.purchaseProductName ? '' : ' ※販売名'
+                            return (
+                              <option key={p.id} value={p.id}>
+                                {label} ({p.sku}){suffix}
+                              </option>
+                            )
+                          })}
+                      </select>
+                      {!line.productId && line.productName !== undefined && (
+                        <input
+                          type="text"
+                          value={line.productName}
+                          onChange={e => updateItem(index, { productName: e.target.value })}
+                          placeholder="新規商品名"
+                          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        />
+                      )}
+                    </div>
                     <input
                       required
                       type="number"
@@ -580,7 +615,7 @@ export default function PurchaseOrdersPage() {
   }
 
   const handleDelete = async (order: PurchaseOrder) => {
-    if (!confirm(`発注「${order.supplierName} / ${order.orderDate}」を削除しますか？\n「入荷済」の場合、関連する入荷記録も削除されます。`)) return
+    if (!confirm(`発注「${order.supplierName} / ${order.orderDate}」を削除しますか？\n入荷済みの場合、関連する入荷記録も削除されます。`)) return
     const services = await getServices()
     await services.purchaseOrders.deletePurchaseOrder(order.id)
     setMessage('発注を削除しました')

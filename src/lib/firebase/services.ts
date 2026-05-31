@@ -37,6 +37,7 @@ import type {
   ProductWithInventory,
   PurchaseOrder,
   PurchaseOrderInput,
+  PurchaseOrderLineInput,
   PurchaseOrderLineItem,
   PurchaseOrderStatus,
   SaleLineItem,
@@ -875,17 +876,20 @@ function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null 
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
   const productId = String(obj.productId ?? '')
-  if (!productId) return null
+  const productName = String(obj.productName ?? '')
+  // Tolerate unlisted items (empty productId) as long as there is a name.
+  if (!productId && !productName.trim()) return null
   const quantityKg = Number(obj.quantityKg ?? 0)
   const unitPrice = Number(obj.unitPrice ?? 0)
   const lineTotal = obj.lineTotal != null ? Number(obj.lineTotal) : quantityKg * unitPrice
   return {
     productId,
     productSku: String(obj.productSku ?? ''),
-    productName: String(obj.productName ?? ''),
+    productName,
     quantityKg,
     unitPrice,
     lineTotal,
+    receivedKg: Number(obj.receivedKg ?? 0),
   }
 }
 
@@ -1022,77 +1026,6 @@ async function syncSuppliersCollection(): Promise<void> {
   await batch.commit()
 }
 
-async function applyPurchaseOrderArrivalEffects(
-  orderId: string,
-  prevStatus: PurchaseOrderStatus | null,
-  nextStatus: PurchaseOrderStatus,
-  items: PurchaseOrderLineItem[],
-  arrivalDate: string,
-): Promise<void> {
-  const wasReceived = prevStatus === 'received'
-  const isReceived = nextStatus === 'received'
-
-  if (wasReceived === isReceived) {
-    if (isReceived) {
-      await stripPurchaseOrderArrivalsFromProducts(orderId)
-      await appendPurchaseOrderArrivalsToProducts(orderId, items, arrivalDate)
-    }
-    return
-  }
-
-  if (isReceived) {
-    await appendPurchaseOrderArrivalsToProducts(orderId, items, arrivalDate)
-  } else {
-    await stripPurchaseOrderArrivalsFromProducts(orderId)
-  }
-}
-
-async function appendPurchaseOrderArrivalsToProducts(
-  orderId: string,
-  items: PurchaseOrderLineItem[],
-  arrivalDate: string,
-): Promise<void> {
-  if (items.length === 0) return
-  const db = getFirebaseDb()
-  const batch = writeBatch(db)
-  const productIds = Array.from(new Set(items.map(item => item.productId)))
-  const productSnaps = await Promise.all(
-    productIds.map(pid => getDoc(doc(db, COLLECTIONS.products, pid))),
-  )
-  const productMap = new Map<string, ArrivalRecord[]>()
-  productSnaps.forEach(snap => {
-    if (!snap.exists()) return
-    const data = snap.data()
-    const existing = Array.isArray(data.arrivalRecords)
-      ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
-      : []
-    productMap.set(snap.id, existing)
-  })
-
-  items.forEach((item, idx) => {
-    const existing = productMap.get(item.productId)
-    if (!existing) return
-    const newRecord: ArrivalRecord = {
-      id: `po:${orderId}:${idx}`,
-      arrivalDate: toIsoDate(arrivalDate),
-      quantityKg: item.quantityKg,
-    }
-    const next = [...existing.filter(r => r.id !== newRecord.id), newRecord]
-    productMap.set(item.productId, next)
-  })
-
-  productMap.forEach((records, productId) => {
-    batch.update(doc(db, COLLECTIONS.products, productId), {
-      arrivalRecords: records,
-      arrivalDate: deriveArrivalDate(records),
-      initialStockKg: deriveInitialStockKg(records),
-      updatedAt: serverTimestamp(),
-    })
-  })
-
-  await batch.commit()
-}
-
 async function stripPurchaseOrderArrivalsFromProducts(orderId: string): Promise<void> {
   const db = getFirebaseDb()
   const products = await getAllProducts()
@@ -1111,6 +1044,67 @@ async function stripPurchaseOrderArrivalsFromProducts(orderId: string): Promise<
     })
   })
   await batch.commit()
+}
+
+async function addArrivalRecordToProduct(productId: string, record: ArrivalRecord): Promise<void> {
+  const db = getFirebaseDb()
+  const ref = doc(db, COLLECTIONS.products, productId)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) {
+    throw new Error('紐付け先の商品が見つかりません')
+  }
+  const data = snap.data()
+  const existing = Array.isArray(data.arrivalRecords)
+    ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
+    : []
+  const next = [...existing.filter(r => r.id !== record.id), { ...record, arrivalDate: toIsoDate(record.arrivalDate) }]
+  await updateDoc(ref, {
+    arrivalRecords: next,
+    arrivalDate: deriveArrivalDate(next),
+    initialStockKg: deriveInitialStockKg(next),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+async function removeArrivalRecordFromProduct(productId: string, recordId: string): Promise<void> {
+  const db = getFirebaseDb()
+  const ref = doc(db, COLLECTIONS.products, productId)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return
+  const data = snap.data()
+  const existing = Array.isArray(data.arrivalRecords)
+    ? normalizeArrivalRecords(data.arrivalRecords as ArrivalRecord[])
+    : []
+  const next = existing.filter(r => r.id !== recordId)
+  if (next.length === existing.length) return
+  await updateDoc(ref, {
+    arrivalRecords: next,
+    arrivalDate: deriveArrivalDate(next),
+    initialStockKg: deriveInitialStockKg(next),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+async function createProductDoc(input: ProductInput): Promise<{ id: string; product: Product }> {
+  const db = getFirebaseDb()
+  const products = await getAllProducts()
+  if (products.some(product => product.sku === input.sku && product.isActive)) {
+    throw new Error(`SKU "${input.sku}" は既に登録されています`)
+  }
+
+  const sortOrder = products
+    .filter(product => product.inventoryGroupId === input.inventoryGroupId && product.isActive)
+    .reduce((max, product) => Math.max(max, product.sortOrder), -1) + 1
+
+  const payload = {
+    ...buildProductPayload(input),
+    sortOrder,
+    isActive: true,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+  const ref = await addDoc(collection(db, COLLECTIONS.products), payload)
+  return { id: ref.id, product: mapProduct(ref.id, payload) }
 }
 
 export function createFirebaseServices(): IServices {
@@ -1746,17 +1740,31 @@ export function createFirebaseServices(): IServices {
       }
       const products = await getAllProducts()
       const items: PurchaseOrderLineItem[] = input.items.map(line => {
-        const product = products.find(p => p.id === line.productId && p.isActive)
-        if (!product) throw new Error('商品が見つかりません')
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
+        if (line.productId) {
+          const product = products.find(p => p.id === line.productId && p.isActive)
+          if (!product) throw new Error('商品が見つかりません')
+          return {
+            productId: product.id,
+            productSku: product.sku,
+            productName: product.purchaseProductName || product.name,
+            quantityKg,
+            unitPrice,
+            lineTotal: quantityKg * unitPrice,
+            receivedKg: Number(line.receivedKg ?? 0),
+          }
+        }
+        const productName = (line.productName ?? '').trim()
+        if (!productName) throw new Error('商品名を入力してください')
         return {
-          productId: product.id,
-          productSku: product.sku,
-          productName: product.purchaseProductName || product.name,
+          productId: '',
+          productSku: '',
+          productName,
           quantityKg,
           unitPrice,
           lineTotal: quantityKg * unitPrice,
+          receivedKg: Number(line.receivedKg ?? 0),
         }
       })
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
@@ -1785,8 +1793,7 @@ export function createFirebaseServices(): IServices {
 
       const ref = await addDoc(collection(db, COLLECTIONS.purchaseOrders), payload)
 
-      const arrivalDate = input.actualDeliveryDate?.trim() || input.orderDate.trim() || new Date().toISOString().slice(0, 10)
-      await applyPurchaseOrderArrivalEffects(ref.id, null, input.status, items, arrivalDate)
+      // Arrivals are reflected only via the receiving flow, not by PO status.
       await syncSuppliersCollection()
 
       return {
@@ -1815,10 +1822,12 @@ export function createFirebaseServices(): IServices {
       if (!snap.exists()) throw new Error('発注が見つかりません')
       const current = mapPurchaseOrder(snap.id, snap.data() ?? {})
 
-      const mergedInputItems = input.items ?? current.items.map(item => ({
-        productId: item.productId,
+      const mergedInputItems: PurchaseOrderLineInput[] = input.items ?? current.items.map(item => ({
+        productId: item.productId || undefined,
+        productName: item.productName,
         quantityKg: item.quantityKg,
         unitPrice: item.unitPrice,
+        receivedKg: item.receivedKg,
       }))
 
       const merged: PurchaseOrderInput = {
@@ -1841,17 +1850,31 @@ export function createFirebaseServices(): IServices {
 
       const products = await getAllProducts()
       const items: PurchaseOrderLineItem[] = merged.items.map(line => {
-        const product = products.find(p => p.id === line.productId && p.isActive)
-        if (!product) throw new Error('商品が見つかりません')
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
+        if (line.productId) {
+          const product = products.find(p => p.id === line.productId && p.isActive)
+          if (!product) throw new Error('商品が見つかりません')
+          return {
+            productId: product.id,
+            productSku: product.sku,
+            productName: product.purchaseProductName || product.name,
+            quantityKg,
+            unitPrice,
+            lineTotal: quantityKg * unitPrice,
+            receivedKg: Number(line.receivedKg ?? 0),
+          }
+        }
+        const productName = (line.productName ?? '').trim()
+        if (!productName) throw new Error('商品名を入力してください')
         return {
-          productId: product.id,
-          productSku: product.sku,
-          productName: product.purchaseProductName || product.name,
+          productId: '',
+          productSku: '',
+          productName,
           quantityKg,
           unitPrice,
           lineTotal: quantityKg * unitPrice,
+          receivedKg: Number(line.receivedKg ?? 0),
         }
       })
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
@@ -1878,8 +1901,7 @@ export function createFirebaseServices(): IServices {
         updatedAt: serverTimestamp(),
       }))
 
-      const arrivalDate = merged.actualDeliveryDate?.trim() || merged.orderDate.trim() || new Date().toISOString().slice(0, 10)
-      await applyPurchaseOrderArrivalEffects(id, current.status, merged.status, items, arrivalDate)
+      // Arrivals are managed by the receiving flow; editing a PO never touches stock.
       await syncSuppliersCollection()
 
       return {
@@ -1904,15 +1926,85 @@ export function createFirebaseServices(): IServices {
 
     async deletePurchaseOrder(id) {
       const ref = doc(db, COLLECTIONS.purchaseOrders, id)
-      const snap = await getDoc(ref)
-      if (snap.exists()) {
-        const current = mapPurchaseOrder(snap.id, snap.data() ?? {})
-        if (current.status === 'received') {
-          await stripPurchaseOrderArrivalsFromProducts(id)
-        }
-      }
+      // Arrivals can exist independent of status, so always strip them.
+      await stripPurchaseOrderArrivalsFromProducts(id)
       await deleteDoc(ref)
       await syncSuppliersCollection()
+    },
+
+    async receivePurchaseOrderLine(orderId, lineIndex, opts) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, orderId)
+      const snapshot = await getDoc(ref)
+      if (!snapshot.exists()) throw new Error('発注が見つかりません')
+      const order = mapPurchaseOrder(snapshot.id, snapshot.data() ?? {})
+      const line = order.items[lineIndex]
+      if (!line) throw new Error('対象の明細が見つかりません')
+
+      let targetProductId: string
+      let targetSku: string
+      let targetName: string
+
+      const mapping = opts.mapping
+      if (mapping.kind === 'existing') {
+        const products = await getAllProducts()
+        const found = products.find(p => p.id === mapping.productId)
+        if (!found || !found.isActive) throw new Error('紐付け先の商品が見つかりません')
+        targetProductId = found.id
+        targetSku = found.sku
+        targetName = found.purchaseProductName || found.name
+      } else {
+        // Create the product WITHOUT an arrival; the arrival is added uniformly below.
+        const created = await createProductDoc({ ...mapping.product, arrivalRecords: [], initialStockKg: 0 })
+        targetProductId = created.id
+        targetSku = created.product.sku
+        targetName = created.product.purchaseProductName || created.product.name
+      }
+
+      await addArrivalRecordToProduct(targetProductId, {
+        id: `po:${orderId}:${lineIndex}`,
+        arrivalDate: opts.arrivalDate,
+        quantityKg: line.quantityKg,
+      })
+
+      const nextItems = order.items.map((item, idx) => (
+        idx === lineIndex
+          ? { ...item, productId: targetProductId, productSku: targetSku, productName: targetName, receivedKg: item.quantityKg }
+          : item
+      ))
+
+      const allReceived = nextItems.every(item => item.receivedKg >= item.quantityKg)
+      const nextStatus: PurchaseOrderStatus = allReceived && order.status !== 'cancelled' ? 'received' : order.status
+
+      await updateDoc(ref, sanitizeRecord({
+        items: nextItems,
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+      }))
+      await syncSuppliersCollection()
+    },
+
+    async unreceivePurchaseOrderLine(orderId, lineIndex) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, orderId)
+      const snapshot = await getDoc(ref)
+      if (!snapshot.exists()) throw new Error('発注が見つかりません')
+      const order = mapPurchaseOrder(snapshot.id, snapshot.data() ?? {})
+      const line = order.items[lineIndex]
+      if (!line) throw new Error('対象の明細が見つかりません')
+
+      if (line.productId) {
+        await removeArrivalRecordFromProduct(line.productId, `po:${orderId}:${lineIndex}`)
+      }
+
+      const nextItems = order.items.map((item, idx) => (
+        idx === lineIndex ? { ...item, receivedKg: 0 } : item
+      ))
+      const nextStatus: PurchaseOrderStatus = order.status === 'received' ? 'placed' : order.status
+
+      await updateDoc(ref, sanitizeRecord({
+        items: nextItems,
+        status: nextStatus,
+        updatedAt: serverTimestamp(),
+      }))
     },
   }
 

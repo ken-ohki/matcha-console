@@ -314,18 +314,21 @@ export interface PurchaseOrderInvoice {
 }
 
 export interface PurchaseOrderLineItem {
-  productId: string
+  productId: string        // empty = unlisted/new product not yet in inventory
   productSku: string
   productName: string
   quantityKg: number
   unitPrice: number
   lineTotal: number
+  receivedKg: number       // cumulative quantity received so far
 }
 
 export interface PurchaseOrderLineInput {
-  productId: string
+  productId?: string       // omit for a new/unlisted product
+  productName?: string     // required when productId is empty (free text)
   quantityKg: number
   unitPrice: number
+  receivedKg?: number
 }
 
 export interface PurchaseOrder {
