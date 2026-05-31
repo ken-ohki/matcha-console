@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { Building2, Calculator, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, X } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LucideIcon } from 'lucide-react'
 
@@ -35,6 +35,8 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: '経理',
     items: [
       { href: '/financials', label: '収支管理', icon: Calculator },
+      { href: '/receivables', label: '入金管理', icon: ArrowDownCircle },
+      { href: '/payables', label: '支払管理', icon: ArrowUpCircle },
     ],
   },
   {
