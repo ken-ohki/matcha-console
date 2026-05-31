@@ -13,6 +13,7 @@ import {
   ISSUER,
   todayString,
   type DocumentLine,
+  computeTotals,
 } from '@/lib/invoice'
 
 interface PoDocumentData {
@@ -32,7 +33,7 @@ interface PoDocumentData {
 function buildInitialDocument(order: PurchaseOrder, supplier: Supplier | undefined): PoDocumentData {
   const lines: DocumentLine[] = order.items.map(item => createBlankLine({
     description: item.productName,
-    isReducedRate: false,
+    isReducedRate: (item.taxRate ?? 10) === 8,
     quantity: item.quantityKg,
     unit: 'kg',
     unitPrice: item.unitPrice,
@@ -113,6 +114,7 @@ export default function PurchaseOrderDocumentPage() {
   }, [params.id])
 
   const totals = useMemo(() => doc ? poTotal(doc.lines) : 0, [doc])
+  const taxTotals = useMemo(() => doc ? computeTotals(doc.lines) : null, [doc])
   const issuerInfo = useMemo(() => effectiveIssuer(issuer), [issuer])
 
   if (loading) {
@@ -236,6 +238,7 @@ export default function PurchaseOrderDocumentPage() {
                   <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-right">数量</th>
                   <th className="w-14 border-b border-r border-gray-300 px-2 py-2 text-center">単位</th>
                   <th className="w-24 border-b border-r border-gray-300 px-2 py-2 text-right">単価</th>
+                  <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-center">税率</th>
                   <th className="w-28 border-b border-gray-300 px-2 py-2 text-right">金額</th>
                   <th className="w-8 border-b border-gray-300 px-1 py-2 no-print"></th>
                 </tr>
@@ -267,6 +270,16 @@ export default function PurchaseOrderDocumentPage() {
                           className="w-full text-right"
                         />
                       </td>
+                      <td className="border-r border-b border-gray-200 px-2 py-1 text-center">
+                        <select
+                          value={line.isReducedRate ? 8 : 10}
+                          onChange={e => updateLine(line.id, { isReducedRate: Number(e.target.value) === 8 })}
+                          className="w-full bg-transparent text-xs focus:outline-none"
+                        >
+                          <option value={10}>10%</option>
+                          <option value={8}>8%</option>
+                        </select>
+                      </td>
                       <td className="border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(amount)}</td>
                       <td className="border-b border-gray-200 px-1 py-1 no-print">
                         <button
@@ -294,6 +307,35 @@ export default function PurchaseOrderDocumentPage() {
               </button>
             </div>
           </div>
+
+          {taxTotals && (
+            <div className="mt-4 ml-auto w-full max-w-sm rounded border border-gray-300 text-sm">
+              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
+                <span className="text-[#68756c]">10%対象 小計</span>
+                <span>¥{formatYen(taxTotals.standardSubtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
+                <span className="text-[#68756c]">10% 消費税</span>
+                <span>¥{formatYen(taxTotals.standardTax)}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
+                <span className="text-[#68756c]">8%対象 小計</span>
+                <span>¥{formatYen(taxTotals.reducedSubtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
+                <span className="text-[#68756c]">8% 消費税</span>
+                <span>¥{formatYen(taxTotals.reducedTax)}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
+                <span className="text-[#68756c]">税抜合計</span>
+                <span>¥{formatYen(taxTotals.subtotal)}</span>
+              </div>
+              <div className="flex items-center justify-between bg-[#f7f5ee] px-3 py-2 font-semibold text-[#173c2a]">
+                <span>税込合計</span>
+                <span>¥{formatYen(taxTotals.total)}</span>
+              </div>
+            </div>
+          )}
 
           <div className="mt-6">
             <p className="mb-1 text-xs font-medium text-[#68756c]">備考</p>

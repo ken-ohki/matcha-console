@@ -71,6 +71,8 @@ export interface ProductWithInventory extends Product {
   stockStatus: StockStatus
 }
 
+export type TaxRate = 8 | 10
+
 export interface SaleLineItem {
   productId: string
   productSku: string
@@ -81,12 +83,14 @@ export interface SaleLineItem {
   revenue: number
   costAmount: number
   grossProfit: number
+  taxRate: TaxRate
 }
 
 export interface SaleLineInput {
   productId: string
   quantityKg: number
   unitPrice: number
+  taxRate?: TaxRate
 }
 
 export interface SaleRecord {
@@ -321,6 +325,7 @@ export interface PurchaseOrderLineItem {
   unitPrice: number
   lineTotal: number
   receivedKg: number       // cumulative quantity received so far
+  taxRate: TaxRate
 }
 
 export interface PurchaseOrderLineInput {
@@ -329,6 +334,7 @@ export interface PurchaseOrderLineInput {
   quantityKg: number
   unitPrice: number
   receivedKg?: number
+  taxRate?: TaxRate
 }
 
 export interface PurchaseOrder {

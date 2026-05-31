@@ -144,7 +144,7 @@ function SaleModal({
     paymentStatus: 'uninvoiced',
     shippingStatus: 'ordering',
     buyerName: '',
-    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0 }],
+    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 10 }],
     shippingFee: 0,
     otherFees: 0,
     otherFeesNote: '',
@@ -166,11 +166,13 @@ function SaleModal({
           productId: item.productId,
           quantityKg: item.quantityKg,
           unitPrice: item.unitPrice,
+          taxRate: item.taxRate ?? 10,
         }))
       : [{
           productId: defaultProductId,
           quantityKg: 0,
           unitPrice: products.find(p => p.id === defaultProductId)?.standardWholesalePrice ?? 0,
+          taxRate: 10,
         }]
 
     setForm({
@@ -198,10 +200,16 @@ function SaleModal({
     const revenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
     const costPerKg = product?.purchaseUnitPrice ?? initialLine?.costPerKg ?? 0
     const costAmount = (Number(line.quantityKg) || 0) * costPerKg
-    return { revenue, costAmount, product }
+    const taxRate = line.taxRate ?? 10
+    return { revenue, costAmount, product, taxRate }
   })
   const revenue = itemTotals.reduce((s, t) => s + t.revenue, 0)
   const costAmount = itemTotals.reduce((s, t) => s + t.costAmount, 0)
+  const subtotal10 = itemTotals.filter(t => t.taxRate === 10).reduce((s, t) => s + t.revenue, 0)
+  const subtotal8 = itemTotals.filter(t => t.taxRate === 8).reduce((s, t) => s + t.revenue, 0)
+  const tax10 = Math.floor(subtotal10 * 0.10)
+  const tax8 = Math.floor(subtotal8 * 0.08)
+  const taxTotal = tax10 + tax8
   const shippingFeeNum = Number(form.shippingFee) || 0
   const otherFeesNum = Number(form.otherFees) || 0
   const paymentFeeNum = Number(form.paymentFee) || 0
@@ -263,7 +271,7 @@ function SaleModal({
     const defaultPrice = products[0]?.standardWholesalePrice ?? 0
     setForm(prev => ({
       ...prev,
-      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice }],
+      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 10 }],
     }))
   }
   const removeItem = (index: number) => {
@@ -402,7 +410,7 @@ function SaleModal({
               {form.items.map((line, index) => {
                 const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
                 return (
-                  <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.4fr,0.7fr,0.7fr,auto,auto]">
+                  <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
                     <select
                       value={line.productId}
                       onChange={event => handleItemProductChange(index, event.target.value)}
@@ -433,10 +441,19 @@ function SaleModal({
                       min="0"
                       step="1"
                       value={line.unitPrice}
-                      placeholder="単価"
+                      placeholder="税抜単価"
                       onChange={event => updateItem(index, { unitPrice: Number(event.target.value) || 0 })}
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
+                    <select
+                      value={line.taxRate ?? 10}
+                      onChange={event => updateItem(index, { taxRate: Number(event.target.value) === 8 ? 8 : 10 })}
+                      title="消費税区分"
+                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    >
+                      <option value={10}>10%</option>
+                      <option value={8}>8%軽減</option>
+                    </select>
                     <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
                       {formatCurrency(lineRevenue)}
                     </div>
@@ -578,6 +595,12 @@ function SaleModal({
                   {formatCurrency(invoiceAmount)}
                 </p>
                 <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料 + 諸費用</p>
+                <p className="mt-1 text-[10px] text-[#68756c]">
+                  消費税: 10%対象 {formatCurrency(tax10)} / 8%対象 {formatCurrency(tax8)} / 合計 {formatCurrency(taxTotal)}
+                </p>
+                <p className="mt-0.5 text-[10px] text-[#68756c]">
+                  税込目安 {formatCurrency(invoiceAmount + taxTotal)}
+                </p>
               </div>
             </div>
           </div>

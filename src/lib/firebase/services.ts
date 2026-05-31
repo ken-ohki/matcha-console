@@ -308,6 +308,7 @@ function normalizeSaleItem(raw: unknown): SaleLineItem | null {
   const revenue = obj.revenue != null ? Number(obj.revenue) : quantityKg * unitPrice
   const costAmount = obj.costAmount != null ? Number(obj.costAmount) : quantityKg * costPerKg
   const grossProfit = obj.grossProfit != null ? Number(obj.grossProfit) : revenue - costAmount
+  const taxRate = Number(obj.taxRate) === 8 ? 8 : 10
   return {
     productId,
     productSku: String(obj.productSku ?? ''),
@@ -318,6 +319,7 @@ function normalizeSaleItem(raw: unknown): SaleLineItem | null {
     revenue,
     costAmount,
     grossProfit,
+    taxRate,
   }
 }
 
@@ -375,6 +377,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
         revenue,
         costAmount,
         grossProfit: data.grossProfit != null ? Number(data.grossProfit) : revenue - costAmount,
+        taxRate: 10,
       }]
     }
   }
@@ -882,6 +885,7 @@ function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null 
   const quantityKg = Number(obj.quantityKg ?? 0)
   const unitPrice = Number(obj.unitPrice ?? 0)
   const lineTotal = obj.lineTotal != null ? Number(obj.lineTotal) : quantityKg * unitPrice
+  const taxRate = Number(obj.taxRate) === 8 ? 8 : 10
   return {
     productId,
     productSku: String(obj.productSku ?? ''),
@@ -890,6 +894,7 @@ function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null 
     unitPrice,
     lineTotal,
     receivedKg: Number(obj.receivedKg ?? 0),
+    taxRate,
   }
 }
 
@@ -1335,6 +1340,7 @@ export function createFirebaseServices(): IServices {
         const costPerKg = product.purchaseUnitPrice ?? 0
         const revenue = quantityKg * unitPrice
         const costAmount = quantityKg * costPerKg
+        const taxRate = line.taxRate === 8 ? 8 : 10
         return {
           productId: product.id,
           productSku: product.sku,
@@ -1345,6 +1351,7 @@ export function createFirebaseServices(): IServices {
           revenue,
           costAmount,
           grossProfit: revenue - costAmount,
+          taxRate,
         }
       })
       const agg = aggregateItems(items)
@@ -1464,6 +1471,7 @@ export function createFirebaseServices(): IServices {
         const costPerKg = product.purchaseUnitPrice ?? 0
         const revenue = quantityKg * unitPrice
         const costAmount = quantityKg * costPerKg
+        const taxRate = line.taxRate === 8 ? 8 : 10
         return {
           productId: product.id,
           productSku: product.sku,
@@ -1474,6 +1482,7 @@ export function createFirebaseServices(): IServices {
           revenue,
           costAmount,
           grossProfit: revenue - costAmount,
+          taxRate,
         }
       })
       const agg = aggregateItems(items)
@@ -1742,6 +1751,7 @@ export function createFirebaseServices(): IServices {
       const items: PurchaseOrderLineItem[] = input.items.map(line => {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
+        const taxRate = line.taxRate === 8 ? 8 : 10
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
@@ -1753,6 +1763,7 @@ export function createFirebaseServices(): IServices {
             unitPrice,
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
+            taxRate,
           }
         }
         const productName = (line.productName ?? '').trim()
@@ -1765,6 +1776,7 @@ export function createFirebaseServices(): IServices {
           unitPrice,
           lineTotal: quantityKg * unitPrice,
           receivedKg: Number(line.receivedKg ?? 0),
+          taxRate,
         }
       })
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
@@ -1852,6 +1864,7 @@ export function createFirebaseServices(): IServices {
       const items: PurchaseOrderLineItem[] = merged.items.map(line => {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
+        const taxRate = line.taxRate === 8 ? 8 : 10
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
@@ -1863,6 +1876,7 @@ export function createFirebaseServices(): IServices {
             unitPrice,
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
+            taxRate,
           }
         }
         const productName = (line.productName ?? '').trim()
@@ -1875,6 +1889,7 @@ export function createFirebaseServices(): IServices {
           unitPrice,
           lineTotal: quantityKg * unitPrice,
           receivedKg: Number(line.receivedKg ?? 0),
+          taxRate,
         }
       })
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
