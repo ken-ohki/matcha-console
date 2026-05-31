@@ -89,7 +89,7 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
   const lines: DocumentLine[] = [
     ...sale.items.map(item => createBlankLine({
       description: item.productName + (item.productSku ? ` (${item.productSku})` : ''),
-      isReducedRate: isJa && (item.taxRate ?? 10) === 8,
+      isReducedRate: isJa && (item.taxRate ?? 8) === 8,
       quantity: item.quantityKg,
       unit: 'kg',
       unitPrice: item.unitPrice,

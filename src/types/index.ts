@@ -343,6 +343,9 @@ export interface PurchaseOrder {
   items: PurchaseOrderLineItem[]
   totalQuantityKg: number
   totalAmount: number
+  shippingFee: number
+  otherFees: number
+  otherFeesNote?: string
   orderDate: string
   expectedDeliveryDate?: string
   actualDeliveryDate?: string
@@ -359,6 +362,9 @@ export interface PurchaseOrder {
 export interface PurchaseOrderInput {
   supplierName: string
   items: PurchaseOrderLineInput[]
+  shippingFee?: number
+  otherFees?: number
+  otherFeesNote?: string
   orderDate: string
   expectedDeliveryDate?: string
   actualDeliveryDate?: string

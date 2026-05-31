@@ -308,7 +308,7 @@ function normalizeSaleItem(raw: unknown): SaleLineItem | null {
   const revenue = obj.revenue != null ? Number(obj.revenue) : quantityKg * unitPrice
   const costAmount = obj.costAmount != null ? Number(obj.costAmount) : quantityKg * costPerKg
   const grossProfit = obj.grossProfit != null ? Number(obj.grossProfit) : revenue - costAmount
-  const taxRate = Number(obj.taxRate) === 8 ? 8 : 10
+  const taxRate = Number(obj.taxRate) === 10 ? 10 : 8
   return {
     productId,
     productSku: String(obj.productSku ?? ''),
@@ -377,7 +377,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
         revenue,
         costAmount,
         grossProfit: data.grossProfit != null ? Number(data.grossProfit) : revenue - costAmount,
-        taxRate: 10,
+        taxRate: 8,
       }]
     }
   }
@@ -885,7 +885,7 @@ function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null 
   const quantityKg = Number(obj.quantityKg ?? 0)
   const unitPrice = Number(obj.unitPrice ?? 0)
   const lineTotal = obj.lineTotal != null ? Number(obj.lineTotal) : quantityKg * unitPrice
-  const taxRate = Number(obj.taxRate) === 8 ? 8 : 10
+  const taxRate = Number(obj.taxRate) === 10 ? 10 : 8
   return {
     productId,
     productSku: String(obj.productSku ?? ''),
@@ -932,6 +932,9 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     items,
     totalQuantityKg,
     totalAmount,
+    shippingFee: Number(data.shippingFee ?? 0),
+    otherFees: Number(data.otherFees ?? 0),
+    otherFeesNote: data.otherFeesNote ? String(data.otherFeesNote) : undefined,
     orderDate: String(data.orderDate ?? ''),
     expectedDeliveryDate: data.expectedDeliveryDate ? String(data.expectedDeliveryDate) : undefined,
     actualDeliveryDate: data.actualDeliveryDate ? String(data.actualDeliveryDate) : undefined,
@@ -1340,7 +1343,7 @@ export function createFirebaseServices(): IServices {
         const costPerKg = product.purchaseUnitPrice ?? 0
         const revenue = quantityKg * unitPrice
         const costAmount = quantityKg * costPerKg
-        const taxRate = line.taxRate === 8 ? 8 : 10
+        const taxRate = line.taxRate === 10 ? 10 : 8
         return {
           productId: product.id,
           productSku: product.sku,
@@ -1471,7 +1474,7 @@ export function createFirebaseServices(): IServices {
         const costPerKg = product.purchaseUnitPrice ?? 0
         const revenue = quantityKg * unitPrice
         const costAmount = quantityKg * costPerKg
-        const taxRate = line.taxRate === 8 ? 8 : 10
+        const taxRate = line.taxRate === 10 ? 10 : 8
         return {
           productId: product.id,
           productSku: product.sku,
@@ -1751,7 +1754,7 @@ export function createFirebaseServices(): IServices {
       const items: PurchaseOrderLineItem[] = input.items.map(line => {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
-        const taxRate = line.taxRate === 8 ? 8 : 10
+        const taxRate = line.taxRate === 10 ? 10 : 8
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
@@ -1785,11 +1788,17 @@ export function createFirebaseServices(): IServices {
       const paymentStatus = input.paymentStatus ?? 'uninvoiced'
       const invoice = input.invoice && input.invoice.url ? input.invoice : undefined
 
+      const shippingFee = Number(input.shippingFee) || 0
+      const otherFees = Number(input.otherFees) || 0
+      const otherFeesNote = input.otherFeesNote?.trim() || undefined
       const payload = sanitizeRecord({
         supplierName: input.supplierName.trim(),
         items,
         totalQuantityKg,
         totalAmount,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
         orderDate: input.orderDate.trim(),
         expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
@@ -1814,6 +1823,9 @@ export function createFirebaseServices(): IServices {
         items,
         totalQuantityKg,
         totalAmount,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
         orderDate: input.orderDate.trim(),
         expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
@@ -1840,11 +1852,15 @@ export function createFirebaseServices(): IServices {
         quantityKg: item.quantityKg,
         unitPrice: item.unitPrice,
         receivedKg: item.receivedKg,
+        taxRate: item.taxRate,
       }))
 
       const merged: PurchaseOrderInput = {
         supplierName: input.supplierName ?? current.supplierName,
         items: mergedInputItems,
+        shippingFee: input.shippingFee ?? current.shippingFee,
+        otherFees: input.otherFees ?? current.otherFees,
+        otherFeesNote: input.otherFeesNote ?? current.otherFeesNote,
         orderDate: input.orderDate ?? current.orderDate,
         expectedDeliveryDate: input.expectedDeliveryDate ?? current.expectedDeliveryDate,
         actualDeliveryDate: input.actualDeliveryDate ?? current.actualDeliveryDate,
@@ -1864,7 +1880,7 @@ export function createFirebaseServices(): IServices {
       const items: PurchaseOrderLineItem[] = merged.items.map(line => {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
-        const taxRate = line.taxRate === 8 ? 8 : 10
+        const taxRate = line.taxRate === 10 ? 10 : 8
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
@@ -1899,11 +1915,18 @@ export function createFirebaseServices(): IServices {
         ? deleteField()
         : (merged.invoice && merged.invoice.url ? merged.invoice : undefined)
 
+      const shippingFee = Number(merged.shippingFee) || 0
+      const otherFees = Number(merged.otherFees) || 0
+      const otherFeesNote = merged.otherFeesNote?.trim() || undefined
+
       await updateDoc(ref, sanitizeRecord({
         supplierName: merged.supplierName.trim(),
         items,
         totalQuantityKg,
         totalAmount,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
         orderDate: merged.orderDate.trim(),
         expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
@@ -1925,6 +1948,9 @@ export function createFirebaseServices(): IServices {
         items,
         totalQuantityKg,
         totalAmount,
+        shippingFee,
+        otherFees,
+        otherFeesNote,
         orderDate: merged.orderDate.trim(),
         expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
         actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,

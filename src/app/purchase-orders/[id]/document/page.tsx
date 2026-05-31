@@ -33,11 +33,29 @@ interface PoDocumentData {
 function buildInitialDocument(order: PurchaseOrder, supplier: Supplier | undefined): PoDocumentData {
   const lines: DocumentLine[] = order.items.map(item => createBlankLine({
     description: item.productName,
-    isReducedRate: (item.taxRate ?? 10) === 8,
+    isReducedRate: (item.taxRate ?? 8) === 8,
     quantity: item.quantityKg,
     unit: 'kg',
     unitPrice: item.unitPrice,
   }))
+  if (order.shippingFee > 0) {
+    lines.push(createBlankLine({
+      description: '送料',
+      isReducedRate: false,
+      quantity: 1,
+      unit: '式',
+      unitPrice: order.shippingFee,
+    }))
+  }
+  if (order.otherFees > 0) {
+    lines.push(createBlankLine({
+      description: order.otherFeesNote ? `諸経費（${order.otherFeesNote}）` : '諸経費',
+      isReducedRate: false,
+      quantity: 1,
+      unit: '式',
+      unitPrice: order.otherFees,
+    }))
+  }
   const recipientAddress = [supplier?.postalCode, supplier?.address].filter(Boolean).join(' ')
   const recipientContact = [
     supplier?.contactPersonName,
@@ -276,8 +294,8 @@ export default function PurchaseOrderDocumentPage() {
                           onChange={e => updateLine(line.id, { isReducedRate: Number(e.target.value) === 8 })}
                           className="w-full bg-transparent text-xs focus:outline-none"
                         >
-                          <option value={10}>10%</option>
                           <option value={8}>8%</option>
+                          <option value={10}>10%</option>
                         </select>
                       </td>
                       <td className="border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(amount)}</td>

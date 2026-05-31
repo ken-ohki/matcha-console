@@ -206,7 +206,10 @@ function PurchaseOrderModal({
   const [supplierFocused, setSupplierFocused] = useState(false)
   const [form, setForm] = useState<PurchaseOrderInput>({
     supplierName: '',
-    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 10 }],
+    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 8 }],
+    shippingFee: 0,
+    otherFees: 0,
+    otherFeesNote: '',
     orderDate: todayIso(),
     expectedDeliveryDate: '',
     actualDeliveryDate: '',
@@ -233,7 +236,7 @@ function PurchaseOrderModal({
           quantityKg: item.quantityKg,
           unitPrice: item.unitPrice,
           receivedKg: item.receivedKg,
-          taxRate: item.taxRate ?? 10,
+          taxRate: item.taxRate ?? 8,
         }))
       : [{
           productId: defaultProductId,
@@ -244,6 +247,9 @@ function PurchaseOrderModal({
     setForm({
       supplierName: initial?.supplierName ?? '',
       items: initialItems,
+      shippingFee: initial?.shippingFee ?? 0,
+      otherFees: initial?.otherFees ?? 0,
+      otherFeesNote: initial?.otherFeesNote ?? '',
       orderDate: initial?.orderDate ?? todayIso(),
       expectedDeliveryDate: initial?.expectedDeliveryDate ?? '',
       actualDeliveryDate: initial?.actualDeliveryDate ?? '',
@@ -268,17 +274,21 @@ function PurchaseOrderModal({
     return filtered.slice(0, 8)
   }, [suppliers, form.supplierName])
 
-  const totalAmount = form.items.reduce(
+  const itemsSubtotal = form.items.reduce(
     (s, i) => s + (Number(i.quantityKg) || 0) * (Number(i.unitPrice) || 0), 0,
   )
   const totalQuantity = form.items.reduce((s, i) => s + (Number(i.quantityKg) || 0), 0)
+  const poShippingFee = Number(form.shippingFee) || 0
+  const poOtherFees = Number(form.otherFees) || 0
+  const totalAmount = itemsSubtotal + poShippingFee + poOtherFees
   const poSubtotal10 = form.items
-    .filter(i => (i.taxRate ?? 10) === 10)
+    .filter(i => (i.taxRate ?? 8) === 10)
     .reduce((s, i) => s + (Number(i.quantityKg) || 0) * (Number(i.unitPrice) || 0), 0)
   const poSubtotal8 = form.items
-    .filter(i => (i.taxRate ?? 10) === 8)
+    .filter(i => (i.taxRate ?? 8) === 8)
     .reduce((s, i) => s + (Number(i.quantityKg) || 0) * (Number(i.unitPrice) || 0), 0)
-  const poTax10 = Math.floor(poSubtotal10 * 0.10)
+  // Treat shipping/other fees as 10% standard rate.
+  const poTax10 = Math.floor((poSubtotal10 + poShippingFee + poOtherFees) * 0.10)
   const poTax8 = Math.floor(poSubtotal8 * 0.08)
   const poTaxTotal = poTax10 + poTax8
 
@@ -293,7 +303,7 @@ function PurchaseOrderModal({
     const defaultPrice = products[0]?.purchaseUnitPrice ?? 0
     setForm(prev => ({
       ...prev,
-      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 10 }],
+      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 8 }],
     }))
   }
   const removeItem = (index: number) => {
@@ -441,13 +451,13 @@ function PurchaseOrderModal({
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
                     <select
-                      value={line.taxRate ?? 10}
-                      onChange={e => updateItem(index, { taxRate: Number(e.target.value) === 8 ? 8 : 10 })}
+                      value={line.taxRate ?? 8}
+                      onChange={e => updateItem(index, { taxRate: Number(e.target.value) === 10 ? 10 : 8 })}
                       title="消費税区分"
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
-                      <option value={10}>10%</option>
                       <option value={8}>8%軽減</option>
+                      <option value={10}>10%</option>
                     </select>
                     <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
                       {formatCurrency(lineTotal)}
@@ -604,6 +614,41 @@ function PurchaseOrderModal({
             />
           </div>
 
+          <div className="grid gap-3 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">送料（税抜）</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.shippingFee ?? 0}
+                onChange={e => setForm(prev => ({ ...prev, shippingFee: Number(e.target.value) || 0 }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">諸経費（税抜）</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.otherFees ?? 0}
+                onChange={e => setForm(prev => ({ ...prev, otherFees: Number(e.target.value) || 0 }))}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">諸経費メモ</label>
+              <input
+                type="text"
+                value={form.otherFeesNote ?? ''}
+                onChange={e => setForm(prev => ({ ...prev, otherFeesNote: e.target.value }))}
+                placeholder="例: 通関手数料"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+            </div>
+          </div>
+
           <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-2">
             <div>
               <p className="text-xs text-[#68756c]">合計数量</p>
@@ -612,6 +657,9 @@ function PurchaseOrderModal({
             <div>
               <p className="text-xs text-[#68756c]">合計金額（税抜）</p>
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(totalAmount)}</p>
+              <p className="mt-1 text-[10px] text-[#68756c]">
+                内訳: 商品 {formatCurrency(itemsSubtotal)} / 送料 {formatCurrency(poShippingFee)} / 諸経費 {formatCurrency(poOtherFees)}
+              </p>
               <p className="mt-1 text-[10px] text-[#68756c]">
                 消費税: 10%対象 {formatCurrency(poTax10)} / 8%対象 {formatCurrency(poTax8)} / 合計 {formatCurrency(poTaxTotal)}
               </p>

@@ -144,7 +144,7 @@ function SaleModal({
     paymentStatus: 'uninvoiced',
     shippingStatus: 'ordering',
     buyerName: '',
-    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 10 }],
+    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 8 }],
     shippingFee: 0,
     otherFees: 0,
     otherFeesNote: '',
@@ -166,7 +166,7 @@ function SaleModal({
           productId: item.productId,
           quantityKg: item.quantityKg,
           unitPrice: item.unitPrice,
-          taxRate: item.taxRate ?? 10,
+          taxRate: item.taxRate ?? 8,
         }))
       : [{
           productId: defaultProductId,
@@ -200,7 +200,7 @@ function SaleModal({
     const revenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
     const costPerKg = product?.purchaseUnitPrice ?? initialLine?.costPerKg ?? 0
     const costAmount = (Number(line.quantityKg) || 0) * costPerKg
-    const taxRate = line.taxRate ?? 10
+    const taxRate = line.taxRate ?? 8
     return { revenue, costAmount, product, taxRate }
   })
   const revenue = itemTotals.reduce((s, t) => s + t.revenue, 0)
@@ -271,7 +271,7 @@ function SaleModal({
     const defaultPrice = products[0]?.standardWholesalePrice ?? 0
     setForm(prev => ({
       ...prev,
-      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 10 }],
+      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 8 }],
     }))
   }
   const removeItem = (index: number) => {
@@ -446,13 +446,13 @@ function SaleModal({
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
                     <select
-                      value={line.taxRate ?? 10}
-                      onChange={event => updateItem(index, { taxRate: Number(event.target.value) === 8 ? 8 : 10 })}
+                      value={line.taxRate ?? 8}
+                      onChange={event => updateItem(index, { taxRate: Number(event.target.value) === 10 ? 10 : 8 })}
                       title="消費税区分"
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
-                      <option value={10}>10%</option>
                       <option value={8}>8%軽減</option>
+                      <option value={10}>10%</option>
                     </select>
                     <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
                       {formatCurrency(lineRevenue)}
