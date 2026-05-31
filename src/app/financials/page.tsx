@@ -178,6 +178,8 @@ export default function FinancialsPage() {
 
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
+      // 収支管理は確定済み案件のみ
+      if (s.status !== 'confirmed') return false
       const t = s.createdAt.getTime()
       if (fromTime != null && t < fromTime) return false
       if (toTime != null && t > toTime) return false
