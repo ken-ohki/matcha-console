@@ -593,7 +593,10 @@ function ProductModal({
     setForm(buildProductForm(initial, defaultGroupId))
     setPendingInventoryCheck({ checkedDate: '', countedQuantityKg: '' })
     setError('')
-  }, [open, initial, defaultGroupId])
+    // Re-init only on open / edited record change — not when defaultGroupId
+    // changes from a background data refetch (would wipe input).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()

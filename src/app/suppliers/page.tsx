@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PageTabs, PURCHASING_TABS } from '@/components/layout/PageTabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type { PurchaseOrder, Supplier, SupplierDetailsInput } from '@/types'
@@ -98,6 +98,7 @@ export default function SuppliersPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        <PageTabs tabs={PURCHASING_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
@@ -107,12 +108,6 @@ export default function SuppliersPage() {
             <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">登録済みの仕入先一覧</h1>
             <p className="mt-2 text-sm text-[#68756c]">行をクリックすると詳細情報と過去の発注が確認できます。</p>
           </div>
-          <Link
-            href="/purchase-orders"
-            className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
-          >
-            発注管理へ戻る
-          </Link>
         </div>
 
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">

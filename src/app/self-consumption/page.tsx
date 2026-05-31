@@ -66,7 +66,8 @@ function SelfConsumptionModal({
       notes: initial?.notes ?? '',
     })
     setError('')
-  }, [open, initial, products])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial])
 
   const selectedProduct = products.find(product => product.id === form.productId)
   const currentQty = initial?.productId === form.productId ? initial.quantityKg : 0

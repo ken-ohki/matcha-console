@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PageTabs, SALES_TABS } from '@/components/layout/PageTabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
@@ -103,6 +104,7 @@ export default function BuyersPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        <PageTabs tabs={SALES_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">

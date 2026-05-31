@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PageTabs, SALES_TABS } from '@/components/layout/PageTabs'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
@@ -10,7 +11,6 @@ import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineI
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
 import {
-  Building2,
   CircleDollarSign,
   ClipboardPenLine,
   Copy,
@@ -189,7 +189,8 @@ function SaleModal({
       notes: initial?.notes ?? matchedBuyer?.notes ?? '',
     })
     setError('')
-  }, [open, initial, defaultProductId, products, buyers])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial])
 
   const itemTotals = form.items.map(line => {
     const product = products.find(p => p.id === line.productId)
@@ -867,18 +868,12 @@ export default function SalesPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        <PageTabs tabs={SALES_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売管理</h1>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <a
-              href="/buyers"
-              className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-[#d9d1be] bg-white px-4 py-2.5 text-sm font-medium text-[#173c2a] transition hover:border-[#b5aa90]"
-            >
-              <Building2 size={16} />
-              販売先一覧
-            </a>
             <button
               onClick={() => {
                 setEditingSale(null)

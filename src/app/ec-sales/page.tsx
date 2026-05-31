@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PageTabs, SALES_TABS } from '@/components/layout/PageTabs'
 import { KPICard } from '@/components/ui/KPICard'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
@@ -76,7 +77,8 @@ function EcSaleModal({
       notes: initial?.notes ?? '',
     })
     setError('')
-  }, [open, initial, defaultProductId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial])
 
   if (!open) return null
 
@@ -283,6 +285,7 @@ export default function EcSalesPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        <PageTabs tabs={SALES_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ffeed9] px-3 py-1 text-sm font-medium text-[#a76a1e]">

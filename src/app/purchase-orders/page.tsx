@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PageTabs, PURCHASING_TABS } from '@/components/layout/PageTabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type {
@@ -78,8 +79,113 @@ function todayIso(): string {
   return `${y}-${m}-${day}`
 }
 
-// Sentinel value used in the per-line product <select> to mean "new/unlisted product".
-const NEW_PRODUCT_OPTION = '__new__'
+function productSubLabel(p: ProductWithInventory): string {
+  const parts = [p.teaType, p.grade].filter(Boolean)
+  const origin = (p.origins ?? []).filter(Boolean).join('・')
+  if (origin) parts.push(origin)
+  return parts.join(' / ')
+}
+
+function ProductCombobox({
+  products,
+  value,
+  freeText,
+  onSelectProduct,
+  onFreeText,
+}: {
+  products: ProductWithInventory[]
+  value: string          // selected productId ('' = none)
+  freeText: string       // free-text name for an unlisted product
+  onSelectProduct: (product: ProductWithInventory) => void
+  onFreeText: (name: string) => void
+}) {
+  const [focused, setFocused] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const selected = value ? products.find(p => p.id === value) : undefined
+  // The text shown in the input: query while typing, else selected name, else free text.
+  const displayValue = focused
+    ? query
+    : selected
+      ? `${selected.purchaseProductName || selected.name}（${selected.sku}）`
+      : freeText
+
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = q
+      ? products.filter(p =>
+          (p.purchaseProductName || '').toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q),
+        )
+      : products
+    return [...list]
+      .sort((a, b) => (a.purchaseProductName || a.name).localeCompare(b.purchaseProductName || b.name, 'ja'))
+      .slice(0, 12)
+  }, [products, query])
+
+  const trimmed = query.trim()
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={displayValue}
+        onChange={e => {
+          setQuery(e.target.value)
+          setFocused(true)
+        }}
+        onFocus={() => {
+          setQuery(selected ? (selected.purchaseProductName || selected.name) : freeText)
+          setFocused(true)
+        }}
+        onBlur={() => setTimeout(() => setFocused(false), 150)}
+        placeholder="商品名・SKUで検索、または新規商品名を入力"
+        className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+      />
+      {focused && (
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+          {suggestions.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={() => {
+                onSelectProduct(p)
+                setQuery('')
+                setFocused(false)
+              }}
+              className="block w-full border-b border-[#f0ebe0] px-3 py-2 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+            >
+              <div className="text-sm font-medium text-[#173c2a]">
+                {p.purchaseProductName || p.name}
+                <span className="ml-1 text-xs font-normal text-[#9a8f76]">{p.sku}</span>
+              </div>
+              {productSubLabel(p) && (
+                <div className="text-[11px] text-[#68756c]">{productSubLabel(p)}</div>
+              )}
+            </button>
+          ))}
+          {trimmed && (
+            <button
+              type="button"
+              onMouseDown={() => {
+                onFreeText(trimmed)
+                setQuery('')
+                setFocused(false)
+              }}
+              className="block w-full px-3 py-2 text-left text-sm text-[#174c33] hover:bg-[#eef3eb]"
+            >
+              ＋ 新規商品として「{trimmed}」を登録
+            </button>
+          )}
+          {suggestions.length === 0 && !trimmed && (
+            <div className="px-3 py-2 text-sm text-[#9a8f76]">商品名やSKUを入力してください</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function PurchaseOrderModal({
   open,
@@ -147,7 +253,10 @@ function PurchaseOrderModal({
       notes: initial?.notes ?? '',
     })
     setError('')
-  }, [open, initial, defaultProductId, products])
+    // Only re-init when the modal opens or the edited record changes — NOT when
+    // products/defaultProductId refresh in the background (would wipe input).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial])
 
   const supplierSuggestions = useMemo(() => {
     const query = form.supplierName.trim().toLowerCase()
@@ -166,30 +275,6 @@ function PurchaseOrderModal({
     setForm(prev => ({
       ...prev,
       items: prev.items.map((item, i) => i === index ? { ...item, ...patch } : item),
-    }))
-  }
-  const handleItemProductChange = (index: number, value: string) => {
-    if (value === NEW_PRODUCT_OPTION) {
-      // Unlisted / new product: clear productId and switch the line to free-text name input.
-      setForm(prev => ({
-        ...prev,
-        items: prev.items.map((item, i) => i === index ? {
-          ...item,
-          productId: '',
-          productName: item.productName ?? '',
-        } : item),
-      }))
-      return
-    }
-    const product = products.find(item => item.id === value)
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => i === index ? {
-        ...item,
-        productId: value,
-        productName: undefined,
-        unitPrice: product?.purchaseUnitPrice ?? item.unitPrice,
-      } : item),
     }))
   }
   const addItem = () => {
@@ -309,33 +394,19 @@ function PurchaseOrderModal({
                 return (
                   <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.4fr,0.7fr,0.7fr,auto,auto]">
                     <div className="space-y-1.5">
-                      <select
-                        value={line.productId ? line.productId : (line.productName !== undefined ? NEW_PRODUCT_OPTION : '')}
-                        onChange={e => handleItemProductChange(index, e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                      >
-                        <option value="">選択してください</option>
-                        <option value={NEW_PRODUCT_OPTION}>＋ 新規商品（在庫未登録）</option>
-                        {[...products]
-                          .sort((a, b) => (a.purchaseProductName || a.name).localeCompare(b.purchaseProductName || b.name, 'en'))
-                          .map(p => {
-                            const label = p.purchaseProductName || p.name
-                            const suffix = p.purchaseProductName ? '' : ' ※販売名'
-                            return (
-                              <option key={p.id} value={p.id}>
-                                {label} ({p.sku}){suffix}
-                              </option>
-                            )
-                          })}
-                      </select>
-                      {!line.productId && line.productName !== undefined && (
-                        <input
-                          type="text"
-                          value={line.productName}
-                          onChange={e => updateItem(index, { productName: e.target.value })}
-                          placeholder="新規商品名"
-                          className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                        />
+                      <ProductCombobox
+                        products={products}
+                        value={line.productId ?? ''}
+                        freeText={line.productName ?? ''}
+                        onSelectProduct={p => updateItem(index, {
+                          productId: p.id,
+                          productName: undefined,
+                          unitPrice: p.purchaseUnitPrice ?? line.unitPrice,
+                        })}
+                        onFreeText={name => updateItem(index, { productId: '', productName: name })}
+                      />
+                      {!line.productId && (line.productName ?? '').trim() && (
+                        <p className="px-1 text-[11px] text-amber-700">新規商品（在庫未登録）：{line.productName}</p>
                       )}
                     </div>
                     <input
@@ -579,6 +650,8 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     const handler = () => {
+      // Don't refetch while the editor is open — it would wipe in-progress input.
+      if (modalOpen) return
       if (document.visibilityState === 'visible') void load()
     }
     document.addEventListener('visibilitychange', handler)
@@ -587,7 +660,7 @@ export default function PurchaseOrdersPage() {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
     }
-  }, [])
+  }, [modalOpen])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -625,6 +698,7 @@ export default function PurchaseOrdersPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        <PageTabs tabs={PURCHASING_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">

@@ -5,19 +5,44 @@ import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { Building2, Calculator, ClipboardList, ExternalLink, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import type { LucideIcon } from 'lucide-react'
 
-const navItems = [
-  { href: '/inventory', label: '在庫管理', icon: Package },
-  { href: '/purchase-orders', label: '発注管理', icon: ClipboardList },
-  { href: '/receiving', label: '入荷管理', icon: PackageOpen },
-  { href: '/suppliers', label: '仕入先一覧', icon: Truck },
-  { href: '/sales', label: '販売管理', icon: Leaf },
-  { href: '/ec-sales', label: '販売管理（EC）', icon: ShoppingBag },
-  { href: '/shipping', label: '発送管理', icon: Send },
-  { href: '/financials', label: '収支管理', icon: Calculator },
-  { href: '/buyers', label: '販売先一覧', icon: Building2 },
-  { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
-  { href: '/settings/masters', label: '設定', icon: Settings },
+interface NavItem {
+  href: string
+  label: string
+  icon: LucideIcon
+  match?: string[]
+}
+
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: '倉庫',
+    items: [
+      { href: '/inventory', label: '在庫管理', icon: Package },
+      { href: '/receiving', label: '入荷管理', icon: PackageOpen },
+      { href: '/shipping', label: '発送管理', icon: Send },
+    ],
+  },
+  {
+    label: '営業',
+    items: [
+      { href: '/sales', label: '販売管理', icon: Leaf, match: ['/sales', '/ec-sales', '/buyers'] },
+      { href: '/purchase-orders', label: '仕入れ管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
+      { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
+    ],
+  },
+  {
+    label: '経理',
+    items: [
+      { href: '/financials', label: '収支管理', icon: Calculator },
+    ],
+  },
+  {
+    label: '管理',
+    items: [
+      { href: '/settings/masters', label: '設定', icon: Settings },
+    ],
+  },
 ]
 
 export function Sidebar({
@@ -62,26 +87,34 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4">
-          {navItems.map(item => {
-            const Icon = item.icon
-            const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onClose}
-                className={`mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-[#285e3f] text-white'
-                    : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                <Icon size={18} />
-                {item.label}
-              </Link>
-            )
-          })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          {navGroups.map(group => (
+            <div key={group.label} className="mb-4 last:mb-0">
+              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100/45">
+                {group.label}
+              </p>
+              {group.items.map(item => {
+                const Icon = item.icon
+                const matchPaths = item.match ?? [item.href]
+                const active = matchPaths.some(p => pathname === p || pathname.startsWith(p + '/'))
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onClose}
+                    className={`mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'bg-[#285e3f] text-white'
+                        : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <Icon size={18} />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-white/10 px-3 py-4">
