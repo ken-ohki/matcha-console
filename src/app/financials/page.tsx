@@ -18,13 +18,20 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type {
+  EcSaleRecord,
   PaymentStatus,
   PurchaseOrder,
   PurchaseOrderPaymentStatus,
   SaleRecord,
 } from '@/types'
+import {
+  buildCashFlowSeries,
+  todayMonthKey,
+  type CashFlowMode,
+  type MonthlyCashFlow,
+} from '@/lib/cashflow'
 
-type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner'
+type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner' | 'cashflow'
 type SaleFilterChip = 'all' | 'pending' | 'paid' | 'overdue'
 type PoFilterChip = 'all' | 'pending' | 'paid' | 'overdue'
 
@@ -134,6 +141,7 @@ const editInputCls =
 export default function FinancialsPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [dateFrom, setDateFrom] = useState<string>('')
@@ -149,9 +157,14 @@ export default function FinancialsPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [s, o] = await Promise.all([svc.sales.getSaleRecords(), svc.purchaseOrders.getPurchaseOrders()])
+      const [s, o, ec] = await Promise.all([
+        svc.sales.getSaleRecords(),
+        svc.purchaseOrders.getPurchaseOrders(),
+        svc.ecSales.getEcSaleRecords(),
+      ])
       setSales(s)
       setOrders(o)
+      setEcSales(ec)
     } finally {
       setLoading(false)
     }
@@ -457,6 +470,7 @@ export default function FinancialsPage() {
             ['monthly', '月別'],
             ['fiscal', '年度別'],
             ['partner', '取引先別'],
+            ['cashflow', 'キャッシュフロー'],
           ] as [TabKey, string][]).map(([k, label]) => (
             <button
               key={k}
@@ -525,6 +539,10 @@ export default function FinancialsPage() {
             <PartnerTable title="販売先" rows={partnerBuyers} headers={['請求総額', '入金済', '未収']} />
             <PartnerTable title="仕入先" rows={partnerSuppliers} headers={['仕入総額', '支払済', '未払']} />
           </div>
+        )}
+
+        {activeTab === 'cashflow' && (
+          <CashFlowTab sales={sales} ecSales={ecSales} purchaseOrders={orders} />
         )}
 
         {/* Receivables (sales) */}
@@ -938,5 +956,233 @@ function PoRow({
         )}
       </td>
     </tr>
+  )
+}
+
+function CashFlowTab({
+  sales,
+  ecSales,
+  purchaseOrders,
+}: {
+  sales: SaleRecord[]
+  ecSales: EcSaleRecord[]
+  purchaseOrders: PurchaseOrder[]
+}) {
+  const todayKey = todayMonthKey()
+  const [openingBalance, setOpeningBalance] = useState<number>(0)
+  const [startMonth, setStartMonth] = useState<string>(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 5)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [endMonth, setEndMonth] = useState<string>(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() + 6)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [mode, setMode] = useState<CashFlowMode>('plan')
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('cashflow.opening')
+      if (stored != null) setOpeningBalance(Number(stored) || 0)
+    } catch {}
+  }, [])
+
+  const handleOpeningChange = (v: number) => {
+    setOpeningBalance(v)
+    try { localStorage.setItem('cashflow.opening', String(v)) } catch {}
+  }
+
+  const applyPreset = (preset: 'last12' | 'thisFY' | 'next12') => {
+    const now = new Date()
+    if (preset === 'last12') {
+      const s = new Date(now); s.setMonth(s.getMonth() - 11)
+      setStartMonth(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`)
+      setEndMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+    } else if (preset === 'thisFY') {
+      const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1
+      setStartMonth(`${fy}-04`)
+      setEndMonth(`${fy + 1}-03`)
+    } else {
+      const s = new Date(now); s.setMonth(s.getMonth() - 2)
+      const e = new Date(now); e.setMonth(e.getMonth() + 11)
+      setStartMonth(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, '0')}`)
+      setEndMonth(`${e.getFullYear()}-${String(e.getMonth() + 1).padStart(2, '0')}`)
+    }
+  }
+
+  const series = useMemo<MonthlyCashFlow[]>(() => buildCashFlowSeries({
+    sales,
+    ecSales,
+    purchaseOrders,
+    startMonth,
+    endMonth,
+    openingBalance,
+    mode,
+  }), [sales, ecSales, purchaseOrders, startMonth, endMonth, openingBalance, mode])
+
+  const currentRow = series.find(r => r.key === todayKey)
+  const currentBalance = currentRow?.endBalance ?? (series[0]?.endBalance ?? openingBalance)
+  const nextRow = series[series.findIndex(r => r.key === todayKey) + 1]
+  const nextBalance = nextRow?.endBalance ?? null
+  const shortMonths = series.filter(r => r.endBalance < 0).length
+
+  const W = 720
+  const H = 200
+  const PAD = { top: 12, right: 8, bottom: 22, left: 8 }
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+  const maxBar = Math.max(1, ...series.map(r => Math.max(r.inActual + r.inExpected, r.outActual + r.outExpected)))
+  const balances = series.map(r => r.endBalance)
+  const minBal = Math.min(0, ...balances)
+  const maxBal = Math.max(0, ...balances)
+  const balRange = maxBal - minBal || 1
+  const colW = series.length > 0 ? innerW / series.length : 0
+  const barW = Math.max(4, Math.min(28, colW * 0.32))
+  const xCenter = (i: number) => PAD.left + colW * (i + 0.5)
+  const yBar = (v: number) => PAD.top + innerH / 2 - (v / maxBar) * (innerH / 2 - 4)
+  const yBal = (v: number) => PAD.top + innerH - ((v - minBal) / balRange) * innerH
+  const yZero = PAD.top + innerH / 2
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-[#68756c]">
+            <span className="mb-1 block">期首残高 (¥)</span>
+            <input
+              type="number"
+              value={openingBalance}
+              onChange={e => handleOpeningChange(Number(e.target.value) || 0)}
+              className="w-36 rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </label>
+          <label className="text-xs text-[#68756c]">
+            <span className="mb-1 block">開始月</span>
+            <input
+              type="month"
+              value={startMonth}
+              onChange={e => setStartMonth(e.target.value)}
+              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </label>
+          <label className="text-xs text-[#68756c]">
+            <span className="mb-1 block">終了月</span>
+            <input
+              type="month"
+              value={endMonth}
+              onChange={e => setEndMonth(e.target.value)}
+              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </label>
+          <div className="flex flex-wrap gap-1">
+            <button onClick={() => applyPreset('last12')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">過去12ヶ月</button>
+            <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">今年度</button>
+            <button onClick={() => applyPreset('next12')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">前後12ヶ月</button>
+          </div>
+          <div className="ml-auto flex gap-1">
+            <button
+              onClick={() => setMode('actual')}
+              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'actual' ? 'border-[#174c33] bg-[#174c33] text-white' : 'border-[#d9d1be] bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+            >実績のみ</button>
+            <button
+              onClick={() => setMode('plan')}
+              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'plan' ? 'border-[#174c33] bg-[#174c33] text-white' : 'border-[#d9d1be] bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+            >実績＋予定</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <KPICard title="現在の残高（今月末）" value={formatCurrency(currentBalance)} color={currentBalance < 0 ? 'red' : 'default'} icon={<Wallet size={18} />} />
+        <KPICard title="翌月末の予測残高" value={nextBalance != null ? formatCurrency(nextBalance) : '-'} color={nextBalance != null && nextBalance < 0 ? 'red' : 'default'} icon={<TrendingUp size={18} />} />
+        <KPICard title="期間内のショート月数" value={`${shortMonths} ヶ月`} color={shortMonths > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
+      </div>
+
+      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+        <div className="mb-2 flex items-center justify-between text-xs text-[#68756c]">
+          <span>月別 入金/支払（縦棒）と現金残高（ライン）</span>
+          <div className="flex gap-3">
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-600" />入金</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />支払</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#173c2a]" />残高</span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block">
+            <line x1={PAD.left} y1={yZero} x2={W - PAD.right} y2={yZero} stroke="#e5e2d6" strokeWidth={1} />
+            {series.map((r, i) => {
+              const cx = xCenter(i)
+              const inflow = r.inActual + (mode === 'plan' ? r.inExpected : 0)
+              const outflow = r.outActual + (mode === 'plan' ? r.outExpected : 0)
+              const inTop = yBar(inflow)
+              const outBottom = yBar(-outflow)
+              return (
+                <g key={r.key}>
+                  {inflow > 0 && (
+                    <rect x={cx - barW / 2} y={inTop} width={barW} height={yZero - inTop} fill="#059669" opacity={r.inExpected > 0 && mode === 'plan' ? 0.7 : 1} />
+                  )}
+                  {outflow > 0 && (
+                    <rect x={cx - barW / 2} y={yZero} width={barW} height={outBottom - yZero} fill="#ef4444" opacity={r.outExpected > 0 && mode === 'plan' ? 0.7 : 1} />
+                  )}
+                </g>
+              )
+            })}
+            {series.length > 1 && (
+              <polyline
+                fill="none"
+                stroke="#173c2a"
+                strokeWidth={2}
+                points={series.map((r, i) => `${xCenter(i)},${yBal(r.endBalance)}`).join(' ')}
+              />
+            )}
+            {series.map((r, i) => (
+              <circle key={`pt-${r.key}`} cx={xCenter(i)} cy={yBal(r.endBalance)} r={2.5} fill={r.endBalance < 0 ? '#dc2626' : '#173c2a'} />
+            ))}
+            {series.map((r, i) => (
+              <text key={`lbl-${r.key}`} x={xCenter(i)} y={H - 6} fontSize={9} textAnchor="middle" fill="#68756c">{r.key.slice(2)}</text>
+            ))}
+          </svg>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white">
+        <table className="min-w-full text-sm">
+          <thead className="bg-[#f7f5ee] text-[#173c2a]">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">月</th>
+              <th className="px-3 py-2 text-right font-medium">入金 (実績)</th>
+              <th className="px-3 py-2 text-right font-medium">入金 (予定)</th>
+              <th className="px-3 py-2 text-right font-medium">支払 (実績)</th>
+              <th className="px-3 py-2 text-right font-medium">支払 (予定)</th>
+              <th className="px-3 py-2 text-right font-medium">月間ネット</th>
+              <th className="px-3 py-2 text-right font-medium">月末残高</th>
+            </tr>
+          </thead>
+          <tbody>
+            {series.map(r => {
+              const isCurrent = r.key === todayKey
+              const negative = r.endBalance < 0
+              return (
+                <tr key={r.key} className={`${negative ? 'bg-red-50' : ''} ${isCurrent ? 'border-l-4 border-[#174c33]' : ''}`}>
+                  <td className="border-b border-gray-100 px-3 py-2 font-medium text-[#173c2a]">{r.key}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-emerald-700">{r.inActual > 0 ? formatCurrency(r.inActual) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-[#68756c]">{r.inExpected > 0 ? formatCurrency(r.inExpected) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-red-700">{r.outActual > 0 ? formatCurrency(r.outActual) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-[#68756c]">{r.outExpected > 0 ? formatCurrency(r.outExpected) : '-'}</td>
+                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-medium ${r.net >= 0 ? 'text-[#173c2a]' : 'text-red-700'}`}>{formatCurrency(r.net)}</td>
+                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-semibold ${negative ? 'text-red-700' : 'text-[#173c2a]'}`}>{formatCurrency(r.endBalance)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[11px] text-[#68756c]">
+        ※ 金額は税込換算（海外向け販売は税抜のまま）。EC 販売は売上日に入金とみなしています。期首残高はブラウザに保存されます。
+      </p>
+    </div>
   )
 }
