@@ -244,7 +244,7 @@ function PurchaseOrderModal({
           productId: defaultProductId,
           quantityKg: 0,
           unitPrice: products.find(p => p.id === defaultProductId)?.purchaseUnitPrice ?? 0,
-          taxRate: 10,
+          taxRate: 8,
         }]
     setForm({
       supplierName: initial?.supplierName ?? '',

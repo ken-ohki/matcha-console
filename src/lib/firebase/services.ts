@@ -1450,6 +1450,7 @@ export function createFirebaseServices(): IServices {
         productId: item.productId,
         quantityKg: item.quantityKg,
         unitPrice: item.unitPrice,
+        taxRate: item.taxRate,
       }))
 
       const merged: SaleRecordInput = {

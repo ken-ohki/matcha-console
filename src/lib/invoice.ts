@@ -1,3 +1,5 @@
+import { computeTaxBuckets } from '@/lib/tax'
+
 export type DocumentType = 'invoice' | 'delivery' | 'quotation'
 export type DocumentLanguage = 'ja' | 'en'
 
@@ -148,24 +150,16 @@ export interface DocumentTotals {
 }
 
 export function computeTotals(lines: DocumentLine[]): DocumentTotals {
-  let reduced = 0
-  let standard = 0
-  for (const line of lines) {
-    const amount = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)
-    if (line.isReducedRate) reduced += amount
-    else standard += amount
-  }
-  const reducedTax = Math.floor(reduced * 0.08)
-  const standardTax = Math.floor(standard * 0.10)
-  return {
-    reducedSubtotal: reduced,
-    standardSubtotal: standard,
-    reducedTax,
-    standardTax,
-    subtotal: reduced + standard,
-    tax: reducedTax + standardTax,
-    total: reduced + standard + reducedTax + standardTax,
-  }
+  // Delegate to the shared tax module so documents and management screens
+  // round identically (floor once per rate bucket). Document fees are already
+  // represented as lines, so no separate fees argument is passed.
+  return computeTaxBuckets(
+    lines.map(line => ({
+      quantityKg: Number(line.quantity) || 0,
+      unitPrice: Number(line.unitPrice) || 0,
+      taxRate: line.isReducedRate ? 8 : 10,
+    })),
+  )
 }
 
 export function formatYen(value: number): string {

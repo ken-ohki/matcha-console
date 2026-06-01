@@ -3,6 +3,7 @@ import type {
   PurchaseOrder,
   SaleRecord,
 } from '@/types'
+import { computeTax } from '@/lib/tax'
 
 export type CashFlowMode = 'actual' | 'plan'
 
@@ -15,33 +16,16 @@ function isJpSale(sale: SaleRecord): boolean {
   return c === '' || c === '日本' || c.toLowerCase() === 'japan' || c.toLowerCase() === 'jp'
 }
 
-function lineTax(qtyKg: number, unitPrice: number, taxRate: number): number {
-  const subtotal = qtyKg * unitPrice
-  const rate = taxRate === 8 ? 0.08 : 0.10
-  return Math.floor(subtotal * rate)
-}
-
 export function computeSaleTaxIncluded(sale: SaleRecord): number {
   const base = sale.invoiceAmount > 0 ? sale.invoiceAmount : sale.revenue
   if (!isJpSale(sale)) return base
-  let tax = 0
-  for (const item of sale.items ?? []) {
-    tax += lineTax(item.quantityKg, item.unitPrice, item.taxRate ?? 8)
-  }
-  // Fees on sale are treated as 10%-rate (consistent with PO breakdown).
   const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
-  tax += Math.floor(fees * 0.10)
-  return base + tax
+  return base + computeTax(sale.items ?? [], fees)
 }
 
 export function computePoTaxIncluded(po: PurchaseOrder): number {
-  let tax = 0
-  for (const item of po.items ?? []) {
-    tax += lineTax(item.quantityKg, item.unitPrice, item.taxRate ?? 8)
-  }
   const fees = (po.shippingFee ?? 0) + (po.otherFees ?? 0)
-  tax += Math.floor(fees * 0.10)
-  return (po.totalAmount ?? 0) + tax
+  return (po.totalAmount ?? 0) + computeTax(po.items ?? [], fees)
 }
 
 export interface MonthlyCashFlow {
