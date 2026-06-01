@@ -321,6 +321,7 @@ export default function ReceivingPage() {
 
   useEffect(() => {
     const handler = () => {
+      if (modalOpen || orphanTarget) return
       if (document.visibilityState === 'visible') void load()
     }
     document.addEventListener('visibilitychange', handler)
@@ -329,7 +330,8 @@ export default function ReceivingPage() {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, orphanTarget])
 
   const pendingLines = useMemo<PendingLine[]>(() => {
     const result: PendingLine[] = []

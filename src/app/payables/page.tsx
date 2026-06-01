@@ -92,8 +92,15 @@ export default function PayablesPage() {
     setFeedback(null)
     try {
       const svc = await getServices()
+      // Keep status and paidDate consistent: entering a paid date marks the PO
+      // paid; clearing it on a paid PO reverts to 未払.
+      const coupledStatus: Partial<Record<'paymentStatus', PurchaseOrderPaymentStatus>> = {}
+      if (patch.paidDate !== undefined && patch.paymentStatus === undefined) {
+        coupledStatus.paymentStatus = patch.paidDate ? 'paid' : 'unpaid'
+      }
       const updated = await svc.purchaseOrders.updatePurchaseOrder(id, {
         ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
+        ...coupledStatus,
         ...(patch.paymentDueDate !== undefined && { paymentDueDate: patch.paymentDueDate || undefined }),
         ...(patch.paidDate !== undefined && { paidDate: patch.paidDate || undefined }),
       })

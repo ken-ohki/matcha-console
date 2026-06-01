@@ -714,6 +714,7 @@ export default function SalesPage() {
 
   useEffect(() => {
     const handler = () => {
+      if (modalOpen) return
       if (document.visibilityState === 'visible') void load()
     }
     document.addEventListener('visibilitychange', handler)
@@ -722,7 +723,8 @@ export default function SalesPage() {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen])
 
   const filteredSales = useMemo(() => {
     const q = search.trim().toLowerCase()

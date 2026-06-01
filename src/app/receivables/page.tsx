@@ -102,8 +102,15 @@ export default function ReceivablesPage() {
     setFeedback(null)
     try {
       const svc = await getServices()
+      // Keep status and paymentDate consistent: entering a payment date marks
+      // the sale paid; clearing it on a paid sale reverts to 請求済.
+      const coupledStatus: Partial<Record<'paymentStatus', PaymentStatus>> = {}
+      if (patch.paymentDate !== undefined && patch.paymentStatus === undefined) {
+        coupledStatus.paymentStatus = patch.paymentDate ? 'paid' : 'invoiced'
+      }
       const updated = await svc.sales.updateSaleRecord(id, {
         ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
+        ...coupledStatus,
         ...(patch.dueDate !== undefined && { dueDate: patch.dueDate || undefined }),
         ...(patch.paymentDate !== undefined && { paymentDate: patch.paymentDate || undefined }),
       })

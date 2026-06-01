@@ -558,6 +558,7 @@ function PurchaseOrderModal({
                         setUploadingInvoice(true)
                         try {
                           const url = await uploadPurchaseOrderInvoice(file, initial?.id || 'new')
+                          if (!url) throw new Error('アップロードURLの取得に失敗しました')
                           setForm(prev => ({
                             ...prev,
                             invoice: {
@@ -920,6 +921,7 @@ function PoListRow({
     setUploading(true)
     try {
       const url = await uploadPurchaseOrderInvoice(file, order.id)
+      if (!url) throw new Error('アップロードURLの取得に失敗しました')
       const services = await getServices()
       const updated = await services.purchaseOrders.updatePurchaseOrder(order.id, {
         invoice: {

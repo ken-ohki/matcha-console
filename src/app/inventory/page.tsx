@@ -1282,6 +1282,7 @@ export default function InventoryPage() {
   // on other pages (e.g. a new sale) are reflected without a manual reload.
   useEffect(() => {
     const handler = () => {
+      if (modalOpen) return
       if (document.visibilityState === 'visible') {
         void load()
       }
@@ -1292,7 +1293,8 @@ export default function InventoryPage() {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen])
 
   const groupProducts = useMemo(() => {
     if (activeGroupId === 'all') {

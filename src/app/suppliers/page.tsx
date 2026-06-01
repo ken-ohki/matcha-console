@@ -55,6 +55,7 @@ export default function SuppliersPage() {
 
   useEffect(() => {
     const handler = () => {
+      if (selectedId) return
       if (document.visibilityState === 'visible') void load()
     }
     document.addEventListener('visibilitychange', handler)
@@ -63,7 +64,8 @@ export default function SuppliersPage() {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
 
   const filtered = useMemo(() => {
     if (!search) return suppliers
