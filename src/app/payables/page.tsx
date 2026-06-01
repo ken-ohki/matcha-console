@@ -16,6 +16,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { PurchaseOrder, PurchaseOrderPaymentStatus } from '@/types'
+import { computePoTaxIncluded } from '@/lib/cashflow'
 
 function formatCurrency(n: number) {
   return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(n)
@@ -111,12 +112,12 @@ export default function PayablesPage() {
   }, [filtered])
 
   const kpis = useMemo(() => {
-    const outstanding = orders.filter(o => o.paymentStatus !== 'paid').reduce((s, o) => s + (o.totalAmount || 0), 0)
-    const overdue = grouped.overdue.reduce((s, o) => s + (o.totalAmount || 0), 0)
-    const thisMonth = grouped.thisMonth.reduce((s, o) => s + (o.totalAmount || 0), 0)
+    const outstanding = orders.filter(o => o.paymentStatus !== 'paid').reduce((s, o) => s + computePoTaxIncluded(o), 0)
+    const overdue = grouped.overdue.reduce((s, o) => s + computePoTaxIncluded(o), 0)
+    const thisMonth = grouped.thisMonth.reduce((s, o) => s + computePoTaxIncluded(o), 0)
     const paidThisMonth = orders
       .filter(o => o.paymentStatus === 'paid' && (o.paidDate ?? '').startsWith(todayIso().slice(0, 7)))
-      .reduce((s, o) => s + (o.totalAmount || 0), 0)
+      .reduce((s, o) => s + computePoTaxIncluded(o), 0)
     return { outstanding, overdue, thisMonth, paidThisMonth }
   }, [orders, grouped])
 
@@ -194,7 +195,7 @@ export default function PayablesPage() {
           const rows = grouped[bucket]
           if (rows.length === 0) return null
           const open = openBuckets[bucket]
-          const total = rows.reduce((s, o) => s + (o.totalAmount || 0), 0)
+          const total = rows.reduce((s, o) => s + computePoTaxIncluded(o), 0)
           return (
             <div key={bucket} className={`rounded-2xl border-2 ${BUCKET_COLORS[bucket]}`}>
               <button
@@ -216,7 +217,7 @@ export default function PayablesPage() {
                         <th className="px-3 py-2 text-left font-medium">期日</th>
                         <th className="px-3 py-2 text-left font-medium">仕入先</th>
                         <th className="px-3 py-2 text-left font-medium">商品</th>
-                        <th className="px-3 py-2 text-right font-medium">金額(税抜)</th>
+                        <th className="px-3 py-2 text-right font-medium">支払額(税込)</th>
                         <th className="px-3 py-2 text-left font-medium">状態</th>
                         <th className="px-3 py-2 text-left font-medium">支払日</th>
                         <th className="px-3 py-2 text-left font-medium">請求書</th>
@@ -241,7 +242,10 @@ export default function PayablesPage() {
                               <Link href={`/purchase-orders/${o.id}/document`} className="hover:underline">{o.supplierName}</Link>
                             </td>
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(o.totalAmount || 0)}</td>
+                            <td className="px-3 py-2 text-right">
+                              <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
+                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(o.totalAmount || 0)}</div>
+                            </td>
                             <td className="px-3 py-2">
                               <select
                                 value={o.paymentStatus}
