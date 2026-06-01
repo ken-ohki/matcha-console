@@ -31,9 +31,7 @@ import {
   type MonthlyCashFlow,
 } from '@/lib/cashflow'
 
-type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner' | 'cashflow'
-type SaleFilterChip = 'all' | 'pending' | 'paid' | 'overdue'
-type PoFilterChip = 'all' | 'pending' | 'paid' | 'overdue'
+type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner' | 'products' | 'cashflow'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('ja-JP', {
@@ -80,43 +78,6 @@ function saleIncome(sale: SaleRecord): number {
   return inv > 0 ? inv : sale.revenue || 0
 }
 
-const PAYMENT_LABELS: Record<PaymentStatus, string> = {
-  uninvoiced: '未請求',
-  invoiced: '請求済',
-  paid: '入金済',
-}
-const PAYMENT_COLORS: Record<PaymentStatus, string> = {
-  uninvoiced: 'bg-gray-100 text-gray-700',
-  invoiced: 'bg-amber-100 text-amber-800',
-  paid: 'bg-emerald-100 text-emerald-800',
-}
-
-const PO_PAYMENT_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
-  uninvoiced: '未請求',
-  unpaid: '未払',
-  paid: '支払済',
-}
-const PO_PAYMENT_COLORS: Record<PurchaseOrderPaymentStatus, string> = {
-  uninvoiced: 'bg-slate-100 text-slate-700',
-  unpaid: 'bg-amber-100 text-amber-800',
-  paid: 'bg-emerald-100 text-emerald-800',
-}
-
-function SaleBadge({ status }: { status: PaymentStatus }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${PAYMENT_COLORS[status]}`}>
-      {PAYMENT_LABELS[status]}
-    </span>
-  )
-}
-function PoBadge({ status }: { status: PurchaseOrderPaymentStatus }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${PO_PAYMENT_COLORS[status]}`}>
-      {PO_PAYMENT_LABELS[status]}
-    </span>
-  )
-}
-
 interface MonthlyRow {
   key: string
   label: string
@@ -125,6 +86,16 @@ interface MonthlyRow {
   expense: number
   paid: number
   net: number
+}
+
+interface ProductRow {
+  productId: string
+  name: string
+  sku: string
+  revenue: number
+  quantity: number
+  profit: number
+  count: number
 }
 
 interface PartnerRow {
@@ -146,12 +117,6 @@ export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
-  const [saleChip, setSaleChip] = useState<SaleFilterChip>('all')
-  const [poChip, setPoChip] = useState<PoFilterChip>('all')
-  const [salesOpen, setSalesOpen] = useState(true)
-  const [posOpen, setPosOpen] = useState(true)
-  const [savingId, setSavingId] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -285,6 +250,50 @@ export default function FinancialsPage() {
       .sort((a, b) => b.key.localeCompare(a.key))
   }, [filteredSales, filteredOrders])
 
+  // All-time monthly map for YoY lookups (ignores date filter).
+  const monthlyAll = useMemo(() => {
+    const map = new Map<string, { revenue: number; expense: number; profit: number }>()
+    for (const r of sales) {
+      if (r.status === 'cancelled') continue
+      const k = monthKey(r.createdAt)
+      const row = map.get(k) ?? { revenue: 0, expense: 0, profit: 0 }
+      const inc = saleIncome(r)
+      row.revenue += inc
+      row.profit += r.grossProfit ?? (inc - (r.costAmount ?? 0))
+      map.set(k, row)
+    }
+    for (const o of orders) {
+      const d = o.orderDate ? new Date(o.orderDate) : null
+      if (!d) continue
+      const k = monthKey(d)
+      const row = map.get(k) ?? { revenue: 0, expense: 0, profit: 0 }
+      row.expense += o.totalAmount || 0
+      map.set(k, row)
+    }
+    return map
+  }, [sales, orders])
+
+  const productRanking = useMemo<ProductRow[]>(() => {
+    const map = new Map<string, ProductRow>()
+    for (const r of filteredSales) {
+      for (const item of r.items ?? []) {
+        const key = item.productId || item.productName
+        const row = map.get(key) ?? {
+          productId: item.productId,
+          name: item.productName || '(未設定)',
+          sku: item.productSku || '',
+          revenue: 0, quantity: 0, profit: 0, count: 0,
+        }
+        row.revenue += item.revenue || 0
+        row.quantity += item.quantityKg || 0
+        row.profit += (item.revenue || 0) - (item.costAmount || 0)
+        row.count += 1
+        map.set(key, row)
+      }
+    }
+    return [...map.values()].sort((a, b) => b.revenue - a.revenue)
+  }, [filteredSales])
+
   const partnerBuyers = useMemo<PartnerRow[]>(() => {
     const map = new Map<string, PartnerRow>()
     for (const r of filteredSales) {
@@ -330,22 +339,6 @@ export default function FinancialsPage() {
   const overdueSales = filteredSales.filter(isOverdueSale)
   const overdueOrders = filteredOrders.filter(isOverduePo)
 
-  const visibleSales = useMemo(() => {
-    const list = [...filteredSales].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    if (saleChip === 'all') return list
-    if (saleChip === 'paid') return list.filter(r => r.paymentStatus === 'paid')
-    if (saleChip === 'pending') return list.filter(r => r.paymentStatus !== 'paid')
-    return list.filter(isOverdueSale)
-  }, [filteredSales, saleChip])
-
-  const visibleOrders = useMemo(() => {
-    const list = [...filteredOrders].sort((a, b) => (b.orderDate || '').localeCompare(a.orderDate || ''))
-    if (poChip === 'all') return list
-    if (poChip === 'paid') return list.filter(o => o.paymentStatus === 'paid')
-    if (poChip === 'pending') return list.filter(o => o.paymentStatus !== 'paid')
-    return list.filter(isOverduePo)
-  }, [filteredOrders, poChip])
-
   const applyPreset = (preset: 'thisMonth' | 'lastMonth' | 'thisFY' | 'all') => {
     const now = new Date()
     if (preset === 'all') {
@@ -368,45 +361,6 @@ export default function FinancialsPage() {
       const fy = fiscalYearOf(now)
       setDateFrom(startOfFiscalYear(fy))
       setDateTo(endOfFiscalYear(fy))
-    }
-  }
-
-  const updateSale = async (id: string, patch: { paymentStatus?: PaymentStatus; paymentMethod?: string; paymentDate?: string; paymentFee?: number }) => {
-    setSavingId(id)
-    setFeedback(null)
-    try {
-      const svc = await getServices()
-      const updated = await svc.sales.updateSaleRecord(id, {
-        ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
-        ...(patch.paymentMethod !== undefined && { paymentMethod: patch.paymentMethod || undefined }),
-        ...(patch.paymentDate !== undefined && { paymentDate: patch.paymentDate || undefined }),
-        ...(patch.paymentFee !== undefined && { paymentFee: patch.paymentFee }),
-      })
-      setSales(prev => prev.map(r => (r.id === id ? updated : r)))
-      setFeedback('更新しました')
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally {
-      setSavingId(null)
-    }
-  }
-
-  const updateOrder = async (id: string, patch: { paymentStatus?: PurchaseOrderPaymentStatus; paymentDueDate?: string; paidDate?: string }) => {
-    setSavingId(id)
-    setFeedback(null)
-    try {
-      const svc = await getServices()
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, {
-        ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
-        ...(patch.paymentDueDate !== undefined && { paymentDueDate: patch.paymentDueDate || undefined }),
-        ...(patch.paidDate !== undefined && { paidDate: patch.paidDate || undefined }),
-      })
-      setOrders(prev => prev.map(o => (o.id === id ? updated : o)))
-      setFeedback('更新しました')
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally {
-      setSavingId(null)
     }
   }
 
@@ -447,10 +401,6 @@ export default function FinancialsPage() {
           </div>
         </div>
 
-        {feedback && (
-          <div className="rounded-xl border border-[#d9d1be] bg-[#faf8f1] px-3 py-2 text-xs text-[#173c2a]">{feedback}</div>
-        )}
-
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
@@ -469,6 +419,7 @@ export default function FinancialsPage() {
             ['overview', '概要'],
             ['monthly', '月別'],
             ['fiscal', '年度別'],
+            ['products', '商品別'],
             ['partner', '取引先別'],
             ['cashflow', 'キャッシュフロー'],
           ] as [TabKey, string][]).map(([k, label]) => (
@@ -528,10 +479,17 @@ export default function FinancialsPage() {
         )}
 
         {activeTab === 'monthly' && (
-          <PeriodTable rows={monthly} title="月別 収支" />
+          <div className="space-y-4">
+            <MonthlyTrendChart rows={monthly} yoy={monthlyAll} />
+            <PeriodTable rows={monthly} title="月別 収支" yoy={monthlyAll} />
+          </div>
         )}
         {activeTab === 'fiscal' && (
           <PeriodTable rows={fiscal} title="年度別 収支" />
+        )}
+
+        {activeTab === 'products' && (
+          <ProductsTab rows={productRanking} />
         )}
 
         {activeTab === 'partner' && (
@@ -545,150 +503,34 @@ export default function FinancialsPage() {
           <CashFlowTab sales={sales} ecSales={ecSales} purchaseOrders={orders} />
         )}
 
-        {/* Receivables (sales) */}
-        <div className="rounded-2xl border border-[#d9d1be] bg-white">
-          <button
-            type="button"
-            onClick={() => setSalesOpen(v => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
-          >
-            <div className="flex items-center gap-2">
-              {salesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <h2 className="text-sm font-semibold text-[#173c2a]">売上（販売側）</h2>
-              <span className="rounded-full bg-[#f4f2ea] px-2 py-0.5 text-[11px] text-[#68756c]">{visibleSales.length}件</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Filter size={12} className="text-[#68756c]" />
-              {([
-                ['all', '全件'],
-                ['pending', '未入金'],
-                ['paid', '入金済'],
-                ['overdue', '期限超過'],
-              ] as [SaleFilterChip, string][]).map(([k, label]) => (
-                <span
-                  key={k}
-                  role="button"
-                  tabIndex={0}
-                  onClick={e => { e.stopPropagation(); setSaleChip(k) }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setSaleChip(k) } }}
-                  className={`cursor-pointer rounded-full px-2 py-0.5 text-[11px] ${saleChip === k ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c] hover:bg-[#eef3eb]'}`}
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </button>
-          {salesOpen && (
-            <div className="overflow-x-auto border-t border-[#ece8db]">
-              <table className="min-w-full text-xs">
-                <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">案件</th>
-                    <th className="px-3 py-2 font-medium">販売先</th>
-                    <th className="px-3 py-2 font-medium">商品</th>
-                    <th className="px-3 py-2 font-medium text-right">請求額</th>
-                    <th className="px-3 py-2 font-medium">ステータス</th>
-                    <th className="px-3 py-2 font-medium">支払方法</th>
-                    <th className="px-3 py-2 font-medium">入金日</th>
-                    <th className="px-3 py-2 font-medium">期日</th>
-                    <th className="px-3 py-2 font-medium text-right">手数料</th>
-                    <th className="px-3 py-2 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleSales.map(r => (
-                    <SaleRow
-                      key={r.id}
-                      record={r}
-                      saving={savingId === r.id}
-                      overdue={isOverdueSale(r)}
-                      onSave={patch => updateSale(r.id, patch)}
-                    />
-                  ))}
-                  {visibleSales.length === 0 && (
-                    <tr><td colSpan={10} className="px-3 py-6 text-center text-[#68756c]">該当する売上はありません。</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Payables (POs) */}
-        <div className="rounded-2xl border border-[#d9d1be] bg-white">
-          <button
-            type="button"
-            onClick={() => setPosOpen(v => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
-          >
-            <div className="flex items-center gap-2">
-              {posOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <h2 className="text-sm font-semibold text-[#173c2a]">仕入（発注側）</h2>
-              <span className="rounded-full bg-[#f4f2ea] px-2 py-0.5 text-[11px] text-[#68756c]">{visibleOrders.length}件</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Filter size={12} className="text-[#68756c]" />
-              {([
-                ['all', '全件'],
-                ['pending', '未払'],
-                ['paid', '支払済'],
-                ['overdue', '期限超過'],
-              ] as [PoFilterChip, string][]).map(([k, label]) => (
-                <span
-                  key={k}
-                  role="button"
-                  tabIndex={0}
-                  onClick={e => { e.stopPropagation(); setPoChip(k) }}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setPoChip(k) } }}
-                  className={`cursor-pointer rounded-full px-2 py-0.5 text-[11px] ${poChip === k ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c] hover:bg-[#eef3eb]'}`}
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </button>
-          {posOpen && (
-            <div className="overflow-x-auto border-t border-[#ece8db]">
-              <table className="min-w-full text-xs">
-                <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">PO</th>
-                    <th className="px-3 py-2 font-medium">仕入先</th>
-                    <th className="px-3 py-2 font-medium">商品</th>
-                    <th className="px-3 py-2 font-medium text-right">合計</th>
-                    <th className="px-3 py-2 font-medium">ステータス</th>
-                    <th className="px-3 py-2 font-medium">支払期日</th>
-                    <th className="px-3 py-2 font-medium">支払日</th>
-                    <th className="px-3 py-2 font-medium">請求書</th>
-                    <th className="px-3 py-2 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleOrders.map(o => (
-                    <PoRow
-                      key={o.id}
-                      order={o}
-                      saving={savingId === o.id}
-                      overdue={isOverduePo(o)}
-                      onSave={patch => updateOrder(o.id, patch)}
-                    />
-                  ))}
-                  {visibleOrders.length === 0 && (
-                    <tr><td colSpan={9} className="px-3 py-6 text-center text-[#68756c]">該当する発注はありません。</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
         {loading && <p className="text-xs text-[#68756c]">読み込み中…</p>}
       </div>
     </AppLayout>
   )
 }
 
-function PeriodTable({ rows, title }: { rows: MonthlyRow[]; title: string }) {
+function prevYearKey(k: string): string {
+  // Accepts YYYY-MM or YYYY; returns the same shape shifted back 12 months / 1 year.
+  if (/^\d{4}-\d{2}$/.test(k)) {
+    const [y, m] = k.split('-').map(Number)
+    return `${y - 1}-${String(m).padStart(2, '0')}`
+  }
+  if (/^\d{4}$/.test(k)) return String(Number(k) - 1)
+  return k
+}
+
+function formatPct(v: number, prev: number): string {
+  if (!prev) return v > 0 ? '+∞' : '—'
+  const r = ((v - prev) / Math.abs(prev)) * 100
+  const sign = r >= 0 ? '+' : ''
+  return `${sign}${r.toFixed(1)}%`
+}
+
+function PeriodTable({ rows, title, yoy }: {
+  rows: MonthlyRow[]
+  title: string
+  yoy?: Map<string, { revenue: number; expense: number; profit: number }>
+}) {
   return (
     <div className="rounded-2xl border border-[#d9d1be] bg-white">
       <div className="border-b border-[#ece8db] px-4 py-3">
@@ -700,6 +542,7 @@ function PeriodTable({ rows, title }: { rows: MonthlyRow[]; title: string }) {
             <tr>
               <th className="px-3 py-2 font-medium">期間</th>
               <th className="px-3 py-2 font-medium text-right">売上計</th>
+              {yoy && <th className="px-3 py-2 font-medium text-right">前年同月比</th>}
               <th className="px-3 py-2 font-medium text-right">入金済</th>
               <th className="px-3 py-2 font-medium text-right">仕入計</th>
               <th className="px-3 py-2 font-medium text-right">支払済</th>
@@ -707,18 +550,24 @@ function PeriodTable({ rows, title }: { rows: MonthlyRow[]; title: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
-              <tr key={r.key} className="border-t border-[#ece8db] text-[#173c2a]">
-                <td className="px-3 py-2 font-medium">{r.label}</td>
-                <td className="px-3 py-2 text-right">{formatCurrency(r.revenue)}</td>
-                <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.collected)}</td>
-                <td className="px-3 py-2 text-right">{formatCurrency(r.expense)}</td>
-                <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.paid)}</td>
-                <td className={`px-3 py-2 text-right font-semibold ${r.net >= 0 ? 'text-[#174c33]' : 'text-[#9d3d28]'}`}>{formatCurrency(r.net)}</td>
-              </tr>
-            ))}
+            {rows.map(r => {
+              const prev = yoy?.get(prevYearKey(r.key))
+              const yoyText = prev ? formatPct(r.revenue, prev.revenue) : '—'
+              const yoyColor = !prev ? 'text-[#68756c]' : r.revenue >= prev.revenue ? 'text-[#174c33]' : 'text-[#9d3d28]'
+              return (
+                <tr key={r.key} className="border-t border-[#ece8db] text-[#173c2a]">
+                  <td className="px-3 py-2 font-medium">{r.label}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(r.revenue)}</td>
+                  {yoy && <td className={`px-3 py-2 text-right text-[11px] ${yoyColor}`}>{yoyText}</td>}
+                  <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.collected)}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(r.expense)}</td>
+                  <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.paid)}</td>
+                  <td className={`px-3 py-2 text-right font-semibold ${r.net >= 0 ? 'text-[#174c33]' : 'text-[#9d3d28]'}`}>{formatCurrency(r.net)}</td>
+                </tr>
+              )
+            })}
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
+              <tr><td colSpan={yoy ? 7 : 6} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
             )}
           </tbody>
         </table>
@@ -727,7 +576,157 @@ function PeriodTable({ rows, title }: { rows: MonthlyRow[]; title: string }) {
   )
 }
 
+function MonthlyTrendChart({ rows, yoy }: {
+  rows: MonthlyRow[]
+  yoy: Map<string, { revenue: number; expense: number; profit: number }>
+}) {
+  const series = [...rows].sort((a, b) => a.key.localeCompare(b.key))
+  if (series.length === 0) {
+    return (
+      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4 text-center text-xs text-[#68756c]">表示できる月次データがありません。</div>
+    )
+  }
+  const W = 720, H = 220
+  const PAD = { top: 12, right: 8, bottom: 22, left: 8 }
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+  const valsRev = series.map(r => r.revenue)
+  const valsExp = series.map(r => r.expense)
+  const valsNet = series.map(r => r.revenue - r.expense)
+  const maxAbs = Math.max(1, ...valsRev, ...valsExp, ...valsNet.map(Math.abs))
+  const colW = innerW / series.length
+  const barW = Math.max(4, Math.min(22, colW * 0.28))
+  const xCenter = (i: number) => PAD.left + colW * (i + 0.5)
+  const yZero = PAD.top + innerH / 2
+  const yVal = (v: number) => yZero - (v / maxAbs) * (innerH / 2 - 4)
+
+  return (
+    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+      <div className="mb-2 flex items-center justify-between text-xs text-[#68756c]">
+        <span>月次トレンド（売上＝緑棒 / 仕入＝赤棒 / 収支ライン＝紺）</span>
+        <div className="flex gap-3">
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-600" />売上</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />仕入</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#173c2a]" />純収支</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#9b9382]" style={{ borderTop: '1.5px dashed #9b9382' }} />前年売上</span>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block">
+          <line x1={PAD.left} y1={yZero} x2={W - PAD.right} y2={yZero} stroke="#e5e2d6" />
+          {series.map((r, i) => {
+            const cx = xCenter(i)
+            return (
+              <g key={r.key}>
+                <rect x={cx - barW - 1} y={yVal(r.revenue)} width={barW} height={yZero - yVal(r.revenue)} fill="#059669" />
+                <rect x={cx + 1} y={yZero} width={barW} height={yVal(-r.expense) - yZero} fill="#ef4444" />
+              </g>
+            )
+          })}
+          {series.length > 1 && (
+            <polyline
+              fill="none"
+              stroke="#173c2a"
+              strokeWidth={2}
+              points={series.map((r, i) => `${xCenter(i)},${yVal(r.revenue - r.expense)}`).join(' ')}
+            />
+          )}
+          {series.length > 1 && (
+            <polyline
+              fill="none"
+              stroke="#9b9382"
+              strokeDasharray="3 3"
+              strokeWidth={1.5}
+              points={series.map((r, i) => {
+                const prev = yoy.get(prevYearKey(r.key))
+                return prev ? `${xCenter(i)},${yVal(prev.revenue)}` : ''
+              }).filter(Boolean).join(' ')}
+            />
+          )}
+          {series.map((r, i) => (
+            <text key={`lbl-${r.key}`} x={xCenter(i)} y={H - 6} fontSize={9} textAnchor="middle" fill="#68756c">{r.key.slice(2)}</text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function ProductsTab({ rows }: { rows: ProductRow[] }) {
+  if (rows.length === 0) {
+    return <div className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">商品データがありません。</div>
+  }
+  const total = rows.reduce((s, r) => s + r.revenue, 0) || 1
+  const maxRev = rows[0]?.revenue || 1
+  const top = rows.slice(0, 20)
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold text-[#173c2a]">商品別 売上ランキング（期間内）</h2>
+        <div className="space-y-1.5">
+          {top.map((r, i) => {
+            const sharePct = (r.revenue / total) * 100
+            const width = (r.revenue / maxRev) * 100
+            return (
+              <div key={`${r.productId}-${i}`} className="grid grid-cols-[24px_minmax(180px,1fr)_2fr_120px_60px] items-center gap-2 text-xs">
+                <span className="text-right font-mono text-[#68756c]">{i + 1}</span>
+                <div className="truncate">
+                  <span className="font-medium text-[#173c2a]">{r.name}</span>
+                  {r.sku && <span className="ml-1 text-[10px] text-[#68756c]">({r.sku})</span>}
+                </div>
+                <div className="relative h-4 rounded bg-[#f4f2ea]">
+                  <div className="absolute inset-y-0 left-0 rounded bg-emerald-500/70" style={{ width: `${width}%` }} />
+                </div>
+                <span className="text-right font-medium text-[#173c2a]">{formatCurrency(r.revenue)}</span>
+                <span className="text-right text-[#68756c]">{sharePct.toFixed(1)}%</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white">
+        <table className="min-w-full text-xs">
+          <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
+            <tr>
+              <th className="px-3 py-2 font-medium">商品</th>
+              <th className="px-3 py-2 font-medium text-right">数量(kg)</th>
+              <th className="px-3 py-2 font-medium text-right">売上</th>
+              <th className="px-3 py-2 font-medium text-right">粗利</th>
+              <th className="px-3 py-2 font-medium text-right">粗利率</th>
+              <th className="px-3 py-2 font-medium text-right">案件</th>
+              <th className="px-3 py-2 font-medium text-right">構成比</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const margin = r.revenue ? (r.profit / r.revenue) * 100 : 0
+              const share = (r.revenue / total) * 100
+              return (
+                <tr key={r.productId || r.name} className="border-t border-[#ece8db] text-[#173c2a]">
+                  <td className="px-3 py-2">
+                    <span className="font-medium">{r.name}</span>
+                    {r.sku && <span className="ml-1 text-[10px] text-[#68756c]">({r.sku})</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right">{r.quantity.toFixed(2)}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(r.revenue)}</td>
+                  <td className={`px-3 py-2 text-right ${r.profit >= 0 ? 'text-[#174c33]' : 'text-[#9d3d28]'}`}>{formatCurrency(r.profit)}</td>
+                  <td className="px-3 py-2 text-right">{margin.toFixed(1)}%</td>
+                  <td className="px-3 py-2 text-right">{r.count}</td>
+                  <td className="px-3 py-2 text-right">{share.toFixed(1)}%</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function PartnerTable({ title, rows, headers }: { title: string; rows: PartnerRow[]; headers: [string, string, string] }) {
+  const total = rows.reduce((s, r) => s + r.total, 0) || 1
+  const maxTotal = rows[0]?.total || 1
   return (
     <div className="rounded-2xl border border-[#d9d1be] bg-white">
       <div className="border-b border-[#ece8db] px-4 py-3">
@@ -739,223 +738,41 @@ function PartnerTable({ title, rows, headers }: { title: string; rows: PartnerRo
             <tr>
               <th className="px-3 py-2 font-medium">取引先</th>
               <th className="px-3 py-2 font-medium text-right">{headers[0]}</th>
+              <th className="px-3 py-2 font-medium" style={{ width: 140 }}>シェア</th>
               <th className="px-3 py-2 font-medium text-right">{headers[1]}</th>
               <th className="px-3 py-2 font-medium text-right">{headers[2]}</th>
               <th className="px-3 py-2 font-medium text-right">件数</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(r => (
-              <tr key={r.name} className="border-t border-[#ece8db] text-[#173c2a]">
-                <td className="px-3 py-2 font-medium">{r.name}</td>
-                <td className="px-3 py-2 text-right">{formatCurrency(r.total)}</td>
-                <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.settled)}</td>
-                <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.outstanding)}</td>
-                <td className="px-3 py-2 text-right">{r.count}</td>
-              </tr>
-            ))}
+            {rows.map(r => {
+              const share = (r.total / total) * 100
+              const width = (r.total / maxTotal) * 100
+              return (
+                <tr key={r.name} className="border-t border-[#ece8db] text-[#173c2a]">
+                  <td className="px-3 py-2 font-medium">{r.name}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(r.total)}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-3 flex-1 rounded bg-[#f4f2ea]">
+                        <div className="absolute inset-y-0 left-0 rounded bg-emerald-500/70" style={{ width: `${width}%` }} />
+                      </div>
+                      <span className="w-10 text-right text-[10px] text-[#68756c]">{share.toFixed(1)}%</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.settled)}</td>
+                  <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.outstanding)}</td>
+                  <td className="px-3 py-2 text-right">{r.count}</td>
+                </tr>
+              )
+            })}
             {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
             )}
           </tbody>
         </table>
       </div>
     </div>
-  )
-}
-
-function SaleRow({
-  record,
-  saving,
-  overdue,
-  onSave,
-}: {
-  record: SaleRecord
-  saving: boolean
-  overdue: boolean
-  onSave: (patch: { paymentStatus?: PaymentStatus; paymentMethod?: string; paymentDate?: string; paymentFee?: number }) => Promise<void>
-}) {
-  const [status, setStatus] = useState<PaymentStatus>(record.paymentStatus)
-  const [method, setMethod] = useState<string>(record.paymentMethod ?? '')
-  const [date, setDate] = useState<string>(record.paymentDate ?? '')
-  const [fee, setFee] = useState<string>(String(record.paymentFee ?? 0))
-
-  useEffect(() => {
-    setStatus(record.paymentStatus)
-    setMethod(record.paymentMethod ?? '')
-    setDate(record.paymentDate ?? '')
-    setFee(String(record.paymentFee ?? 0))
-  }, [record])
-
-  const dirty =
-    status !== record.paymentStatus ||
-    (method || '') !== (record.paymentMethod ?? '') ||
-    (date || '') !== (record.paymentDate ?? '') ||
-    Number(fee || 0) !== Number(record.paymentFee ?? 0)
-
-  const extraItems = record.items.length > 1 ? `他${record.items.length - 1}件` : ''
-  const productLabel = `${record.items[0]?.productName ?? '-'}${extraItems ? ` (${extraItems})` : ''}`
-
-  return (
-    <tr className={`border-t border-[#ece8db] ${overdue ? 'bg-[#fff7f4]' : ''}`}>
-      <td className="px-3 py-2">
-        <Link href={`/sales`} className="text-[#174c33] hover:underline">{record.id.slice(0, 8)}</Link>
-      </td>
-      <td className="px-3 py-2 text-[#173c2a]">{record.buyerName}</td>
-      <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-      <td className="px-3 py-2 text-right font-medium text-[#173c2a]">{formatCurrency(saleIncome(record))}</td>
-      <td className="px-3 py-2">
-        <select
-          value={status}
-          onChange={e => setStatus(e.target.value as PaymentStatus)}
-          className={editInputCls}
-        >
-          <option value="uninvoiced">未請求</option>
-          <option value="invoiced">請求済</option>
-          <option value="paid">入金済</option>
-        </select>
-        <div className="mt-1"><SaleBadge status={record.paymentStatus} /></div>
-      </td>
-      <td className="px-3 py-2">
-        <select
-          value={method}
-          onChange={e => setMethod(e.target.value)}
-          className={editInputCls}
-        >
-          <option value="">未設定</option>
-          <option value="銀行振込">銀行振込</option>
-          <option value="Stripe">Stripe</option>
-          <option value="PayPal">PayPal</option>
-          <option value="Square">Square</option>
-          <option value="現金">現金</option>
-          <option value="その他">その他</option>
-        </select>
-      </td>
-      <td className="px-3 py-2">
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          className={editInputCls}
-        />
-      </td>
-      <td className={`px-3 py-2 ${overdue ? 'font-medium text-[#9d3d28]' : 'text-[#68756c]'}`}>{record.dueDate || '-'}</td>
-      <td className="px-3 py-2 text-right">
-        <input
-          type="number"
-          value={fee}
-          onChange={e => setFee(e.target.value)}
-          className={`${editInputCls} text-right`}
-        />
-      </td>
-      <td className="px-3 py-2">
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => onSave({ paymentStatus: status, paymentMethod: method, paymentDate: date, paymentFee: Number(fee) || 0 })}
-            disabled={saving}
-            className="rounded-lg bg-[#174c33] px-2 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
-        )}
-      </td>
-    </tr>
-  )
-}
-
-function PoRow({
-  order,
-  saving,
-  overdue,
-  onSave,
-}: {
-  order: PurchaseOrder
-  saving: boolean
-  overdue: boolean
-  onSave: (patch: { paymentStatus?: PurchaseOrderPaymentStatus; paymentDueDate?: string; paidDate?: string }) => Promise<void>
-}) {
-  const [status, setStatus] = useState<PurchaseOrderPaymentStatus>(order.paymentStatus)
-  const [dueDate, setDueDate] = useState<string>(order.paymentDueDate ?? '')
-  const [paidDate, setPaidDate] = useState<string>(order.paidDate ?? '')
-
-  useEffect(() => {
-    setStatus(order.paymentStatus)
-    setDueDate(order.paymentDueDate ?? '')
-    setPaidDate(order.paidDate ?? '')
-  }, [order])
-
-  const dirty =
-    status !== order.paymentStatus ||
-    (dueDate || '') !== (order.paymentDueDate ?? '') ||
-    (paidDate || '') !== (order.paidDate ?? '')
-
-  const extraItems = order.items.length > 1 ? `他${order.items.length - 1}件` : ''
-  const productLabel = `${order.items[0]?.productName ?? '-'}${extraItems ? ` (${extraItems})` : ''}`
-
-  return (
-    <tr className={`border-t border-[#ece8db] ${overdue ? 'bg-[#fff7f4]' : ''}`}>
-      <td className="px-3 py-2">
-        <Link href={`/purchase-orders`} className="text-[#174c33] hover:underline">{order.id.slice(0, 8)}</Link>
-      </td>
-      <td className="px-3 py-2 text-[#173c2a]">{order.supplierName}</td>
-      <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-      <td className="px-3 py-2 text-right font-medium text-[#173c2a]">{formatCurrency(order.totalAmount || 0)}</td>
-      <td className="px-3 py-2">
-        <select
-          value={status}
-          onChange={e => setStatus(e.target.value as PurchaseOrderPaymentStatus)}
-          className={editInputCls}
-        >
-          <option value="uninvoiced">未請求</option>
-          <option value="unpaid">未払</option>
-          <option value="paid">支払済</option>
-        </select>
-        <div className="mt-1"><PoBadge status={order.paymentStatus} /></div>
-      </td>
-      <td className="px-3 py-2">
-        <input
-          type="date"
-          value={dueDate}
-          onChange={e => setDueDate(e.target.value)}
-          className={`${editInputCls} ${overdue ? 'border-[#9d3d28]' : ''}`}
-        />
-      </td>
-      <td className="px-3 py-2">
-        <input
-          type="date"
-          value={paidDate}
-          onChange={e => setPaidDate(e.target.value)}
-          className={editInputCls}
-        />
-      </td>
-      <td className="px-3 py-2">
-        {order.invoice ? (
-          <a
-            href={order.invoice.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[#174c33] hover:underline"
-          >
-            <FileText size={12} /> PDF
-          </a>
-        ) : (
-          <span className="text-[#a59f8c]">-</span>
-        )}
-      </td>
-      <td className="px-3 py-2">
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => onSave({ paymentStatus: status, paymentDueDate: dueDate, paidDate })}
-            disabled={saving}
-            className="rounded-lg bg-[#174c33] px-2 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
-        )}
-      </td>
-    </tr>
   )
 }
 
