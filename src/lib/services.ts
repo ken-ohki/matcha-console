@@ -33,6 +33,7 @@ export interface IInventoryService {
   createInventoryGroup(input: InventoryGroupInput): Promise<InventoryGroup>
   updateInventoryGroup(id: string, input: Partial<InventoryGroupInput>): Promise<InventoryGroup>
   deleteInventoryGroup(id: string): Promise<void>
+  deleteArrivalRecord(productId: string, arrivalId: string): Promise<void>
 }
 
 export interface ISalesService {

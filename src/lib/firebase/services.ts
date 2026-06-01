@@ -1290,6 +1290,14 @@ export function createFirebaseServices(): IServices {
         updatedAt: serverTimestamp(),
       })
     },
+
+    async deleteArrivalRecord(productId, arrivalId) {
+      // Refuse to delete PO-linked arrivals — use the PO unreceive flow instead.
+      if (arrivalId.startsWith('po:')) {
+        throw new Error('PO に紐付いた入荷は「入荷管理」で取消してください')
+      }
+      await removeArrivalRecordFromProduct(productId, arrivalId)
+    },
   }
 
   const salesService: ISalesService = {

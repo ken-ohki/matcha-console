@@ -10,7 +10,7 @@ import type {
   ProductWithInventory,
   PurchaseOrder,
 } from '@/types'
-import { PackageOpen, Check, Undo2, X, FilePlus } from 'lucide-react'
+import { PackageOpen, Check, Undo2, X, FilePlus, Trash2 } from 'lucide-react'
 
 function formatKg(value: number): string {
   return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
@@ -519,14 +519,30 @@ export default function ReceivingPage() {
                             <td className="px-4 py-3 text-[#173c2a]">{formatKg(arrival.quantityKg)}</td>
                             <td className="px-4 py-3 text-right">
                               {isAdmin && (
-                                <button
-                                  type="button"
-                                  onClick={() => setOrphanTarget({ product, arrival })}
-                                  className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#173c2a]"
-                                >
-                                  <FilePlus size={14} />
-                                  発注として登録
-                                </button>
+                                <div className="inline-flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOrphanTarget({ product, arrival })}
+                                    className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#173c2a]"
+                                  >
+                                    <FilePlus size={14} />
+                                    発注として登録
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!confirm(`${product.name} の ${arrival.arrivalDate} の入荷記録（${formatKg(arrival.quantityKg)}）を削除しますか？\n在庫から差し引かれます。`)) return
+                                      const services = await getServices()
+                                      await services.inventory.deleteArrivalRecord(product.id, arrival.id)
+                                      await load()
+                                    }}
+                                    title="入荷記録を削除"
+                                    className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 size={14} />
+                                    削除
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
