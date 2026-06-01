@@ -12,12 +12,14 @@ import {
   Mail,
   Wallet,
 } from 'lucide-react'
+import { X } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { PaymentStatus, SaleRecord } from '@/types'
+import type { PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-import { formatCurrency, todayIso } from '@/lib/format'
+import { computeTaxBuckets } from '@/lib/tax'
+import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
 // Tax-inclusive billed amount (matches the invoice document and 支払管理).
@@ -36,6 +38,19 @@ const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   paid: '入金済',
 }
 
+const SALE_STATUS_LABELS: Record<SaleStatus, string> = {
+  negotiating: '商談中',
+  confirmed: '確定',
+  cancelled: '取消',
+}
+
+const SHIPPING_STATUS_LABELS: Record<ShippingStatus, string> = {
+  ordering: '発注対応中',
+  producing: '製造中',
+  ready_to_ship: '出荷準備完了',
+  shipped: '出荷済',
+}
+
 const BUCKET_LABELS = makeBucketLabels('入金済')
 
 export default function ReceivablesPage() {
@@ -45,6 +60,7 @@ export default function ReceivablesPage() {
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hidePaid, setHidePaid] = useState(true)
+  const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [openBuckets, setOpenBuckets] = useState<Record<Bucket, boolean>>({
     overdue: true, thisMonth: true, nextMonth: true, later: false, noDate: false, paid: false,
   })
@@ -208,7 +224,7 @@ export default function ReceivablesPage() {
                               />
                             </td>
                             <td className="px-3 py-2 text-[#173c2a]">
-                              <Link href={`/sales/${s.id}/document?type=invoice`} className="hover:underline">{s.buyerName}</Link>
+                              <button type="button" onClick={() => setDetailSale(s)} className="text-left hover:underline">{s.buyerName}</button>
                             </td>
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
                             <td className="px-3 py-2 text-right">
@@ -270,6 +286,98 @@ export default function ReceivablesPage() {
           <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">該当の売掛はありません。</p>
         )}
       </main>
+
+      <SaleDetailModal sale={detailSale} onClose={() => setDetailSale(null)} />
     </AppLayout>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 py-1 text-sm">
+      <span className="text-[#68756c]">{label}</span>
+      <span className="text-right font-medium text-[#173c2a]">{value}</span>
+    </div>
+  )
+}
+
+function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: () => void }) {
+  if (!sale) return null
+  const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
+  const tax = computeTaxBuckets(sale.items ?? [], fees)
+  const exclTotal = saleIncomeExcl(sale)
+  const inclTotal = saleIncome(sale)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6" onClick={e => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#173c2a]">{sale.buyerName}</h2>
+            <p className="mt-1 text-xs text-[#68756c]">販売案件の詳細（読み取り専用）</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href={`/sales/${sale.id}/document?type=invoice`} className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">請求書 →</Link>
+            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X size={18} /></button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+            <DetailRow label="販売ステータス" value={SALE_STATUS_LABELS[sale.status]} />
+            <DetailRow label="入金ステータス" value={PAYMENT_LABELS[sale.paymentStatus]} />
+            <DetailRow label="出荷ステータス" value={SHIPPING_STATUS_LABELS[sale.shippingStatus]} />
+            <DetailRow label="国" value={sale.country || '-'} />
+            <DetailRow label="支払期日" value={sale.dueDate || '-'} />
+            <DetailRow label="入金日" value={sale.paymentDate || '-'} />
+            <DetailRow label="支払方法" value={sale.paymentMethod || '-'} />
+          </div>
+          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+            <DetailRow label="商品代金（税抜）" value={formatCurrency(sale.revenue)} />
+            <DetailRow label="送料" value={formatCurrency(sale.shippingFee ?? 0)} />
+            <DetailRow label="諸費用" value={formatCurrency(sale.otherFees ?? 0)} />
+            <DetailRow label="決済手数料" value={formatCurrency(sale.paymentFee ?? 0)} />
+            <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
+            <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
+            <DetailRow label="請求額（税抜）" value={formatCurrency(exclTotal)} />
+            <DetailRow label="請求額（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[#f7f5ee] text-left text-[#173c2a]">
+              <tr>
+                <th className="px-3 py-2 font-medium">商品</th>
+                <th className="px-3 py-2 font-medium text-right">数量</th>
+                <th className="px-3 py-2 font-medium text-right">単価(税抜)</th>
+                <th className="px-3 py-2 font-medium text-center">税率</th>
+                <th className="px-3 py-2 font-medium text-right">金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(sale.items ?? []).map((item, i) => (
+                <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-[#68756c]">({item.productSku})</span>}</td>
+                  <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                  <td className="px-3 py-2 text-center">{(item.taxRate ?? 8)}%</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(item.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {(sale.shippingAddress || sale.shippingPostalCode || sale.notes) && (
+          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
+            {(sale.shippingPostalCode || sale.shippingAddress) && (
+              <p className="text-[#173c2a]"><span className="text-[#68756c]">配送先：</span>{[sale.shippingPostalCode, sale.shippingAddress].filter(Boolean).join(' ')}</p>
+            )}
+            {sale.notes && <p className="mt-1 whitespace-pre-wrap text-[#173c2a]"><span className="text-[#68756c]">メモ：</span>{sale.notes}</p>}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

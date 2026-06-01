@@ -11,19 +11,28 @@ import {
   FileText,
   Filter,
   Wallet,
+  X,
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { PurchaseOrder, PurchaseOrderPaymentStatus } from '@/types'
+import type { PurchaseOrder, PurchaseOrderPaymentStatus, PurchaseOrderStatus } from '@/types'
 import { computePoTaxIncluded } from '@/lib/cashflow'
-import { formatCurrency, todayIso } from '@/lib/format'
+import { computeTaxBuckets } from '@/lib/tax'
+import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
 const PAY_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
   uninvoiced: '未請求',
   unpaid: '未払',
   paid: '支払済',
+}
+
+const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
+  placed: '発注済',
+  shipped: '発送中',
+  received: '入荷済',
+  cancelled: '取消',
 }
 
 const BUCKET_LABELS = makeBucketLabels('支払済')
@@ -35,6 +44,7 @@ export default function PayablesPage() {
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hidePaid, setHidePaid] = useState(true)
+  const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null)
   const [openBuckets, setOpenBuckets] = useState<Record<Bucket, boolean>>({
     overdue: true, thisMonth: true, nextMonth: true, later: false, noDate: false, paid: false,
   })
@@ -197,7 +207,7 @@ export default function PayablesPage() {
                               />
                             </td>
                             <td className="px-3 py-2 text-[#173c2a]">
-                              <Link href={`/purchase-orders/${o.id}/document`} className="hover:underline">{o.supplierName}</Link>
+                              <button type="button" onClick={() => setDetailOrder(o)} className="text-left hover:underline">{o.supplierName}</button>
                             </td>
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
                             <td className="px-3 py-2 text-right">
@@ -264,6 +274,95 @@ export default function PayablesPage() {
           <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">該当の買掛はありません。</p>
         )}
       </main>
+
+      <PoDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />
     </AppLayout>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 py-1 text-sm">
+      <span className="text-[#68756c]">{label}</span>
+      <span className="text-right font-medium text-[#173c2a]">{value}</span>
+    </div>
+  )
+}
+
+function PoDetailModal({ order, onClose }: { order: PurchaseOrder | null; onClose: () => void }) {
+  if (!order) return null
+  const fees = (order.shippingFee ?? 0) + (order.otherFees ?? 0)
+  const tax = computeTaxBuckets(order.items ?? [], fees)
+  const inclTotal = computePoTaxIncluded(order)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6" onClick={e => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#173c2a]">{order.supplierName}</h2>
+            <p className="mt-1 text-xs text-[#68756c]">発注の詳細（読み取り専用）</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">発注書 →</Link>
+            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X size={18} /></button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+            <DetailRow label="発注ステータス" value={PO_STATUS_LABELS[order.status]} />
+            <DetailRow label="支払ステータス" value={PAY_LABELS[order.paymentStatus]} />
+            <DetailRow label="発注日" value={order.orderDate || '-'} />
+            <DetailRow label="入荷予定日" value={order.expectedDeliveryDate || '-'} />
+            <DetailRow label="入荷日" value={order.actualDeliveryDate || '-'} />
+            <DetailRow label="支払期日" value={order.paymentDueDate || '-'} />
+            <DetailRow label="支払日" value={order.paidDate || '-'} />
+          </div>
+          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+            <DetailRow label="商品代金（税抜）" value={formatCurrency(order.totalAmount - (order.shippingFee ?? 0) - (order.otherFees ?? 0))} />
+            <DetailRow label="送料" value={formatCurrency(order.shippingFee ?? 0)} />
+            <DetailRow label="諸経費" value={formatCurrency(order.otherFees ?? 0)} />
+            <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
+            <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
+            <DetailRow label="合計（税抜）" value={formatCurrency(order.totalAmount)} />
+            <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
+            <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-[#174c33] hover:underline">PDF</a> : '未添付'} />
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
+          <table className="min-w-full text-sm">
+            <thead className="bg-[#f7f5ee] text-left text-[#173c2a]">
+              <tr>
+                <th className="px-3 py-2 font-medium">商品</th>
+                <th className="px-3 py-2 font-medium text-right">数量</th>
+                <th className="px-3 py-2 font-medium text-right">単価(税抜)</th>
+                <th className="px-3 py-2 font-medium text-center">税率</th>
+                <th className="px-3 py-2 font-medium text-right">金額</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(order.items ?? []).map((item, i) => (
+                <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-[#68756c]">({item.productSku})</span>}</td>
+                  <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                  <td className="px-3 py-2 text-center">{(item.taxRate ?? 8)}%</td>
+                  <td className="px-3 py-2 text-right">{formatCurrency(item.lineTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {(order.otherFeesNote || order.notes) && (
+          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
+            {order.otherFeesNote && <p className="text-[#173c2a]"><span className="text-[#68756c]">諸経費メモ：</span>{order.otherFeesNote}</p>}
+            {order.notes && <p className="mt-1 whitespace-pre-wrap text-[#173c2a]"><span className="text-[#68756c]">メモ：</span>{order.notes}</p>}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
