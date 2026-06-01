@@ -17,6 +17,7 @@ import type {
 import Link from 'next/link'
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
+import { computePoTaxIncluded } from '@/lib/cashflow'
 
 function formatDate(value?: string): string {
   if (!value) return '-'
@@ -836,7 +837,7 @@ export default function PurchaseOrdersPage() {
                   <th className="whitespace-nowrap px-3 py-3 font-medium">発注先</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">商品</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium text-right">数量</th>
-                  <th className="whitespace-nowrap px-3 py-3 font-medium text-right">金額</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium text-right">金額(税込)</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">発注日</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">入荷予定</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">支払</th>
@@ -987,7 +988,10 @@ function PoListRow({
         <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
-      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right">
+        <div className="font-semibold">{formatCurrency(computePoTaxIncluded(order))}</div>
+        <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(order.totalAmount)}</div>
+      </td>
       <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
       <td className="whitespace-nowrap px-3 py-3">
