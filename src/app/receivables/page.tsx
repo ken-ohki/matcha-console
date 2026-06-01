@@ -16,6 +16,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { PaymentStatus, SaleRecord } from '@/types'
+import { computeSaleTaxIncluded } from '@/lib/cashflow'
 
 function formatCurrency(n: number) {
   return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(n)
@@ -36,7 +37,13 @@ function endOfNextMonthIso(d: Date) {
   return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
 }
 
+// Tax-inclusive billed amount (matches the invoice document and 支払管理).
 function saleIncome(sale: SaleRecord): number {
+  return computeSaleTaxIncluded(sale)
+}
+
+// Tax-exclusive base, for the small secondary line.
+function saleIncomeExcl(sale: SaleRecord): number {
   return sale.invoiceAmount > 0 ? sale.invoiceAmount : sale.revenue
 }
 
@@ -222,7 +229,7 @@ export default function ReceivablesPage() {
                         <th className="px-3 py-2 text-left font-medium">期日</th>
                         <th className="px-3 py-2 text-left font-medium">販売先</th>
                         <th className="px-3 py-2 text-left font-medium">商品</th>
-                        <th className="px-3 py-2 text-right font-medium">請求額</th>
+                        <th className="px-3 py-2 text-right font-medium">請求額(税込)</th>
                         <th className="px-3 py-2 text-left font-medium">状態</th>
                         <th className="px-3 py-2 text-left font-medium">入金日</th>
                         <th className="px-3 py-2"></th>
@@ -246,7 +253,10 @@ export default function ReceivablesPage() {
                               <Link href={`/sales/${s.id}/document?type=invoice`} className="hover:underline">{s.buyerName}</Link>
                             </td>
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(saleIncome(s))}</td>
+                            <td className="px-3 py-2 text-right">
+                              <div className="font-medium">{formatCurrency(saleIncome(s))}</div>
+                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
+                            </td>
                             <td className="px-3 py-2">
                               <select
                                 value={s.paymentStatus}
