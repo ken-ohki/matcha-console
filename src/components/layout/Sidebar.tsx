@@ -27,7 +27,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     label: '営業',
     items: [
       { href: '/sales', label: '販売管理', icon: Leaf, match: ['/sales', '/ec-sales', '/buyers'] },
-      { href: '/purchase-orders', label: '仕入れ管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
+      { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
       { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
     ],
   },
