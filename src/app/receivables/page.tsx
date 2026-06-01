@@ -94,7 +94,7 @@ export default function ReceivablesPage() {
     try {
       const svc = await getServices()
       const all = await svc.sales.getSaleRecords()
-      setSales(all.filter(s => s.status !== 'cancelled'))
+      setSales(all.filter(s => s.status === 'confirmed'))
     } finally { setLoading(false) }
   }
 
