@@ -828,22 +828,22 @@ export default function PurchaseOrdersPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="mt-5 -mx-4 overflow-x-auto md:-mx-6">
+            <table className="min-w-[1400px] text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
-                  <th className="px-3 py-3 font-medium">状態</th>
-                  <th className="px-3 py-3 font-medium">発注先</th>
-                  <th className="px-3 py-3 font-medium">商品</th>
-                  <th className="px-3 py-3 font-medium text-right">数量</th>
-                  <th className="px-3 py-3 font-medium text-right">金額</th>
-                  <th className="px-3 py-3 font-medium">発注日</th>
-                  <th className="px-3 py-3 font-medium">入荷予定</th>
-                  <th className="px-3 py-3 font-medium">支払</th>
-                  <th className="px-3 py-3 font-medium">支払期日</th>
-                  <th className="px-3 py-3 font-medium">支払日</th>
-                  <th className="px-3 py-3 font-medium">請求書</th>
-                  <th className="px-3 py-3 font-medium"></th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">状態</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">発注先</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">商品</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium text-right">数量</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium text-right">金額</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">発注日</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">入荷予定</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払期日</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払日</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">請求書</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -978,19 +978,19 @@ function PoListRow({
 
   return (
     <tr className="border-b border-[#f0ebdf] text-[#173c2a] hover:bg-[#faf8f2]">
-      <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
-      <td className={`px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>
+      <td className="whitespace-nowrap px-3 py-3"><StatusBadge status={order.status} /></td>
+      <td className={`whitespace-nowrap px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>
         {order.supplierName}
       </td>
-      <td className="px-3 py-3">
+      <td className="whitespace-nowrap px-3 py-3">
         <div className="font-medium">{first?.productName ?? '-'}</div>
         <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
       </td>
-      <td className="px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
-      <td className="px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
-      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
-      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
-      <td className="px-3 py-3">
+      <td className="whitespace-nowrap px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
+      <td className="whitespace-nowrap px-3 py-3">
         {canEdit ? (
           <select
             value={status}
@@ -1005,7 +1005,7 @@ function PoListRow({
           <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
         )}
       </td>
-      <td className="px-3 py-3">
+      <td className="whitespace-nowrap px-3 py-3">
         {canEdit ? (
           <input
             type="date"
@@ -1017,7 +1017,7 @@ function PoListRow({
           <span className="text-[#68756c]">{formatDate(order.paymentDueDate)}</span>
         )}
       </td>
-      <td className="px-3 py-3">
+      <td className="whitespace-nowrap px-3 py-3">
         {canEdit ? (
           <input
             type="date"
@@ -1029,7 +1029,7 @@ function PoListRow({
           <span className="text-[#68756c]">{formatDate(order.paidDate)}</span>
         )}
       </td>
-      <td className="px-3 py-3">
+      <td className="whitespace-nowrap px-3 py-3">
         <div className="flex items-center gap-1">
           {order.invoice ? (
             <>
@@ -1075,7 +1075,7 @@ function PoListRow({
         </div>
         {error && <p className="mt-1 text-[10px] text-red-600">{error}</p>}
       </td>
-      <td className="px-3 py-3 text-right">
+      <td className="whitespace-nowrap px-3 py-3 text-right">
         <div className="flex justify-end gap-1">
           {canEdit && dirty && (
             <button
