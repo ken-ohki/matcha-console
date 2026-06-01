@@ -10,6 +10,7 @@ import type {
   PurchaseOrder,
   PurchaseOrderInput,
   PurchaseOrderLineInput,
+  PurchaseOrderPaymentStatus,
   PurchaseOrderStatus,
   Supplier,
 } from '@/types'
@@ -838,75 +839,31 @@ export default function PurchaseOrdersPage() {
                   <th className="px-3 py-3 font-medium text-right">金額</th>
                   <th className="px-3 py-3 font-medium">発注日</th>
                   <th className="px-3 py-3 font-medium">入荷予定</th>
-                  <th className="px-3 py-3 font-medium">支払い</th>
+                  <th className="px-3 py-3 font-medium">支払</th>
                   <th className="px-3 py-3 font-medium">支払期日</th>
+                  <th className="px-3 py-3 font-medium">支払日</th>
+                  <th className="px-3 py-3 font-medium">請求書</th>
                   <th className="px-3 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={12} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       発注はまだ登録されていません。
                     </td>
                   </tr>
                 )}
-                {filtered.map(order => {
-                  const first = order.items[0]
-                  const rest = order.items.length > 1 ? ` 他${order.items.length - 1}件` : ''
-                  return (
-                    <tr key={order.id} className="border-b border-[#f0ebdf] text-[#173c2a] hover:bg-[#faf8f2]">
-                      <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
-                      <td className={`px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>
-                        {order.supplierName}
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium">{first?.productName ?? '-'}</div>
-                        <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
-                      </td>
-                      <td className="px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
-                      <td className="px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
-                      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
-                      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
-                      <td className="px-3 py-3">
-                        <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
-                      </td>
-                      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.paymentDueDate)}</td>
-                      <td className="px-3 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Link
-                            href={`/purchase-orders/${order.id}/document`}
-                            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#173c2a]"
-                            aria-label="発注書"
-                            title="発注書を表示"
-                          >
-                            <FileText size={14} />
-                          </Link>
-                          {canEdit && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => { setEditing(order); setModalOpen(true) }}
-                                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#173c2a]"
-                                aria-label="編集"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(order)}
-                                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
-                                aria-label="削除"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {filtered.map(order => (
+                  <PoListRow
+                    key={order.id}
+                    order={order}
+                    canEdit={canEdit}
+                    onEdit={() => { setEditing(order); setModalOpen(true) }}
+                    onDelete={() => handleDelete(order)}
+                    onUpdated={updated => setOrders(prev => prev.map(o => o.id === updated.id ? updated : o))}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
@@ -922,5 +879,244 @@ export default function PurchaseOrdersPage() {
         onSave={handleSave}
       />
     </AppLayout>
+  )
+}
+
+function PoListRow({
+  order,
+  canEdit,
+  onEdit,
+  onDelete,
+  onUpdated,
+}: {
+  order: PurchaseOrder
+  canEdit: boolean
+  onEdit: () => void
+  onDelete: () => void
+  onUpdated: (order: PurchaseOrder) => void
+}) {
+  const first = order.items[0]
+  const rest = order.items.length > 1 ? ` 他${order.items.length - 1}件` : ''
+
+  const [status, setStatus] = useState<PurchaseOrderPaymentStatus>(order.paymentStatus)
+  const [dueDate, setDueDate] = useState<string>(order.paymentDueDate ?? '')
+  const [paidDate, setPaidDate] = useState<string>(order.paidDate ?? '')
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setStatus(order.paymentStatus)
+    setDueDate(order.paymentDueDate ?? '')
+    setPaidDate(order.paidDate ?? '')
+  }, [order.id, order.paymentStatus, order.paymentDueDate, order.paidDate])
+
+  const dirty = status !== order.paymentStatus
+    || (dueDate || '') !== (order.paymentDueDate ?? '')
+    || (paidDate || '') !== (order.paidDate ?? '')
+
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const services = await getServices()
+      const updated = await services.purchaseOrders.updatePurchaseOrder(order.id, {
+        paymentStatus: status,
+        paymentDueDate: dueDate || undefined,
+        paidDate: paidDate || undefined,
+      })
+      onUpdated(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpload = async (file: File) => {
+    setError('')
+    if (file.size > 30 * 1024 * 1024) {
+      setError('30MBを超えるファイルはアップロードできません')
+      return
+    }
+    setUploading(true)
+    try {
+      const url = await uploadPurchaseOrderInvoice(file, order.id)
+      const services = await getServices()
+      const updated = await services.purchaseOrders.updatePurchaseOrder(order.id, {
+        invoice: {
+          name: file.name,
+          url,
+          uploadedAt: new Date().toISOString().slice(0, 10),
+          size: file.size,
+        },
+        paymentStatus: order.paymentStatus === 'uninvoiced' ? 'unpaid' : order.paymentStatus,
+      })
+      onUpdated(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'アップロードに失敗しました')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveInvoice = async () => {
+    if (!order.invoice) return
+    if (!confirm('請求書を削除しますか？')) return
+    setError('')
+    try {
+      if (order.invoice.url) await deleteStorageObjectByUrl(order.invoice.url)
+      const services = await getServices()
+      const updated = await services.purchaseOrders.updatePurchaseOrder(order.id, { invoice: null })
+      onUpdated(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '削除に失敗しました')
+    }
+  }
+
+  const cellInputCls = 'rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600'
+
+  return (
+    <tr className="border-b border-[#f0ebdf] text-[#173c2a] hover:bg-[#faf8f2]">
+      <td className="px-3 py-3"><StatusBadge status={order.status} /></td>
+      <td className={`px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>
+        {order.supplierName}
+      </td>
+      <td className="px-3 py-3">
+        <div className="font-medium">{first?.productName ?? '-'}</div>
+        <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
+      </td>
+      <td className="px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
+      <td className="px-3 py-3 text-right font-semibold">{formatCurrency(order.totalAmount)}</td>
+      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
+      <td className="px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
+      <td className="px-3 py-3">
+        {canEdit ? (
+          <select
+            value={status}
+            onChange={e => setStatus(e.target.value as PurchaseOrderPaymentStatus)}
+            className={cellInputCls}
+          >
+            <option value="uninvoiced">未請求</option>
+            <option value="unpaid">未払</option>
+            <option value="paid">支払済</option>
+          </select>
+        ) : (
+          <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
+        )}
+      </td>
+      <td className="px-3 py-3">
+        {canEdit ? (
+          <input
+            type="date"
+            value={dueDate}
+            onChange={e => setDueDate(e.target.value)}
+            className={cellInputCls}
+          />
+        ) : (
+          <span className="text-[#68756c]">{formatDate(order.paymentDueDate)}</span>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        {canEdit ? (
+          <input
+            type="date"
+            value={paidDate}
+            onChange={e => setPaidDate(e.target.value)}
+            className={cellInputCls}
+          />
+        ) : (
+          <span className="text-[#68756c]">{formatDate(order.paidDate)}</span>
+        )}
+      </td>
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-1">
+          {order.invoice ? (
+            <>
+              <a
+                href={order.invoice.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#f7f5ee] px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+                title={order.invoice.name}
+              >
+                <FileText size={12} /> PDF
+              </a>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleRemoveInvoice}
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  aria-label="請求書を削除"
+                  title="請求書を削除"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </>
+          ) : canEdit ? (
+            <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-dashed border-[#d9d1be] bg-white px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">
+              {uploading ? 'アップロード中…' : '添付'}
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                disabled={uploading}
+                onChange={async e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) await handleUpload(file)
+                }}
+              />
+            </label>
+          ) : (
+            <span className="text-[11px] text-[#a59f8c]">未添付</span>
+          )}
+        </div>
+        {error && <p className="mt-1 text-[10px] text-red-600">{error}</p>}
+      </td>
+      <td className="px-3 py-3 text-right">
+        <div className="flex justify-end gap-1">
+          {canEdit && dirty && (
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="rounded-lg bg-[#174c33] px-2 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+            >
+              {saving ? '…' : '保存'}
+            </button>
+          )}
+          <Link
+            href={`/purchase-orders/${order.id}/document`}
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#173c2a]"
+            aria-label="発注書"
+            title="発注書を表示"
+          >
+            <FileText size={14} />
+          </Link>
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-[#173c2a]"
+                aria-label="編集"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                aria-label="削除"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }
