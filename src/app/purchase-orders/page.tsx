@@ -18,23 +18,7 @@ import Link from 'next/link'
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 import { computePoTaxIncluded } from '@/lib/cashflow'
-
-function formatDate(value?: string): string {
-  if (!value) return '-'
-  return value
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function formatKg(value: number): string {
-  return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
-}
+import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 
 const STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   placed: '発注済',
@@ -73,13 +57,6 @@ function StatusBadge({ status }: { status: PurchaseOrderStatus }) {
   )
 }
 
-function todayIso(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 function productSubLabel(p: ProductWithInventory): string {
   const parts = [p.teaType, p.grade].filter(Boolean)

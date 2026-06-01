@@ -17,25 +17,8 @@ import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { PaymentStatus, SaleRecord } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(n)
-}
-
-function todayIso() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function endOfMonthIso(d: Date) {
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
-}
-
-function endOfNextMonthIso(d: Date) {
-  const last = new Date(d.getFullYear(), d.getMonth() + 2, 0)
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
-}
+import { formatCurrency, todayIso } from '@/lib/format'
+import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
 // Tax-inclusive billed amount (matches the invoice document and 支払管理).
 function saleIncome(sale: SaleRecord): number {
@@ -53,37 +36,7 @@ const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   paid: '入金済',
 }
 
-type Bucket = 'overdue' | 'thisMonth' | 'nextMonth' | 'later' | 'noDate' | 'paid'
-
-const BUCKET_LABELS: Record<Bucket, string> = {
-  overdue: '期限超過',
-  thisMonth: '今月期限',
-  nextMonth: '来月期限',
-  later: 'それ以降',
-  noDate: '期日未設定',
-  paid: '入金済',
-}
-
-const BUCKET_COLORS: Record<Bucket, string> = {
-  overdue: 'border-red-300 bg-red-50',
-  thisMonth: 'border-amber-300 bg-amber-50',
-  nextMonth: 'border-emerald-200 bg-emerald-50/50',
-  later: 'border-[#d9d1be] bg-white',
-  noDate: 'border-gray-200 bg-gray-50',
-  paid: 'border-emerald-200 bg-emerald-50/30',
-}
-
-function bucketOf(sale: SaleRecord): Bucket {
-  if (sale.paymentStatus === 'paid') return 'paid'
-  if (!sale.dueDate) return 'noDate'
-  const today = todayIso()
-  const eom = endOfMonthIso(new Date())
-  const eonm = endOfNextMonthIso(new Date())
-  if (sale.dueDate < today) return 'overdue'
-  if (sale.dueDate <= eom) return 'thisMonth'
-  if (sale.dueDate <= eonm) return 'nextMonth'
-  return 'later'
-}
+const BUCKET_LABELS = makeBucketLabels('入金済')
 
 export default function ReceivablesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
@@ -114,7 +67,7 @@ export default function ReceivablesPage() {
 
   const grouped = useMemo(() => {
     const groups: Record<Bucket, SaleRecord[]> = { overdue: [], thisMonth: [], nextMonth: [], later: [], noDate: [], paid: [] }
-    for (const s of filtered) groups[bucketOf(s)].push(s)
+    for (const s of filtered) groups[bucketOf(s.dueDate, s.paymentStatus === 'paid')].push(s)
     for (const k of Object.keys(groups) as Bucket[]) {
       groups[k].sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
     }
@@ -160,9 +113,7 @@ export default function ReceivablesPage() {
     } finally { setSavingId(null) }
   }
 
-  const bucketsToRender: Bucket[] = hidePaid
-    ? ['overdue', 'thisMonth', 'nextMonth', 'later', 'noDate']
-    : ['overdue', 'thisMonth', 'nextMonth', 'later', 'noDate', 'paid']
+  const bucketsToRender: Bucket[] = hidePaid ? BUCKET_ORDER_OPEN : BUCKET_ORDER_ALL
 
   return (
     <AppLayout>
