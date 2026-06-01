@@ -39,6 +39,7 @@ const BUCKET_LABELS = makeBucketLabels('支払済')
 
 export default function PayablesPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [bankInfoBySupplier, setBankInfoBySupplier] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
@@ -53,8 +54,16 @@ export default function PayablesPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const all = await svc.purchaseOrders.getPurchaseOrders()
+      const [all, suppliers] = await Promise.all([
+        svc.purchaseOrders.getPurchaseOrders(),
+        svc.suppliers.getSuppliers(),
+      ])
       setOrders(all.filter(o => o.status !== 'cancelled'))
+      const map: Record<string, string> = {}
+      for (const s of suppliers) {
+        if (s.bankInfo) map[s.name] = s.bankInfo
+      }
+      setBankInfoBySupplier(map)
     } finally { setLoading(false) }
   }
 
@@ -275,7 +284,11 @@ export default function PayablesPage() {
         )}
       </main>
 
-      <PoDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />
+      <PoDetailModal
+        order={detailOrder}
+        bankInfo={detailOrder ? bankInfoBySupplier[detailOrder.supplierName] : undefined}
+        onClose={() => setDetailOrder(null)}
+      />
     </AppLayout>
   )
 }
@@ -289,7 +302,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-function PoDetailModal({ order, onClose }: { order: PurchaseOrder | null; onClose: () => void }) {
+function PoDetailModal({ order, bankInfo, onClose }: { order: PurchaseOrder | null; bankInfo?: string; onClose: () => void }) {
   if (!order) return null
   const fees = (order.shippingFee ?? 0) + (order.otherFees ?? 0)
   const tax = computeTaxBuckets(order.items ?? [], fees)
@@ -329,6 +342,13 @@ function PoDetailModal({ order, onClose }: { order: PurchaseOrder | null; onClos
             <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
             <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-[#174c33] hover:underline">PDF</a> : '未添付'} />
           </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
+          <p className="mb-1 text-xs font-medium text-[#68756c]">振込先（支払口座）</p>
+          {bankInfo
+            ? <p className="whitespace-pre-wrap text-[#173c2a]">{bankInfo}</p>
+            : <p className="text-[#a59f8c]">仕入先マスタに未登録です。<Link href="/suppliers" className="text-[#174c33] hover:underline">仕入先管理</Link>で登録してください。</p>}
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">

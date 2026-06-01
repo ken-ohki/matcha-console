@@ -198,6 +198,7 @@ function SupplierDetailModal({
     address: supplier.address ?? '',
     postalCode: supplier.postalCode ?? '',
     country: supplier.country ?? '',
+    bankInfo: supplier.bankInfo ?? '',
     notes: supplier.notes ?? '',
     attachments: supplier.attachments ?? [],
   })
@@ -346,6 +347,18 @@ function SupplierDetailModal({
                     )}
                   </select>
                 </Field>
+                <div className="sm:col-span-2">
+                  <Field label="振込先（支払口座）">
+                    <textarea
+                      rows={3}
+                      value={form.bankInfo ?? ''}
+                      onChange={e => setForm(prev => ({ ...prev, bankInfo: e.target.value }))}
+                      className={inputClass}
+                      disabled={!canEdit}
+                      placeholder="例: 〇〇銀行 △△支店 普通 1234567 カ）マッチャショウカイ"
+                    />
+                  </Field>
+                </div>
                 <div className="sm:col-span-2">
                   <Field label="メモ">
                     <textarea

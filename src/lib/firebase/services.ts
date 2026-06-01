@@ -962,6 +962,7 @@ function mapSupplier(id: string, data: DocumentData): Supplier {
     address: data.address ? String(data.address) : undefined,
     postalCode: data.postalCode ? String(data.postalCode) : undefined,
     country: data.country ? String(data.country) : undefined,
+    bankInfo: data.bankInfo ? String(data.bankInfo) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
     attachments: Array.isArray(data.attachments)
       ? data.attachments
@@ -2172,6 +2173,7 @@ export function createFirebaseServices(): IServices {
         'address',
         'postalCode',
         'country',
+        'bankInfo',
         'notes',
       ] as const
       for (const key of optionalKeys) {

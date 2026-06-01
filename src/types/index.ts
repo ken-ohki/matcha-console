@@ -395,6 +395,7 @@ export interface Supplier {
   address?: string
   postalCode?: string
   country?: string
+  bankInfo?: string
   notes?: string
   attachments: SupplierAttachment[]
   orderCount: number
@@ -411,6 +412,7 @@ export interface SupplierDetailsInput {
   address?: string
   postalCode?: string
   country?: string
+  bankInfo?: string
   notes?: string
   attachments?: SupplierAttachment[]
 }
