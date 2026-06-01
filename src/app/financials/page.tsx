@@ -11,6 +11,7 @@ import {
   ChevronRight,
   FileText,
   Filter,
+  ShoppingBag,
   TrendingUp,
   Wallet,
 } from 'lucide-react'
@@ -78,6 +79,10 @@ function saleIncome(sale: SaleRecord): number {
   return inv > 0 ? inv : sale.revenue || 0
 }
 
+function ecRevenue(ec: EcSaleRecord): number {
+  return ec.revenue != null ? ec.revenue : (ec.unitPrice ?? 0) * ec.quantityKg
+}
+
 interface MonthlyRow {
   key: string
   label: string
@@ -113,6 +118,7 @@ export default function FinancialsPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
+  const [costByProduct, setCostByProduct] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [dateFrom, setDateFrom] = useState<string>('')
@@ -122,14 +128,18 @@ export default function FinancialsPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [s, o, ec] = await Promise.all([
+      const [s, o, ec, products] = await Promise.all([
         svc.sales.getSaleRecords(),
         svc.purchaseOrders.getPurchaseOrders(),
         svc.ecSales.getEcSaleRecords(),
+        svc.inventory.getProductsWithInventory(),
       ])
       setSales(s)
       setOrders(o)
       setEcSales(ec)
+      const costMap: Record<string, number> = {}
+      for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
+      setCostByProduct(costMap)
     } finally {
       setLoading(false)
     }
@@ -175,11 +185,25 @@ export default function FinancialsPage() {
     })
   }, [orders, fromTime, toTime])
 
+  const filteredEc = useMemo(() => {
+    return ecSales.filter(ec => {
+      if (ec.status === 'cancelled') return false
+      if (!ec.soldOn) return false
+      const t = new Date(ec.soldOn).getTime()
+      if (fromTime != null && t < fromTime) return false
+      if (toTime != null && t > toTime) return false
+      return true
+    })
+  }, [ecSales, fromTime, toTime])
+
   const kpis = useMemo(() => {
-    const totalRevenue = filteredSales.reduce((s, r) => s + saleIncome(r), 0)
+    const ecTotal = filteredEc.reduce((s, ec) => s + ecRevenue(ec), 0)
+    const directRevenue = filteredSales.reduce((s, r) => s + saleIncome(r), 0)
+    const totalRevenue = directRevenue + ecTotal
+    // EC sales are collected on the sale date.
     const collected = filteredSales
       .filter(r => r.paymentStatus === 'paid')
-      .reduce((s, r) => s + saleIncome(r), 0)
+      .reduce((s, r) => s + saleIncome(r), 0) + ecTotal
     const outstanding = filteredSales
       .filter(r => r.status === 'confirmed' && r.paymentStatus !== 'paid')
       .reduce((s, r) => s + saleIncome(r), 0)
@@ -192,6 +216,7 @@ export default function FinancialsPage() {
       .reduce((s, o) => s + (o.totalAmount || 0), 0)
     return {
       totalRevenue,
+      ecRevenue: ecTotal,
       collected,
       outstanding,
       totalExpense,
@@ -200,7 +225,7 @@ export default function FinancialsPage() {
       realizedNet: collected - paid,
       expectedNet: totalRevenue - totalExpense,
     }
-  }, [filteredSales, filteredOrders])
+  }, [filteredSales, filteredOrders, filteredEc])
 
   const monthly = useMemo<MonthlyRow[]>(() => {
     const map = new Map<string, MonthlyRow>()
@@ -209,6 +234,14 @@ export default function FinancialsPage() {
       const row = map.get(k) ?? { key: k, label: k, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
       row.revenue += saleIncome(r)
       if (r.paymentStatus === 'paid') row.collected += saleIncome(r)
+      map.set(k, row)
+    }
+    for (const ec of filteredEc) {
+      const k = monthKey(new Date(ec.soldOn))
+      const row = map.get(k) ?? { key: k, label: k, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
+      const amt = ecRevenue(ec)
+      row.revenue += amt
+      row.collected += amt
       map.set(k, row)
     }
     for (const o of filteredOrders) {
@@ -223,7 +256,7 @@ export default function FinancialsPage() {
     return [...map.values()]
       .map(r => ({ ...r, net: r.collected - r.paid }))
       .sort((a, b) => b.key.localeCompare(a.key))
-  }, [filteredSales, filteredOrders])
+  }, [filteredSales, filteredOrders, filteredEc])
 
   const fiscal = useMemo<MonthlyRow[]>(() => {
     const map = new Map<string, MonthlyRow>()
@@ -233,6 +266,15 @@ export default function FinancialsPage() {
       const row = map.get(k) ?? { key: k, label: `FY${fy} (${fy}/04 - ${fy + 1}/03)`, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
       row.revenue += saleIncome(r)
       if (r.paymentStatus === 'paid') row.collected += saleIncome(r)
+      map.set(k, row)
+    }
+    for (const ec of filteredEc) {
+      const fy = fiscalYearOf(new Date(ec.soldOn))
+      const k = String(fy)
+      const row = map.get(k) ?? { key: k, label: `FY${fy} (${fy}/04 - ${fy + 1}/03)`, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
+      const amt = ecRevenue(ec)
+      row.revenue += amt
+      row.collected += amt
       map.set(k, row)
     }
     for (const o of filteredOrders) {
@@ -248,7 +290,7 @@ export default function FinancialsPage() {
     return [...map.values()]
       .map(r => ({ ...r, net: r.collected - r.paid }))
       .sort((a, b) => b.key.localeCompare(a.key))
-  }, [filteredSales, filteredOrders])
+  }, [filteredSales, filteredOrders, filteredEc])
 
   // All-time monthly map for YoY lookups (ignores date filter).
   const monthlyAll = useMemo(() => {
@@ -262,6 +304,16 @@ export default function FinancialsPage() {
       row.profit += r.grossProfit ?? (inc - (r.costAmount ?? 0))
       map.set(k, row)
     }
+    for (const ec of ecSales) {
+      if (ec.status === 'cancelled' || !ec.soldOn) continue
+      const k = monthKey(new Date(ec.soldOn))
+      const row = map.get(k) ?? { revenue: 0, expense: 0, profit: 0 }
+      const amt = ecRevenue(ec)
+      const cost = (costByProduct[ec.productId] ?? 0) * ec.quantityKg
+      row.revenue += amt
+      row.profit += amt - cost
+      map.set(k, row)
+    }
     for (const o of orders) {
       const d = o.orderDate ? new Date(o.orderDate) : null
       if (!d) continue
@@ -271,7 +323,7 @@ export default function FinancialsPage() {
       map.set(k, row)
     }
     return map
-  }, [sales, orders])
+  }, [sales, orders, ecSales, costByProduct])
 
   const productRanking = useMemo<ProductRow[]>(() => {
     const map = new Map<string, ProductRow>()
@@ -291,8 +343,24 @@ export default function FinancialsPage() {
         map.set(key, row)
       }
     }
+    for (const ec of filteredEc) {
+      const key = ec.productId || ec.productName
+      const row = map.get(key) ?? {
+        productId: ec.productId,
+        name: ec.productName || '(未設定)',
+        sku: ec.productSku || '',
+        revenue: 0, quantity: 0, profit: 0, count: 0,
+      }
+      const amt = ecRevenue(ec)
+      const cost = (costByProduct[ec.productId] ?? 0) * ec.quantityKg
+      row.revenue += amt
+      row.quantity += ec.quantityKg || 0
+      row.profit += amt - cost
+      row.count += 1
+      map.set(key, row)
+    }
     return [...map.values()].sort((a, b) => b.revenue - a.revenue)
-  }, [filteredSales])
+  }, [filteredSales, filteredEc, costByProduct])
 
   const partnerBuyers = useMemo<PartnerRow[]>(() => {
     const map = new Map<string, PartnerRow>()
@@ -404,6 +472,7 @@ export default function FinancialsPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
+          <KPICard title="うち EC売上" value={formatCurrency(kpis.ecRevenue)} color="default" icon={<ShoppingBag size={16} />} />
           <KPICard title="入金済" value={formatCurrency(kpis.collected)} color="green" icon={<ArrowDownCircle size={16} />} />
           <KPICard title="未収" value={formatCurrency(kpis.outstanding)} color="amber" icon={<AlertTriangle size={16} />} />
           <KPICard title="仕入計" value={formatCurrency(kpis.totalExpense)} color="default" icon={<ArrowUpCircle size={16} />} />

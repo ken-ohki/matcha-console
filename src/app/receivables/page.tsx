@@ -16,7 +16,7 @@ import { X } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
+import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
@@ -55,12 +55,14 @@ const BUCKET_LABELS = makeBucketLabels('入金済')
 
 export default function ReceivablesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
+  const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hidePaid, setHidePaid] = useState(true)
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
+  const [ecOpen, setEcOpen] = useState(false)
   const [openBuckets, setOpenBuckets] = useState<Record<Bucket, boolean>>({
     overdue: true, thisMonth: true, nextMonth: true, later: false, noDate: false, paid: false,
   })
@@ -69,8 +71,12 @@ export default function ReceivablesPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const all = await svc.sales.getSaleRecords()
+      const [all, ec] = await Promise.all([
+        svc.sales.getSaleRecords(),
+        svc.ecSales.getEcSaleRecords(),
+      ])
       setSales(all.filter(s => s.status === 'confirmed'))
+      setEcSales(ec.filter(e => e.status !== 'cancelled'))
     } finally { setLoading(false) }
   }
 
@@ -80,6 +86,23 @@ export default function ReceivablesPage() {
     const q = query.trim().toLowerCase()
     return sales.filter(s => !q || s.buyerName.toLowerCase().includes(q) || s.items.some(i => i.productName.toLowerCase().includes(q)))
   }, [sales, query])
+
+  const ecRev = (ec: EcSaleRecord) => ec.revenue != null ? ec.revenue : (ec.unitPrice ?? 0) * ec.quantityKg
+
+  const ecThisMonth = useMemo(() => {
+    const ym = todayIso().slice(0, 7)
+    return ecSales
+      .filter(e => (e.soldOn ?? '').startsWith(ym))
+      .reduce((s, e) => s + ecRev(e), 0)
+  }, [ecSales])
+
+  const ecFiltered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return [...ecSales]
+      .filter(e => !q || (e.productName ?? '').toLowerCase().includes(q) || (e.orderNumber ?? '').toLowerCase().includes(q))
+      .sort((a, b) => (b.soldOn ?? '').localeCompare(a.soldOn ?? ''))
+      .slice(0, 50)
+  }, [ecSales, query])
 
   const grouped = useMemo(() => {
     const groups: Record<Bucket, SaleRecord[]> = { overdue: [], thisMonth: [], nextMonth: [], later: [], noDate: [], paid: [] }
@@ -96,9 +119,9 @@ export default function ReceivablesPage() {
     const thisMonth = grouped.thisMonth.reduce((s, r) => s + saleIncome(r), 0)
     const collectedThisMonth = sales
       .filter(s => s.paymentStatus === 'paid' && (s.paymentDate ?? '').startsWith(todayIso().slice(0, 7)))
-      .reduce((sum, s) => sum + saleIncome(s), 0)
+      .reduce((sum, s) => sum + saleIncome(s), 0) + ecThisMonth
     return { outstanding, overdue, thisMonth, collectedThisMonth }
-  }, [sales, grouped])
+  }, [sales, grouped, ecThisMonth])
 
   const markPaid = async (id: string) => {
     setSavingId(id)
@@ -155,7 +178,7 @@ export default function ReceivablesPage() {
           <KPICard title="未入金 残高" value={formatCurrency(kpis.outstanding)} color={kpis.outstanding > 0 ? 'amber' : 'default'} icon={<Wallet size={18} />} />
           <KPICard title="期限超過" value={formatCurrency(kpis.overdue)} color={kpis.overdue > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
           <KPICard title="今月期限" value={formatCurrency(kpis.thisMonth)} color={kpis.thisMonth > 0 ? 'amber' : 'default'} icon={<CircleDollarSign size={18} />} />
-          <KPICard title="今月入金 (確認済)" value={formatCurrency(kpis.collectedThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
+          <KPICard title="今月入金 (確認済・EC込)" value={formatCurrency(kpis.collectedThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#d9d1be] bg-white p-3">
@@ -284,6 +307,53 @@ export default function ReceivablesPage() {
 
         {!loading && bucketsToRender.every(b => grouped[b].length === 0) && (
           <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">該当の売掛はありません。</p>
+        )}
+
+        {!loading && ecSales.length > 0 && (
+          <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30">
+            <button
+              type="button"
+              onClick={() => setEcOpen(v => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left"
+            >
+              <div className="flex items-center gap-2">
+                {ecOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                <h2 className="text-sm font-semibold text-[#173c2a]">EC売上（入金済・参考）</h2>
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
+                  {ecFiltered.length}件 / 今月 {formatCurrency(ecThisMonth)}
+                </span>
+              </div>
+            </button>
+            {ecOpen && (
+              <div className="overflow-x-auto border-t border-white/60">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-white/60 text-[#173c2a]">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">売上日</th>
+                      <th className="px-3 py-2 text-left font-medium">商品</th>
+                      <th className="px-3 py-2 text-left font-medium">注文番号</th>
+                      <th className="px-3 py-2 text-right font-medium">数量</th>
+                      <th className="px-3 py-2 text-right font-medium">売上</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ecFiltered.map(e => (
+                      <tr key={e.id} className="border-t border-white/60">
+                        <td className="px-3 py-2 text-[#173c2a]">{e.soldOn || '-'}</td>
+                        <td className="px-3 py-2 text-[#68756c]">{e.productName}</td>
+                        <td className="px-3 py-2 text-[#68756c]">{e.orderNumber || '-'}</td>
+                        <td className="px-3 py-2 text-right">{formatKg(e.quantityKg)}</td>
+                        <td className="px-3 py-2 text-right font-medium">{formatCurrency(ecRev(e))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {ecSales.length > ecFiltered.length && (
+                  <p className="px-4 py-2 text-[11px] text-[#68756c]">最新 {ecFiltered.length} 件のみ表示しています。</p>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </main>
 
