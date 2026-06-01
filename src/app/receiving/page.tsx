@@ -10,7 +10,7 @@ import type {
   ProductWithInventory,
   PurchaseOrder,
 } from '@/types'
-import { PackageOpen, Check, Undo2, X } from 'lucide-react'
+import { PackageOpen, Check, Undo2, X, FilePlus } from 'lucide-react'
 
 function formatKg(value: number): string {
   return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
@@ -27,6 +27,11 @@ function todayIso(): string {
 interface PendingLine {
   order: PurchaseOrder
   lineIndex: number
+}
+
+interface OrphanArrival {
+  product: ProductWithInventory
+  arrival: { id: string; arrivalDate: string; quantityKg: number }
 }
 
 interface ReceivedLine {
@@ -302,8 +307,10 @@ export default function ReceivingPage() {
   const [inventoryGroups, setInventoryGroups] = useState<InventoryGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [showReceived, setShowReceived] = useState(false)
+  const [showOrphans, setShowOrphans] = useState(true)
   const [modalTarget, setModalTarget] = useState<PendingLine | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [orphanTarget, setOrphanTarget] = useState<OrphanArrival | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -351,6 +358,19 @@ export default function ReceivingPage() {
       return da.localeCompare(db)
     })
   }, [orders])
+
+  const orphanArrivals = useMemo<OrphanArrival[]>(() => {
+    const result: OrphanArrival[] = []
+    for (const product of products) {
+      for (const arrival of product.arrivalRecords ?? []) {
+        if (!arrival?.id) continue
+        if (arrival.id.startsWith('po:')) continue
+        if (arrival.id.startsWith('legacy-')) continue
+        result.push({ product, arrival })
+      }
+    }
+    return result.sort((a, b) => (b.arrival.arrivalDate || '').localeCompare(a.arrival.arrivalDate || ''))
+  }, [products])
 
   const receivedLines = useMemo<ReceivedLine[]>(() => {
     const result: ReceivedLine[] = []
@@ -463,6 +483,61 @@ export default function ReceivingPage() {
               </table>
             </div>
 
+            {orphanArrivals.length > 0 && (
+              <div className="mt-6 overflow-hidden rounded-3xl border-2 border-amber-300 bg-amber-50">
+                <button
+                  type="button"
+                  onClick={() => setShowOrphans(prev => !prev)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FilePlus size={16} className="text-amber-700" />
+                    <h2 className="text-sm font-semibold text-amber-900">未登録の入荷（発注なしで在庫追加された記録）</h2>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-amber-800">{orphanArrivals.length}件</span>
+                  </div>
+                  <span className="text-xs text-amber-800">{showOrphans ? '隠す' : '表示'}</span>
+                </button>
+                {showOrphans && (
+                  <div className="overflow-x-auto border-t border-amber-200 bg-white">
+                    <table className="w-full text-sm">
+                      <thead className="bg-amber-50 text-left text-xs uppercase tracking-wider text-amber-900">
+                        <tr>
+                          <th className="px-4 py-3">入荷日</th>
+                          <th className="px-4 py-3">商品</th>
+                          <th className="px-4 py-3">数量</th>
+                          <th className="px-4 py-3 text-right"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orphanArrivals.map(({ product, arrival }) => (
+                          <tr key={`${product.id}:${arrival.id}`} className="border-t border-amber-100">
+                            <td className="px-4 py-3 text-[#173c2a]">{arrival.arrivalDate || '-'}</td>
+                            <td className="px-4 py-3 text-[#173c2a]">
+                              {product.name}
+                              {product.sku && <span className="ml-1 text-[11px] text-[#68756c]">({product.sku})</span>}
+                            </td>
+                            <td className="px-4 py-3 text-[#173c2a]">{formatKg(arrival.quantityKg)}</td>
+                            <td className="px-4 py-3 text-right">
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOrphanTarget({ product, arrival })}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#173c2a]"
+                                >
+                                  <FilePlus size={14} />
+                                  発注として登録
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-6">
               <button
                 type="button"
@@ -528,6 +603,167 @@ export default function ReceivingPage() {
         onClose={() => setModalOpen(false)}
         onConfirm={handleConfirm}
       />
+
+      <OrphanConvertModal
+        target={orphanTarget}
+        onClose={() => setOrphanTarget(null)}
+        onConfirm={async input => {
+          if (!orphanTarget) return
+          const services = await getServices()
+          await services.purchaseOrders.convertOrphanArrivalToPo(
+            orphanTarget.product.id,
+            orphanTarget.arrival.id,
+            input,
+          )
+          setOrphanTarget(null)
+          await load()
+        }}
+      />
     </AppLayout>
+  )
+}
+
+function OrphanConvertModal({
+  target,
+  onClose,
+  onConfirm,
+}: {
+  target: OrphanArrival | null
+  onClose: () => void
+  onConfirm: (input: {
+    supplierName: string
+    unitPrice: number
+    taxRate: 8 | 10
+    orderDate: string
+    notes?: string
+  }) => Promise<void>
+}) {
+  const [supplierName, setSupplierName] = useState('')
+  const [unitPrice, setUnitPrice] = useState(0)
+  const [taxRate, setTaxRate] = useState<8 | 10>(8)
+  const [orderDate, setOrderDate] = useState('')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!target) return
+    setSupplierName('')
+    setUnitPrice(target.product.purchaseUnitPrice ?? 0)
+    setTaxRate(8)
+    setOrderDate(target.arrival.arrivalDate || todayIso())
+    setNotes('')
+    setError('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target?.product.id, target?.arrival.id])
+
+  if (!target) return null
+
+  const lineTotal = (Number(target.arrival.quantityKg) || 0) * (Number(unitPrice) || 0)
+  const tax = Math.floor(lineTotal * (taxRate === 8 ? 0.08 : 0.10))
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      if (!supplierName.trim()) throw new Error('仕入先を入力してください')
+      await onConfirm({ supplierName: supplierName.trim(), unitPrice, taxRate, orderDate, notes })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[100vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#173c2a]">発注として登録</h2>
+            <p className="mt-1 text-xs text-[#68756c]">
+              {target.product.name}{target.product.sku && `（${target.product.sku}）`} / {formatKg(target.arrival.quantityKg)} / 入荷日 {target.arrival.arrivalDate}
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">仕入先</label>
+            <input
+              required
+              value={supplierName}
+              onChange={e => setSupplierName(e.target.value)}
+              placeholder="例: 鹿児島茶葉商会（不明な場合は「不明」など）"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">税抜単価</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={unitPrice}
+                onChange={e => setUnitPrice(Number(e.target.value) || 0)}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">税率</label>
+              <select
+                value={taxRate}
+                onChange={e => setTaxRate(Number(e.target.value) === 10 ? 10 : 8)}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              >
+                <option value={8}>8%軽減</option>
+                <option value={10}>10%</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">発注日</label>
+            <input
+              type="date"
+              value={orderDate}
+              onChange={e => setOrderDate(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">備考（任意）</label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="未入力時は「期首在庫から自動変換」"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            />
+          </div>
+
+          <div className="rounded-xl bg-[#f7f5ee] p-3 text-xs text-[#68756c]">
+            <div className="flex justify-between"><span>金額（税抜）</span><span className="font-medium text-[#173c2a]">¥{new Intl.NumberFormat('ja-JP').format(lineTotal)}</span></div>
+            <div className="flex justify-between"><span>消費税</span><span>¥{new Intl.NumberFormat('ja-JP').format(tax)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-[#e6dfcf] pt-1 font-semibold text-[#173c2a]"><span>税込合計</span><span>¥{new Intl.NumberFormat('ja-JP').format(lineTotal + tax)}</span></div>
+          </div>
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+              キャンセル
+            </button>
+            <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#173c2a] disabled:opacity-60">
+              {saving ? '登録中…' : '発注を作成'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }

@@ -40,6 +40,7 @@ import type {
   PurchaseOrderLineInput,
   PurchaseOrderLineItem,
   PurchaseOrderStatus,
+  PurchaseOrderPaymentStatus,
   SaleLineItem,
   SaleRecord,
   SaleRecordInput,
@@ -2046,6 +2047,98 @@ export function createFirebaseServices(): IServices {
         status: nextStatus,
         updatedAt: serverTimestamp(),
       }))
+    },
+
+    async convertOrphanArrivalToPo(productId, arrivalId, input) {
+      // Find the product and its arrival record.
+      const productRef = doc(db, COLLECTIONS.products, productId)
+      const productSnap = await getDoc(productRef)
+      if (!productSnap.exists()) throw new Error('商品が見つかりません')
+      const productData = productSnap.data() ?? {}
+      const arrivals: Array<{ id: string; arrivalDate: string; quantityKg: number }> =
+        Array.isArray(productData.arrivalRecords) ? productData.arrivalRecords : []
+      const arrival = arrivals.find(a => a.id === arrivalId)
+      if (!arrival) throw new Error('入荷記録が見つかりません')
+
+      const supplierName = input.supplierName.trim()
+      if (!supplierName) throw new Error('仕入先を入力してください')
+      const unitPrice = Number(input.unitPrice) || 0
+      const taxRate: 8 | 10 = input.taxRate === 10 ? 10 : 8
+      const orderDate = (input.orderDate || arrival.arrivalDate || '').trim()
+      if (!orderDate) throw new Error('発注日を指定してください')
+
+      const productName = String(productData.purchaseProductName || productData.name || '')
+      const productSku = String(productData.sku || '')
+      const quantityKg = Number(arrival.quantityKg) || 0
+      const lineTotal = quantityKg * unitPrice
+
+      const items: PurchaseOrderLineItem[] = [{
+        productId,
+        productSku,
+        productName,
+        quantityKg,
+        unitPrice,
+        lineTotal,
+        receivedKg: quantityKg,
+        taxRate,
+      }]
+      const totalAmount = lineTotal
+
+      const payload = sanitizeRecord({
+        supplierName,
+        items,
+        totalQuantityKg: quantityKg,
+        totalAmount,
+        shippingFee: 0,
+        otherFees: 0,
+        orderDate,
+        actualDeliveryDate: arrival.arrivalDate,
+        status: 'received' as PurchaseOrderStatus,
+        paymentStatus: 'uninvoiced' as PurchaseOrderPaymentStatus,
+        notes: input.notes?.trim() || '期首在庫から自動変換',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      const newOrderRef = await addDoc(collection(db, COLLECTIONS.purchaseOrders), payload)
+
+      // Re-key the arrival ID: remove the orphan and add a PO-linked one with the same date/quantity.
+      const remaining = arrivals.filter(a => a.id !== arrivalId)
+      const newArrival = {
+        id: `po:${newOrderRef.id}:0`,
+        arrivalDate: toIsoDate(arrival.arrivalDate),
+        quantityKg,
+      }
+      const nextArrivals = [...remaining, newArrival]
+      await updateDoc(productRef, {
+        arrivalRecords: nextArrivals,
+        arrivalDate: deriveArrivalDate(nextArrivals),
+        initialStockKg: deriveInitialStockKg(nextArrivals),
+        updatedAt: serverTimestamp(),
+      })
+
+      await syncSuppliersCollection()
+
+      return {
+        id: newOrderRef.id,
+        supplierName,
+        items,
+        totalQuantityKg: quantityKg,
+        totalAmount,
+        shippingFee: 0,
+        otherFees: 0,
+        otherFeesNote: undefined,
+        orderDate,
+        expectedDeliveryDate: undefined,
+        actualDeliveryDate: arrival.arrivalDate,
+        status: 'received',
+        paymentStatus: 'uninvoiced',
+        paymentDueDate: undefined,
+        paidDate: undefined,
+        invoice: undefined,
+        notes: input.notes?.trim() || '期首在庫から自動変換',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
     },
   }
 

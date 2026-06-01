@@ -132,6 +132,17 @@ export interface IPurchaseOrdersService {
     },
   ): Promise<void>
   unreceivePurchaseOrderLine(orderId: string, lineIndex: number): Promise<void>
+  convertOrphanArrivalToPo(
+    productId: string,
+    arrivalId: string,
+    input: {
+      supplierName: string
+      unitPrice: number
+      taxRate?: 8 | 10
+      orderDate?: string
+      notes?: string
+    },
+  ): Promise<PurchaseOrder>
 }
 
 export interface ISuppliersService {
