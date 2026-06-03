@@ -262,6 +262,7 @@ export default function ShippingPage() {
                   <th className="px-3 py-3 font-medium">ステータス</th>
                   <th className="px-3 py-3 font-medium">販売先 / 国</th>
                   <th className="px-3 py-3 font-medium">商品</th>
+                  <th className="px-3 py-3 font-medium">発送メモ</th>
                   <th className="px-3 py-3 font-medium">納期</th>
                   <th className="px-3 py-3 font-medium">発送方法</th>
                   <th className="px-3 py-3 font-medium">発送日</th>
@@ -273,7 +274,7 @@ export default function ShippingPage() {
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
+                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
                 )}
                 {filtered.map(sale => {
                   const first = sale.items[0]
@@ -309,6 +310,11 @@ export default function ShippingPage() {
                         <div className="font-medium">{first?.productName ?? '-'}</div>
                         <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
                         <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {sale.shippingNote
+                          ? <div className="max-w-[200px] whitespace-pre-wrap rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">{sale.shippingNote}</div>
+                          : <span className="text-[11px] text-[#a59f8c]">-</span>}
                       </td>
                       <td className={`px-3 py-3 ${overdue ? 'text-red-700 font-medium' : 'text-[#68756c]'}`}>{sale.dueDate || '-'}</td>
                       <td className="px-3 py-3">

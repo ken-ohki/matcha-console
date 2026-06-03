@@ -432,6 +432,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     shippingMethod: data.shippingMethod ? String(data.shippingMethod) : undefined,
     shippingDate: data.shippingDate ? String(data.shippingDate) : undefined,
     trackingNumber: data.trackingNumber ? String(data.trackingNumber) : undefined,
+    shippingNote: data.shippingNote ? String(data.shippingNote) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -1444,6 +1445,7 @@ export function createFirebaseServices(): IServices {
         shippingMethod: input.shippingMethod,
         shippingDate: input.shippingDate,
         trackingNumber: input.trackingNumber,
+        shippingNote: input.shippingNote,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
@@ -1482,6 +1484,7 @@ export function createFirebaseServices(): IServices {
         shippingMethod: input.shippingMethod ?? current.shippingMethod,
         shippingDate: input.shippingDate ?? current.shippingDate,
         trackingNumber: input.trackingNumber ?? current.trackingNumber,
+        shippingNote: input.shippingNote ?? current.shippingNote,
       }
 
       const { productMap } = await assertSufficientStock(merged, { excludeSaleId: id })
@@ -1574,6 +1577,7 @@ export function createFirebaseServices(): IServices {
         shippingMethod: merged.shippingMethod,
         shippingDate: merged.shippingDate,
         trackingNumber: merged.trackingNumber,
+        shippingNote: merged.shippingNote,
         createdAt: current.createdAt,
         updatedAt: new Date(),
       }

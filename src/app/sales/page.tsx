@@ -155,6 +155,7 @@ function SaleModal({
     dueDate: '',
     terms: '',
     notes: '',
+    shippingNote: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -192,6 +193,7 @@ function SaleModal({
       dueDate: initial?.dueDate ?? '',
       terms: initial?.terms ?? matchedBuyer?.terms ?? '',
       notes: initial?.notes ?? matchedBuyer?.notes ?? '',
+      shippingNote: initial?.shippingNote ?? '',
     })
     setError('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,6 +553,17 @@ function SaleModal({
               rows={3}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
               placeholder="商談の補足や条件など"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">発送担当者へのメモ</label>
+            <textarea
+              value={form.shippingNote ?? ''}
+              onChange={event => setForm(prev => ({ ...prev, shippingNote: event.target.value }))}
+              rows={2}
+              className="w-full rounded-xl border border-amber-300 bg-amber-50/40 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              placeholder="例: ギフト包装、納品書同梱不可、冷蔵便 など（発送管理に表示されます）"
             />
           </div>
 

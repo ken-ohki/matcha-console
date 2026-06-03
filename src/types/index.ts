@@ -125,6 +125,7 @@ export interface SaleRecord {
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string
+  shippingNote?: string   // 発送担当者へのメモ
   createdAt: Date
   updatedAt: Date
 }
@@ -256,6 +257,7 @@ export interface SaleRecordInput {
   shippingMethod?: string
   shippingDate?: string
   trackingNumber?: string
+  shippingNote?: string
 }
 
 export interface SelfConsumptionRecordInput {
