@@ -11,6 +11,7 @@ import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineI
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
+import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import {
   CircleDollarSign,
   ClipboardPenLine,
@@ -1218,7 +1219,8 @@ export default function SalesPage() {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
                     <div>数量 {formatKg(record.quantityKg)}</div>
-                    <div className="mt-1">売上高 {formatCurrency(record.revenue)}</div>
+                    <div className="mt-1 font-medium text-[#173c2a]">売上高(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
+                    <div className="mt-1">売上高(税抜) {formatCurrency(record.revenue)}</div>
                     <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
                     <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
                   </div>
@@ -1262,7 +1264,7 @@ export default function SalesPage() {
                   <th className="px-3 py-3 font-medium">購入者</th>
                   <th className="px-3 py-3 font-medium">商品</th>
                   <th className="px-3 py-3 font-medium">数量</th>
-                  <th className="px-3 py-3 font-medium">売上高</th>
+                  <th className="px-3 py-3 font-medium">売上高(税込)</th>
                   <th className="px-3 py-3 font-medium">原価</th>
                   <th className="px-3 py-3 font-medium">粗利</th>
                   <th className="px-3 py-3 font-medium">国</th>
@@ -1302,7 +1304,10 @@ export default function SalesPage() {
                       <div className="text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
                     </td>
                     <td className="px-3 py-4">{formatKg(record.quantityKg)}</td>
-                    <td className="px-3 py-4 font-medium">{formatCurrency(record.revenue)}</td>
+                    <td className="px-3 py-4">
+                      <div className="font-medium">{formatCurrency(computeSaleTaxIncluded(record))}</div>
+                      <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.revenue)}</div>
+                    </td>
                     <td className="px-3 py-4">{formatCurrency(record.costAmount)}</td>
                     <td className="px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
                     <td className="px-3 py-4">{record.country}</td>
@@ -1544,6 +1549,7 @@ function SaleDetailModal({
                 value={`${formatCurrency(record.otherFees || 0)}${record.otherFeesNote ? ` (${record.otherFeesNote})` : ''}`}
               />
               <DetailField label="請求額（税抜）" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
+              <DetailField label="請求額（税込）" value={formatCurrency(computeSaleTaxIncluded(record))} valueClass="font-semibold" />
               <DetailField label="支払手数料" value={formatCurrency(record.paymentFee || 0)} />
               <DetailField label="原価" value={formatCurrency(record.costAmount)} />
               <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
