@@ -409,6 +409,9 @@ function SaleModal({
             <div className="space-y-2">
               {form.items.map((line, index) => {
                 const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
+                const lineRate = line.taxRate ?? 8
+                const lineTax = lineRate === 0 ? 0 : Math.floor(lineRevenue * (lineRate === 8 ? 0.08 : 0.10))
+                const lineIncl = lineRevenue + lineTax
                 return (
                   <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
                     <select
@@ -446,16 +449,21 @@ function SaleModal({
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
                     <select
-                      value={line.taxRate ?? 8}
-                      onChange={event => updateItem(index, { taxRate: Number(event.target.value) === 10 ? 10 : 8 })}
+                      value={lineRate}
+                      onChange={event => {
+                        const v = Number(event.target.value)
+                        updateItem(index, { taxRate: v === 0 ? 0 : v === 10 ? 10 : 8 })
+                      }}
                       title="消費税区分"
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
+                      <option value={0}>免税</option>
                       <option value={8}>8%軽減</option>
                       <option value={10}>10%</option>
                     </select>
-                    <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
-                      {formatCurrency(lineRevenue)}
+                    <div className="flex flex-col items-end justify-center text-xs md:px-2">
+                      <span className="font-medium text-[#173c2a]">{formatCurrency(lineIncl)}</span>
+                      <span className="text-[10px] text-[#68756c]">税抜 {formatCurrency(lineRevenue)}</span>
                     </div>
                     <button
                       type="button"
@@ -1560,10 +1568,10 @@ function SaleDetailModal({
             </div>
             <div className="mt-3 flex justify-end">
               <Link
-                href="/financials"
+                href="/receivables"
                 className="text-xs font-medium text-[#174c33] hover:underline"
               >
-                収支管理で編集 →
+                入金管理で編集 →
               </Link>
             </div>
           </Section>

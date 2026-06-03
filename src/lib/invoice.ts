@@ -7,6 +7,7 @@ export interface DocumentLine {
   id: string
   description: string
   isReducedRate: boolean
+  taxExempt?: boolean   // 免税（消費税 0）
   quantity: number
   unit: string
   unitPrice: number
@@ -140,6 +141,7 @@ export function createBlankLine(overrides: Partial<DocumentLine> = {}): Document
 }
 
 export interface DocumentTotals {
+  exemptSubtotal: number    // 免税対象 (税抜)
   reducedSubtotal: number   // 8%対象 (税抜)
   standardSubtotal: number  // 10%対象 (税抜)
   reducedTax: number        // 8%消費税
@@ -157,7 +159,7 @@ export function computeTotals(lines: DocumentLine[]): DocumentTotals {
     lines.map(line => ({
       quantityKg: Number(line.quantity) || 0,
       unitPrice: Number(line.unitPrice) || 0,
-      taxRate: line.isReducedRate ? 8 : 10,
+      taxRate: line.taxExempt ? 0 : line.isReducedRate ? 8 : 10,
     })),
   )
 }

@@ -5,7 +5,7 @@
 // screens delegate here so the tax-inclusive total shown anywhere matches
 // the printed document to the yen.
 
-export type TaxRate = 8 | 10
+export type TaxRate = 0 | 8 | 10  // 0 = 免税
 
 export interface TaxLine {
   quantityKg: number
@@ -14,6 +14,7 @@ export interface TaxLine {
 }
 
 export interface TaxBreakdown {
+  exemptSubtotal: number    // 免税対象 (税抜・非課税)
   reducedSubtotal: number   // 8%対象 (税抜)
   standardSubtotal: number  // 10%対象 (税抜)
   reducedTax: number        // 8%消費税
@@ -25,23 +26,27 @@ export interface TaxBreakdown {
 
 /**
  * Compute a tax breakdown from line items plus fees.
- * Fees (shipping / other) are always treated as 10% standard rate.
+ * taxRate 0 = 免税 (no tax). Fees (shipping / other) are always 10% standard.
  */
 export function computeTaxBuckets(lines: TaxLine[], fees = 0): TaxBreakdown {
+  let exempt = 0
   let reduced = 0
   let standard = 0
   for (const line of lines) {
     const amount = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
-    if (Number(line.taxRate) === 8) reduced += amount
+    const rate = Number(line.taxRate)
+    if (rate === 0) exempt += amount
+    else if (rate === 8) reduced += amount
     else standard += amount
   }
   standard += Number(fees) || 0
 
   const reducedTax = Math.floor(reduced * 0.08)
   const standardTax = Math.floor(standard * 0.10)
-  const subtotal = reduced + standard
+  const subtotal = exempt + reduced + standard
   const tax = reducedTax + standardTax
   return {
+    exemptSubtotal: exempt,
     reducedSubtotal: reduced,
     standardSubtotal: standard,
     reducedTax,

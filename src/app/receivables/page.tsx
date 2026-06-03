@@ -431,7 +431,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
                   <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-[#68756c]">({item.productSku})</span>}</td>
                   <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-3 py-2 text-center">{(item.taxRate ?? 8)}%</td>
+                  <td className="px-3 py-2 text-center">{(item.taxRate ?? 8) === 0 ? '免税' : `${item.taxRate ?? 8}%`}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(item.revenue)}</td>
                 </tr>
               ))}

@@ -34,6 +34,7 @@ function buildInitialDocument(order: PurchaseOrder, supplier: Supplier | undefin
   const lines: DocumentLine[] = order.items.map(item => createBlankLine({
     description: item.productName,
     isReducedRate: (item.taxRate ?? 8) === 8,
+    taxExempt: (item.taxRate ?? 8) === 0,
     quantity: item.quantityKg,
     unit: 'kg',
     unitPrice: item.unitPrice,

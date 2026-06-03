@@ -431,10 +431,14 @@ function PurchaseOrderModal({
                     />
                     <select
                       value={line.taxRate ?? 8}
-                      onChange={e => updateItem(index, { taxRate: Number(e.target.value) === 10 ? 10 : 8 })}
+                      onChange={e => {
+                        const v = Number(e.target.value)
+                        updateItem(index, { taxRate: v === 0 ? 0 : v === 10 ? 10 : 8 })
+                      }}
                       title="消費税区分"
                       className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     >
+                      <option value={0}>免税</option>
                       <option value={8}>8%軽減</option>
                       <option value={10}>10%</option>
                     </select>
@@ -498,8 +502,8 @@ function PurchaseOrderModal({
           <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・支払い</p>
-              <Link href="/financials" className="text-[11px] font-medium text-[#174c33] hover:underline">
-                収支管理で編集 →
+              <Link href="/payables" className="text-[11px] font-medium text-[#174c33] hover:underline">
+                支払管理で編集 →
               </Link>
             </div>
             <div className="grid gap-3 md:grid-cols-3">

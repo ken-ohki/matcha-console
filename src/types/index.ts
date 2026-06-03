@@ -71,7 +71,7 @@ export interface ProductWithInventory extends Product {
   stockStatus: StockStatus
 }
 
-export type TaxRate = 8 | 10
+export type TaxRate = 0 | 8 | 10  // 0 = 免税
 
 export interface SaleLineItem {
   productId: string
