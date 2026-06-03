@@ -10,6 +10,7 @@ import { getServices } from '@/lib/services'
 import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineInput, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
+import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import {
   CircleDollarSign,
   ClipboardPenLine,
@@ -149,6 +150,7 @@ function SaleModal({
     otherFees: 0,
     otherFeesNote: '',
     paymentFee: 0,
+    paymentMethod: '',
     country: '',
     dueDate: '',
     terms: '',
@@ -185,6 +187,7 @@ function SaleModal({
       otherFees: initial?.otherFees ?? 0,
       otherFeesNote: initial?.otherFeesNote ?? '',
       paymentFee: initial?.paymentFee ?? 0,
+      paymentMethod: initial?.paymentMethod ?? '',
       country: initial?.country ?? matchedBuyer?.country ?? '',
       dueDate: initial?.dueDate ?? '',
       terms: initial?.terms ?? matchedBuyer?.terms ?? '',
@@ -596,6 +599,20 @@ function SaleModal({
                   onChange={event => setForm(prev => ({ ...prev, paymentFee: Number(event.target.value) || 0 }))}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">支払い方法</label>
+                <select
+                  value={form.paymentMethod ?? ''}
+                  onChange={event => setForm(prev => ({ ...prev, paymentMethod: event.target.value || undefined }))}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                >
+                  <option value="">未設定</option>
+                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  {form.paymentMethod && !PAYMENT_METHODS.includes(form.paymentMethod as never) && (
+                    <option value={form.paymentMethod}>{form.paymentMethod}</option>
+                  )}
+                </select>
               </div>
               <div>
                 <p className="mb-1 text-xs font-medium text-gray-700">請求額（税抜・自動）</p>

@@ -19,6 +19,7 @@ import { getServices } from '@/lib/services'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeTaxBuckets } from '@/lib/tax'
+import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
@@ -136,7 +137,7 @@ export default function ReceivablesPage() {
     } finally { setSavingId(null) }
   }
 
-  const updateInline = async (id: string, patch: { paymentStatus?: PaymentStatus; dueDate?: string; paymentDate?: string }) => {
+  const updateInline = async (id: string, patch: { paymentStatus?: PaymentStatus; dueDate?: string; paymentDate?: string; paymentMethod?: string }) => {
     setSavingId(id)
     setFeedback(null)
     try {
@@ -152,6 +153,7 @@ export default function ReceivablesPage() {
         ...coupledStatus,
         ...(patch.dueDate !== undefined && { dueDate: patch.dueDate || undefined }),
         ...(patch.paymentDate !== undefined && { paymentDate: patch.paymentDate || undefined }),
+        ...(patch.paymentMethod !== undefined && { paymentMethod: patch.paymentMethod || undefined }),
       })
       setSales(prev => prev.map(s => s.id === id ? updated : s))
     } catch (err) {
@@ -229,6 +231,7 @@ export default function ReceivablesPage() {
                         <th className="px-3 py-2 text-right font-medium">請求額(税込)</th>
                         <th className="px-3 py-2 text-left font-medium">状態</th>
                         <th className="px-3 py-2 text-left font-medium">入金日</th>
+                        <th className="px-3 py-2 text-left font-medium">支払方法</th>
                         <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
@@ -272,6 +275,19 @@ export default function ReceivablesPage() {
                                 onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
                                 className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
                               />
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={s.paymentMethod ?? ''}
+                                onChange={e => updateInline(s.id, { paymentMethod: e.target.value })}
+                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+                              >
+                                <option value="">未設定</option>
+                                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                                {s.paymentMethod && !PAYMENT_METHODS.includes(s.paymentMethod as never) && (
+                                  <option value={s.paymentMethod}>{s.paymentMethod}</option>
+                                )}
+                              </select>
                             </td>
                             <td className="px-3 py-2 text-right">
                               {s.paymentStatus !== 'paid' && (
