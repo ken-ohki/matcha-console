@@ -254,8 +254,15 @@ export default function ReceivablesPage() {
                             </td>
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
                             <td className="px-3 py-2 text-right">
-                              <div className="font-medium">{formatCurrency(saleIncome(s))}</div>
+                              <div className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(s))}</div>
                               <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
+                              {((s.shippingFee || 0) > 0 || (s.otherFees || 0) > 0) && (
+                                <div className="text-[10px] text-[#68756c]">
+                                  商品 {formatCurrency(s.revenue)}
+                                  {(s.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(s.shippingFee)}</>}
+                                  {(s.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(s.otherFees)}</>}
+                                </div>
+                              )}
                             </td>
                             <td className="px-3 py-2">
                               <select

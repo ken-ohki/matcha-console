@@ -1219,8 +1219,11 @@ export default function SalesPage() {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
                     <div>数量 {formatKg(record.quantityKg)}</div>
-                    <div className="mt-1 font-medium text-[#173c2a]">売上高(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
-                    <div className="mt-1">売上高(税抜) {formatCurrency(record.revenue)}</div>
+                    <div className="mt-1 font-semibold text-[#173c2a]">請求額(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
+                    <div className="mt-1">
+                      （税抜 {formatCurrency(record.invoiceAmount || record.revenue)}
+                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}</>}）
+                    </div>
                     <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
                     <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
                   </div>
@@ -1264,7 +1267,7 @@ export default function SalesPage() {
                   <th className="px-3 py-3 font-medium">購入者</th>
                   <th className="px-3 py-3 font-medium">商品</th>
                   <th className="px-3 py-3 font-medium">数量</th>
-                  <th className="px-3 py-3 font-medium">売上高(税込)</th>
+                  <th className="px-3 py-3 font-medium">請求額(税込)</th>
                   <th className="px-3 py-3 font-medium">原価</th>
                   <th className="px-3 py-3 font-medium">粗利</th>
                   <th className="px-3 py-3 font-medium">国</th>
@@ -1305,8 +1308,15 @@ export default function SalesPage() {
                     </td>
                     <td className="px-3 py-4">{formatKg(record.quantityKg)}</td>
                     <td className="px-3 py-4">
-                      <div className="font-medium">{formatCurrency(computeSaleTaxIncluded(record))}</div>
-                      <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.revenue)}</div>
+                      <div className="font-semibold text-[#173c2a]">{formatCurrency(computeSaleTaxIncluded(record))}</div>
+                      <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
+                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0) && (
+                        <div className="text-[10px] text-[#68756c]">
+                          商品 {formatCurrency(record.revenue)}
+                          {(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}
+                          {(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-4">{formatCurrency(record.costAmount)}</td>
                     <td className="px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
