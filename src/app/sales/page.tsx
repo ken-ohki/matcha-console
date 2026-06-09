@@ -1561,11 +1561,18 @@ function SaleDetailModal({
   const [shipping, setShipping] = useState({
     shippingStatus: record.shippingStatus,
     shippingAddress: record.shippingAddress ?? buyerShippingAddress ?? '',
+    shippingPostalCode: record.shippingPostalCode ?? '',
     shippingMethod: record.shippingMethod ?? '',
     shippingDate: record.shippingDate ?? '',
     trackingNumber: record.trackingNumber ?? '',
   })
-  const [savingSection, setSavingSection] = useState<'shipping' | null>(null)
+  const [payment, setPayment] = useState({
+    paymentStatus: record.paymentStatus,
+    paymentMethod: record.paymentMethod ?? '',
+    paymentDate: record.paymentDate ?? '',
+    dueDate: record.dueDate ?? '',
+  })
+  const [savingSection, setSavingSection] = useState<'shipping' | 'payment' | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1579,6 +1586,7 @@ function SaleDetailModal({
   const shippingDirty =
     shipping.shippingStatus !== record.shippingStatus ||
     (shipping.shippingAddress || '') !== (record.shippingAddress ?? '') ||
+    (shipping.shippingPostalCode || '') !== (record.shippingPostalCode ?? '') ||
     (shipping.shippingMethod || '') !== (record.shippingMethod ?? '') ||
     (shipping.shippingDate || '') !== (record.shippingDate ?? '') ||
     (shipping.trackingNumber || '') !== (record.trackingNumber ?? '')
@@ -1590,11 +1598,40 @@ function SaleDetailModal({
       await onUpdate({
         shippingStatus: shipping.shippingStatus,
         shippingAddress: shipping.shippingAddress.trim() || undefined,
+        shippingPostalCode: shipping.shippingPostalCode.trim() || undefined,
         shippingMethod: shipping.shippingMethod.trim() || undefined,
         shippingDate: shipping.shippingDate || undefined,
         trackingNumber: shipping.trackingNumber.trim() || undefined,
       })
       setFeedback('発送情報を更新しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSavingSection(null)
+    }
+  }
+
+  const paymentDirty =
+    payment.paymentStatus !== record.paymentStatus ||
+    (payment.paymentMethod || '') !== (record.paymentMethod ?? '') ||
+    (payment.paymentDate || '') !== (record.paymentDate ?? '') ||
+    (payment.dueDate || '') !== (record.dueDate ?? '')
+
+  const savePayment = async () => {
+    setSavingSection('payment')
+    setFeedback(null)
+    try {
+      // Keep status and paymentDate consistent.
+      const status = payment.paymentDate && payment.paymentStatus !== 'paid'
+        ? 'paid'
+        : payment.paymentStatus
+      await onUpdate({
+        paymentStatus: status,
+        paymentMethod: payment.paymentMethod || undefined,
+        paymentDate: payment.paymentDate || undefined,
+        dueDate: payment.dueDate || undefined,
+      })
+      setFeedback('請求・支払い情報を更新しました')
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
     } finally {
@@ -1686,50 +1723,110 @@ function SaleDetailModal({
             )}
           </Section>
 
-          {/* 支払い */}
-          <Section title="支払い">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* 支払い（直接編集可） */}
+          <Section title="請求・支払い">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払いステータス</p>
-                <div className="py-1.5"><PaymentBadge status={record.paymentStatus} /></div>
+                <select
+                  value={payment.paymentStatus}
+                  onChange={e => setPayment(p => ({ ...p, paymentStatus: e.target.value as PaymentStatus }))}
+                  className={fieldClass}
+                >
+                  <option value="uninvoiced">未請求</option>
+                  <option value="invoiced">請求済</option>
+                  <option value="paid">入金済</option>
+                </select>
               </div>
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い方法</p>
-                <p className="text-sm text-[#173c2a]">{record.paymentMethod || '未設定'}</p>
+                <select
+                  value={payment.paymentMethod}
+                  onChange={e => setPayment(p => ({ ...p, paymentMethod: e.target.value }))}
+                  className={fieldClass}
+                >
+                  <option value="">未設定</option>
+                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  {payment.paymentMethod && !PAYMENT_METHODS.includes(payment.paymentMethod as never) && (
+                    <option value={payment.paymentMethod}>{payment.paymentMethod}</option>
+                  )}
+                </select>
               </div>
               <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い日</p>
-                <p className="text-sm text-[#173c2a]">{record.paymentDate || '-'}</p>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払期日</p>
+                <input type="date" value={payment.dueDate} onChange={e => setPayment(p => ({ ...p, dueDate: e.target.value }))} className={fieldClass} />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">入金日</p>
+                <input type="date" value={payment.paymentDate} onChange={e => setPayment(p => ({ ...p, paymentDate: e.target.value }))} className={fieldClass} />
               </div>
             </div>
-            <div className="mt-3 flex justify-end">
-              <Link
-                href="/receivables"
-                className="text-xs font-medium text-[#174c33] hover:underline"
+            <div className="mt-3 flex items-center justify-end gap-3">
+              <Link href="/receivables" className="text-xs text-[#68756c] hover:underline">入金管理で一覧</Link>
+              <button
+                type="button"
+                onClick={savePayment}
+                disabled={!paymentDirty || savingSection === 'payment'}
+                className="rounded-xl bg-[#174c33] px-4 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-40"
               >
-                入金管理で編集 →
-              </Link>
+                {savingSection === 'payment' ? '保存中…' : '請求・支払いを保存'}
+              </button>
             </div>
           </Section>
 
-          {/* 発送 */}
+          {/* 発送（直接編集可） */}
           <Section title="発送">
             <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              <DetailField label="発送ステータス" value={<ShippingBadge status={record.shippingStatus} />} />
-              <DetailField label="発送方法" value={record.shippingMethod || '-'} />
-              <DetailField label="発送日" value={record.shippingDate || '-'} />
-              <DetailField label="追跡番号" value={record.trackingNumber || '-'} />
-              <DetailField label="郵便番号" value={record.shippingPostalCode || '-'} />
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送ステータス</p>
+                <select
+                  value={shipping.shippingStatus}
+                  onChange={e => setShipping(s => ({ ...s, shippingStatus: e.target.value as ShippingStatus }))}
+                  className={fieldClass}
+                >
+                  {(Object.keys(SHIPPING_LABELS) as ShippingStatus[]).map(k => (
+                    <option key={k} value={k}>{SHIPPING_LABELS[k]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送方法</p>
+                <input value={shipping.shippingMethod} onChange={e => setShipping(s => ({ ...s, shippingMethod: e.target.value }))} className={fieldClass} placeholder="例: ヤマト宅急便" />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送日</p>
+                <input type="date" value={shipping.shippingDate} onChange={e => setShipping(s => ({ ...s, shippingDate: e.target.value }))} className={fieldClass} />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">追跡番号</p>
+                <input value={shipping.trackingNumber} onChange={e => setShipping(s => ({ ...s, trackingNumber: e.target.value }))} className={fieldClass} />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">郵便番号</p>
+                <input value={shipping.shippingPostalCode} onChange={e => setShipping(s => ({ ...s, shippingPostalCode: e.target.value }))} className={fieldClass} placeholder="〒" />
+              </div>
               <div className="sm:col-span-2">
-                <p className="text-[11px] uppercase tracking-wider text-[#68756c]">発送先</p>
-                <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-2.5 text-sm text-[#173c2a]">
-                  {record.shippingAddress || buyerShippingAddress || '-'}
-                </p>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送先</p>
+                <textarea
+                  rows={2}
+                  value={shipping.shippingAddress}
+                  onChange={e => setShipping(s => ({ ...s, shippingAddress: e.target.value }))}
+                  className={fieldClass}
+                  placeholder={buyerShippingAddress || '住所'}
+                />
               </div>
             </div>
-            <p className="mt-3 text-right text-xs">
-              <Link href="/shipping" className="text-[#174c33] hover:underline">発送管理で編集 →</Link>
-            </p>
+            <div className="mt-3 flex items-center justify-end gap-3">
+              <Link href="/shipping" className="text-xs text-[#68756c] hover:underline">発送管理で一覧</Link>
+              <button
+                type="button"
+                onClick={saveShipping}
+                disabled={!shippingDirty || savingSection === 'shipping'}
+                className="rounded-xl bg-[#174c33] px-4 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-40"
+              >
+                {savingSection === 'shipping' ? '保存中…' : '発送情報を保存'}
+              </button>
+            </div>
           </Section>
 
           {/* 書類発行 */}
