@@ -26,7 +26,8 @@ import {
   X,
 } from 'lucide-react'
 
-type ViewMode = 'list' | 'by-month' | 'by-fiscal' | 'by-country' | 'by-product'
+type ViewMode = 'by-month' | 'by-fiscal' | 'by-country' | 'by-product'
+type SortKey = 'createdAt' | 'buyerName' | 'amount' | 'grossProfit' | 'dueDate' | 'paymentDate' | 'status'
 
 interface AggregateRow {
   key: string
@@ -113,6 +114,32 @@ function getStatusLabel(status: SaleStatus): string {
   if (status === 'confirmed') return '確定'
   if (status === 'cancelled') return '取消'
   return '商談中'
+}
+
+function formatDateOnly(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function SortTh({ label, col, sortKey, sortDir, onSort }: {
+  label: string
+  col: SortKey
+  sortKey: SortKey
+  sortDir: 'asc' | 'desc'
+  onSort: (key: SortKey) => void
+}) {
+  const active = sortKey === col
+  return (
+    <th className="whitespace-nowrap px-3 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => onSort(col)}
+        className={`inline-flex items-center gap-1 ${active ? 'text-[#173c2a]' : 'hover:text-[#173c2a]'}`}
+      >
+        {label}
+        <span className="text-[10px]">{active ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  )
 }
 
 function statusColor(status: SaleStatus): string {
@@ -710,7 +737,10 @@ export default function SalesPage() {
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('by-month')
+  const [mainTab, setMainTab] = useState<'dashboard' | 'records'>('records')
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSale, setEditingSale] = useState<SaleRecord | null>(null)
   const [prefillSale, setPrefillSale] = useState<SaleRecord | null>(null)
@@ -794,6 +824,35 @@ export default function SalesPage() {
 
   // Statistics exclude cancelled deals (取消)
   const analyticsSales = useMemo(() => filteredSales.filter(s => s.status !== 'cancelled'), [filteredSales])
+
+  const STATUS_ORDER: Record<SaleStatus, number> = { negotiating: 0, confirmed: 1, cancelled: 2 }
+  const sortedSales = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    const val = (r: SaleRecord): string | number => {
+      switch (sortKey) {
+        case 'buyerName': return r.buyerName ?? ''
+        case 'amount': return computeSaleTaxIncluded(r)
+        case 'grossProfit': return r.grossProfit ?? 0
+        case 'dueDate': return r.dueDate ?? ''
+        case 'paymentDate': return r.paymentDate ?? ''
+        case 'status': return STATUS_ORDER[r.status] ?? 9
+        case 'createdAt':
+        default: return r.createdAt.getTime()
+      }
+    }
+    return [...filteredSales].sort((a, b) => {
+      const av = val(a), bv = val(b)
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSales, sortKey, sortDir])
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir(key === 'buyerName' ? 'asc' : 'desc') }
+  }
 
   const aggregations = useMemo(() => ({
     monthly: aggregateSales(analyticsSales, r => {
@@ -957,6 +1016,27 @@ export default function SalesPage() {
           </div>
         )}
 
+        <div className="flex gap-1 border-b border-[#e6dfcf]">
+          {([
+            ['records', '案件一覧'],
+            ['dashboard', 'ダッシュボード'],
+          ] as ['records' | 'dashboard', string][]).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setMainTab(k)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
+                mainTab === k
+                  ? 'border-[#174c33] text-[#173c2a]'
+                  : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mainTab === 'dashboard' && (<>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <KPICard title={`売上高（${scopeLabel}）`} value={formatCurrency(scopeRevenue)} color="green" icon={<CircleDollarSign size={18} />} />
           <KPICard title="数量" value={formatKg(scopeQuantity)} color="default" icon={<Package2 size={18} />} />
@@ -1031,11 +1111,12 @@ export default function SalesPage() {
             </div>
           </section>
         </div>
+        </>)}
 
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          {mainTab === 'dashboard' && (
           <div className="mb-4 flex flex-wrap gap-2">
             {([
-              { mode: 'list', label: '一覧' },
               { mode: 'by-month', label: '月別' },
               { mode: 'by-fiscal', label: '年度別' },
               { mode: 'by-country', label: '国別' },
@@ -1055,9 +1136,10 @@ export default function SalesPage() {
               </button>
             ))}
           </div>
+          )}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <h2 className="text-lg font-semibold text-[#173c2a]">
-              {viewMode === 'list' ? '販売案件一覧'
+              {mainTab === 'records' ? '販売案件一覧'
                 : viewMode === 'by-month' ? '月別集計'
                 : viewMode === 'by-fiscal' ? '年度別集計（4月〜3月）'
                 : viewMode === 'by-country' ? '国別集計'
@@ -1165,7 +1247,7 @@ export default function SalesPage() {
             </div>
           )}
 
-          {viewMode !== 'list' && (
+          {mainTab === 'dashboard' && (
             <div className="mt-5 overflow-x-auto">
               <AggregateTable
                 rows={
@@ -1184,13 +1266,13 @@ export default function SalesPage() {
             </div>
           )}
 
-          <div className={`mt-5 space-y-3 ${viewMode === 'list' ? 'md:hidden' : 'hidden'}`}>
-            {!loading && filteredSales.length === 0 && (
+          <div className={`mt-5 space-y-3 ${mainTab === 'records' ? 'md:hidden' : 'hidden'}`}>
+            {!loading && sortedSales.length === 0 && (
               <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
                 条件に合う販売案件はありません。
               </div>
             )}
-            {filteredSales.map(record => (
+            {sortedSales.map(record => (
               <div
                 key={record.id}
                 onClick={() => setDetailSaleId(record.id)}
@@ -1259,44 +1341,49 @@ export default function SalesPage() {
             ))}
           </div>
 
-          <div className={`mt-5 overflow-x-auto ${viewMode === 'list' ? 'hidden md:block' : 'hidden'}`}>
-            <table className="min-w-full text-sm">
+          <div className={`mt-5 -mx-5 overflow-x-auto ${mainTab === 'records' ? 'hidden md:block' : 'hidden'}`}>
+            <table className="min-w-[1280px] text-sm">
               <thead>
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
-                  <th className="px-3 py-3 font-medium">ステータス</th>
-                  <th className="px-3 py-3 font-medium">購入者</th>
-                  <th className="px-3 py-3 font-medium">商品</th>
-                  <th className="px-3 py-3 font-medium">数量</th>
-                  <th className="px-3 py-3 font-medium">請求額(税込)</th>
-                  <th className="px-3 py-3 font-medium">原価</th>
-                  <th className="px-3 py-3 font-medium">粗利</th>
-                  <th className="px-3 py-3 font-medium">国</th>
-                  <th className="px-3 py-3 font-medium">納期</th>
-                  <th className="px-3 py-3 font-medium text-right">操作</th>
+                  <SortTh label="ステータス" col="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh label="購入者" col="buyerName" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh label="作成日" col="createdAt" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">商品</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">数量</th>
+                  <SortTh label="請求額(税込)" col="amount" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">原価</th>
+                  <SortTh label="粗利" col="grossProfit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">国</th>
+                  <SortTh label="納期" col="dueDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払期日</th>
+                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払方法</th>
+                  <SortTh label="入金日" col="paymentDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <th className="whitespace-nowrap px-3 py-3 font-medium text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {!loading && filteredSales.length === 0 && (
+                {!loading && sortedSales.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={14} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       条件に合う販売案件はありません。
                     </td>
                   </tr>
                 )}
-                {filteredSales.map(record => (
+                {sortedSales.map(record => (
                   <tr
                     key={record.id}
                     onClick={() => setDetailSaleId(record.id)}
                     className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
                   >
-                    <td className="px-3 py-4">
+                    <td className="whitespace-nowrap px-3 py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <SalesStatusBadge status={record.status} />
                         <PaymentBadge status={record.paymentStatus} />
                         <ShippingBadge status={record.shippingStatus} />
                       </div>
                     </td>
-                    <td className="px-3 py-4 font-medium">{record.buyerName}</td>
+                    <td className="whitespace-nowrap px-3 py-4 font-medium">{record.buyerName}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{formatDateOnly(record.createdAt)}</td>
                     <td className="px-3 py-4">
                       <div>
                         {record.items[0]?.productName ?? record.productName}
@@ -1306,8 +1393,8 @@ export default function SalesPage() {
                       </div>
                       <div className="text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
                     </td>
-                    <td className="px-3 py-4">{formatKg(record.quantityKg)}</td>
-                    <td className="px-3 py-4">
+                    <td className="whitespace-nowrap px-3 py-4">{formatKg(record.quantityKg)}</td>
+                    <td className="whitespace-nowrap px-3 py-4">
                       <div className="font-semibold text-[#173c2a]">{formatCurrency(computeSaleTaxIncluded(record))}</div>
                       <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
                       {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0) && (
@@ -1318,11 +1405,14 @@ export default function SalesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-4">{formatCurrency(record.costAmount)}</td>
-                    <td className="px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
-                    <td className="px-3 py-4">{record.country}</td>
-                    <td className="px-3 py-4">{record.dueDate || '-'}</td>
-                    <td className="px-3 py-4">
+                    <td className="whitespace-nowrap px-3 py-4">{formatCurrency(record.costAmount)}</td>
+                    <td className="whitespace-nowrap px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
+                    <td className="whitespace-nowrap px-3 py-4">{record.country}</td>
+                    <td className="whitespace-nowrap px-3 py-4">{record.dueDate || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4">{record.dueDate || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4">{record.paymentMethod || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4">{record.paymentDate || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4">
                       <div className="flex flex-wrap justify-end gap-1" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleDuplicate(record)}
