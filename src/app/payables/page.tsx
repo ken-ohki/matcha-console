@@ -16,8 +16,9 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { PurchaseOrder, PurchaseOrderPaymentStatus, PurchaseOrderStatus } from '@/types'
-import { computePoTaxIncluded } from '@/lib/cashflow'
+import type { PurchaseOrder, PurchaseOrderPayment, PurchaseOrderPaymentStatus, PurchaseOrderStatus } from '@/types'
+import { computePoTaxIncluded, poPaidTotal, poRemaining } from '@/lib/cashflow'
+import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
@@ -25,6 +26,7 @@ import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_OR
 const PAY_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
   uninvoiced: '未請求',
   unpaid: '未払',
+  partial: '一部支払',
   paid: '支払済',
 }
 
@@ -84,23 +86,51 @@ export default function PayablesPage() {
   }, [filtered])
 
   const kpis = useMemo(() => {
-    const outstanding = orders.filter(o => o.paymentStatus !== 'paid').reduce((s, o) => s + computePoTaxIncluded(o), 0)
-    const overdue = grouped.overdue.reduce((s, o) => s + computePoTaxIncluded(o), 0)
-    const thisMonth = grouped.thisMonth.reduce((s, o) => s + computePoTaxIncluded(o), 0)
-    const paidThisMonth = orders
-      .filter(o => o.paymentStatus === 'paid' && (o.paidDate ?? '').startsWith(todayIso().slice(0, 7)))
-      .reduce((s, o) => s + computePoTaxIncluded(o), 0)
+    // Outstanding/aging use the remaining (unpaid) amount so partial payments
+    // reduce the balance correctly.
+    const outstanding = orders.reduce((s, o) => s + poRemaining(o), 0)
+    const overdue = grouped.overdue.reduce((s, o) => s + poRemaining(o), 0)
+    const thisMonth = grouped.thisMonth.reduce((s, o) => s + poRemaining(o), 0)
+    const ym = todayIso().slice(0, 7)
+    // Paid this month = split payments dated this month + legacy single payments.
+    const paidThisMonth = orders.reduce((s, o) => {
+      const splits = (o.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0)
+      const legacy = (o.payments ?? []).length === 0 && o.paymentStatus === 'paid' && (o.paidDate ?? '').startsWith(ym)
+        ? computePoTaxIncluded(o) : 0
+      return s + splits + legacy
+    }, 0)
     return { outstanding, overdue, thisMonth, paidThisMonth }
   }, [orders, grouped])
 
   const markPaid = async (id: string) => {
+    const order = orders.find(o => o.id === id)
+    if (!order) return
     setSavingId(id)
     setFeedback(null)
     try {
       const svc = await getServices()
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { paymentStatus: 'paid', paidDate: todayIso() })
+      // Record the remaining amount as a payment dated today (full settlement).
+      const remaining = poRemaining(order)
+      const nextPayments = [
+        ...(order.payments ?? []),
+        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : computePoTaxIncluded(order), paidDate: todayIso() },
+      ]
+      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments: nextPayments, paidDate: todayIso() })
       setOrders(prev => prev.map(o => o.id === id ? updated : o))
       setFeedback('支払確認しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
+    } finally { setSavingId(null) }
+  }
+
+  const savePayments = async (id: string, payments: PurchaseOrderPayment[]) => {
+    setSavingId(id)
+    setFeedback(null)
+    try {
+      const svc = await getServices()
+      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments })
+      setOrders(prev => prev.map(o => o.id === id ? updated : o))
+      setDetailOrder(updated)
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingId(null) }
@@ -222,17 +252,24 @@ export default function PayablesPage() {
                             <td className="px-3 py-2 text-right">
                               <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
                               <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(o.totalAmount || 0)}</div>
+                              {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
+                                <div className="text-[10px] text-[#9d3d28]">残額 {formatCurrency(poRemaining(o))}</div>
+                              )}
                             </td>
                             <td className="px-3 py-2">
-                              <select
-                                value={o.paymentStatus}
-                                onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
-                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                              >
-                                <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
-                                <option value="unpaid">{PAY_LABELS.unpaid}</option>
-                                <option value="paid">{PAY_LABELS.paid}</option>
-                              </select>
+                              {(o.payments ?? []).length > 0 ? (
+                                <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{PAY_LABELS[o.paymentStatus]}</span>
+                              ) : (
+                                <select
+                                  value={o.paymentStatus === 'partial' ? 'unpaid' : o.paymentStatus}
+                                  onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
+                                  className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+                                >
+                                  <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
+                                  <option value="unpaid">{PAY_LABELS.unpaid}</option>
+                                  <option value="paid">{PAY_LABELS.paid}</option>
+                                </select>
+                              )}
                             </td>
                             <td className="px-3 py-2">
                               <input
@@ -288,6 +325,7 @@ export default function PayablesPage() {
         order={detailOrder}
         bankInfo={detailOrder ? bankInfoBySupplier[detailOrder.supplierName] : undefined}
         onClose={() => setDetailOrder(null)}
+        onSavePayments={savePayments}
       />
     </AppLayout>
   )
@@ -302,7 +340,12 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-function PoDetailModal({ order, bankInfo, onClose }: { order: PurchaseOrder | null; bankInfo?: string; onClose: () => void }) {
+function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
+  order: PurchaseOrder | null
+  bankInfo?: string
+  onClose: () => void
+  onSavePayments: (id: string, payments: PurchaseOrderPayment[]) => Promise<void>
+}) {
   if (!order) return null
   const fees = (order.shippingFee ?? 0) + (order.otherFees ?? 0)
   const tax = computeTaxBuckets(order.items ?? [], fees)
@@ -349,6 +392,15 @@ function PoDetailModal({ order, bankInfo, onClose }: { order: PurchaseOrder | nu
           {bankInfo
             ? <p className="whitespace-pre-wrap text-[#173c2a]">{bankInfo}</p>
             : <p className="text-[#a59f8c]">仕入先マスタに未登録です。<Link href="/suppliers" className="text-[#174c33] hover:underline">仕入先管理</Link>で登録してください。</p>}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[#e6dfcf] p-3">
+          <p className="mb-2 text-xs font-medium text-[#68756c]">支払い（分割対応）</p>
+          <PaymentsEditor
+            payments={order.payments ?? []}
+            totalIncl={computePoTaxIncluded(order)}
+            onChange={next => { void onSavePayments(order.id, next) }}
+          />
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">

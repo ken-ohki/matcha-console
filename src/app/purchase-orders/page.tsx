@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 import { computePoTaxIncluded } from '@/lib/cashflow'
+import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 
 const STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
@@ -34,10 +35,11 @@ const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
   cancelled: 'bg-gray-100 text-gray-500',
 }
 
-function PaymentStatusBadge({ status, hasInvoice }: { status: 'uninvoiced' | 'unpaid' | 'paid'; hasInvoice: boolean }) {
+function PaymentStatusBadge({ status, hasInvoice }: { status: PurchaseOrderPaymentStatus; hasInvoice: boolean }) {
   const map = {
     uninvoiced: { label: '未請求', cls: 'bg-slate-100 text-slate-700' },
     unpaid: { label: '未払', cls: 'bg-amber-100 text-amber-800' },
+    partial: { label: '一部支払', cls: 'bg-sky-100 text-sky-800' },
     paid: { label: '支払済', cls: 'bg-emerald-100 text-emerald-800' },
   } as const
   const m = map[status]
@@ -196,6 +198,7 @@ function PurchaseOrderModal({
     paymentStatus: 'uninvoiced',
     paymentDueDate: '',
     paidDate: '',
+    payments: [],
     invoice: undefined,
     notes: '',
   })
@@ -236,6 +239,7 @@ function PurchaseOrderModal({
       paymentStatus: initial?.paymentStatus ?? 'uninvoiced',
       paymentDueDate: initial?.paymentDueDate ?? '',
       paidDate: initial?.paidDate ?? '',
+      payments: initial?.payments ?? [],
       invoice: initial?.invoice,
       notes: initial?.notes ?? '',
     })
@@ -583,6 +587,14 @@ function PurchaseOrderModal({
                   </label>
                 )}
                 {invoiceError && <p className="mt-1 text-xs text-red-600">{invoiceError}</p>}
+              </div>
+              <div className="md:col-span-3">
+                <p className="mb-2 text-xs font-medium text-gray-700">支払い（分割対応）</p>
+                <PaymentsEditor
+                  payments={form.payments ?? []}
+                  totalIncl={totalAmount + poTaxTotal}
+                  onChange={next => setForm(prev => ({ ...prev, payments: next }))}
+                />
               </div>
             </div>
           </div>

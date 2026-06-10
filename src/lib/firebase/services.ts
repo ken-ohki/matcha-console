@@ -41,6 +41,7 @@ import type {
   PurchaseOrderLineItem,
   PurchaseOrderStatus,
   PurchaseOrderPaymentStatus,
+  PurchaseOrderPayment,
   SaleLineItem,
   SaleRecord,
   SaleRecordInput,
@@ -68,6 +69,7 @@ import type {
 } from '../services'
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
 import { ISSUER } from '../invoice'
+import { derivePoPaymentStatus } from '../cashflow'
 
 const COLLECTIONS = {
   groups: 'inventory_groups',
@@ -884,6 +886,19 @@ async function syncBuyersCollection(): Promise<void> {
   await batch.commit()
 }
 
+function normalizePoPayments(raw: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map(p => ({
+      id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}`,
+      amount: Number(p.amount) || 0,
+      paidDate: (p.paidDate ?? '').trim(),
+      method: p.method?.trim() || undefined,
+      note: p.note?.trim() || undefined,
+    }))
+    .filter(p => p.amount > 0)
+}
+
 function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null {
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
@@ -923,9 +938,25 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     ? Number(data.totalAmount)
     : items.reduce((sum, item) => sum + item.lineTotal, 0)
   const status = isValidPurchaseOrderStatus(data.status) ? data.status : 'placed'
-  const paymentStatus = (data.paymentStatus === 'unpaid' || data.paymentStatus === 'paid')
+  const storedPaymentStatus = (data.paymentStatus === 'unpaid' || data.paymentStatus === 'partial' || data.paymentStatus === 'paid')
     ? data.paymentStatus
     : 'uninvoiced'
+  const payments = Array.isArray(data.payments)
+    ? data.payments
+        .map((raw: unknown) => {
+          const obj = (raw ?? {}) as Record<string, unknown>
+          const amount = Number(obj.amount ?? 0)
+          if (!(amount > 0)) return null
+          return {
+            id: String(obj.id ?? `${Date.now()}-${amount}`),
+            amount,
+            paidDate: obj.paidDate ? toIsoDate(String(obj.paidDate)) : '',
+            method: obj.method ? String(obj.method) : undefined,
+            note: obj.note ? String(obj.note) : undefined,
+          }
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null)
+    : []
   const invoiceRaw = data.invoice as Record<string, unknown> | undefined
   const invoice = invoiceRaw && invoiceRaw.url
     ? {
@@ -935,7 +966,7 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
         size: invoiceRaw.size != null ? Number(invoiceRaw.size) : undefined,
       }
     : undefined
-  return {
+  const base: PurchaseOrder = {
     id,
     supplierName: String(data.supplierName ?? ''),
     items,
@@ -948,14 +979,18 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     expectedDeliveryDate: data.expectedDeliveryDate ? String(data.expectedDeliveryDate) : undefined,
     actualDeliveryDate: data.actualDeliveryDate ? String(data.actualDeliveryDate) : undefined,
     status,
-    paymentStatus,
+    paymentStatus: storedPaymentStatus,
     paymentDueDate: data.paymentDueDate ? String(data.paymentDueDate) : undefined,
     paidDate: data.paidDate ? String(data.paidDate) : undefined,
+    payments,
     invoice,
     notes: data.notes ? String(data.notes) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
+  // Derive status from split payments when present.
+  base.paymentStatus = derivePoPaymentStatus(base, storedPaymentStatus)
+  return base
 }
 
 function mapSupplier(id: string, data: DocumentData): Supplier {
@@ -1809,6 +1844,7 @@ export function createFirebaseServices(): IServices {
 
       const paymentStatus = input.paymentStatus ?? 'uninvoiced'
       const invoice = input.invoice && input.invoice.url ? input.invoice : undefined
+      const payments = normalizePoPayments(input.payments)
 
       const shippingFee = Number(input.shippingFee) || 0
       const otherFees = Number(input.otherFees) || 0
@@ -1828,6 +1864,7 @@ export function createFirebaseServices(): IServices {
         paymentStatus,
         paymentDueDate: input.paymentDueDate?.trim() || undefined,
         paidDate: input.paidDate?.trim() || undefined,
+        payments,
         invoice,
         notes: input.notes?.trim() || undefined,
         createdAt: serverTimestamp(),
@@ -1839,27 +1876,7 @@ export function createFirebaseServices(): IServices {
       // Arrivals are reflected only via the receiving flow, not by PO status.
       await syncSuppliersCollection()
 
-      return {
-        id: ref.id,
-        supplierName: input.supplierName.trim(),
-        items,
-        totalQuantityKg,
-        totalAmount,
-        shippingFee,
-        otherFees,
-        otherFeesNote,
-        orderDate: input.orderDate.trim(),
-        expectedDeliveryDate: input.expectedDeliveryDate?.trim() || undefined,
-        actualDeliveryDate: input.actualDeliveryDate?.trim() || undefined,
-        status: input.status,
-        paymentStatus,
-        paymentDueDate: input.paymentDueDate?.trim() || undefined,
-        paidDate: input.paidDate?.trim() || undefined,
-        invoice,
-        notes: input.notes?.trim() || undefined,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+      return mapPurchaseOrder(ref.id, { ...payload, createdAt: new Date(), updatedAt: new Date() })
     },
 
     async updatePurchaseOrder(id, input) {
@@ -1890,6 +1907,7 @@ export function createFirebaseServices(): IServices {
         paymentStatus: input.paymentStatus ?? current.paymentStatus,
         paymentDueDate: input.paymentDueDate ?? current.paymentDueDate,
         paidDate: input.paidDate ?? current.paidDate,
+        payments: input.payments ?? current.payments,
         invoice: input.invoice === null ? null : (input.invoice ?? current.invoice),
         notes: input.notes ?? current.notes,
       }
@@ -1940,8 +1958,9 @@ export function createFirebaseServices(): IServices {
       const shippingFee = Number(merged.shippingFee) || 0
       const otherFees = Number(merged.otherFees) || 0
       const otherFeesNote = merged.otherFeesNote?.trim() || undefined
+      const payments = normalizePoPayments(merged.payments)
 
-      await updateDoc(ref, sanitizeRecord({
+      const writePayload = {
         supplierName: merged.supplierName.trim(),
         items,
         totalQuantityKg,
@@ -1956,6 +1975,11 @@ export function createFirebaseServices(): IServices {
         paymentStatus: merged.paymentStatus ?? 'uninvoiced',
         paymentDueDate: merged.paymentDueDate?.trim() || undefined,
         paidDate: merged.paidDate?.trim() || undefined,
+        payments,
+      }
+
+      await updateDoc(ref, sanitizeRecord({
+        ...writePayload,
         invoice: invoiceToWrite,
         notes: merged.notes?.trim() || undefined,
         updatedAt: serverTimestamp(),
@@ -1964,27 +1988,13 @@ export function createFirebaseServices(): IServices {
       // Arrivals are managed by the receiving flow; editing a PO never touches stock.
       await syncSuppliersCollection()
 
-      return {
-        id,
-        supplierName: merged.supplierName.trim(),
-        items,
-        totalQuantityKg,
-        totalAmount,
-        shippingFee,
-        otherFees,
-        otherFeesNote,
-        orderDate: merged.orderDate.trim(),
-        expectedDeliveryDate: merged.expectedDeliveryDate?.trim() || undefined,
-        actualDeliveryDate: merged.actualDeliveryDate?.trim() || undefined,
-        status: merged.status,
-        paymentStatus: merged.paymentStatus ?? 'uninvoiced',
-        paymentDueDate: merged.paymentDueDate?.trim() || undefined,
-        paidDate: merged.paidDate?.trim() || undefined,
+      return mapPurchaseOrder(id, {
+        ...writePayload,
         invoice: merged.invoice === null ? undefined : merged.invoice,
         notes: merged.notes?.trim() || undefined,
         createdAt: current.createdAt,
         updatedAt: new Date(),
-      }
+      })
     },
 
     async deletePurchaseOrder(id) {
@@ -2155,6 +2165,7 @@ export function createFirebaseServices(): IServices {
         paymentStatus: 'uninvoiced',
         paymentDueDate: undefined,
         paidDate: undefined,
+        payments: [],
         invoice: undefined,
         notes: input.notes?.trim() || '期首在庫から自動変換',
         createdAt: new Date(),

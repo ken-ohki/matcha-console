@@ -1,6 +1,7 @@
 import type {
   EcSaleRecord,
   PurchaseOrder,
+  PurchaseOrderPaymentStatus,
   SaleRecord,
 } from '@/types'
 import { computeTax } from '@/lib/tax'
@@ -26,6 +27,33 @@ export function computeSaleTaxIncluded(sale: SaleRecord): number {
 export function computePoTaxIncluded(po: PurchaseOrder): number {
   const fees = (po.shippingFee ?? 0) + (po.otherFees ?? 0)
   return (po.totalAmount ?? 0) + computeTax(po.items ?? [], fees)
+}
+
+/** Sum of recorded split payments (税込 cash actually paid). */
+export function poPaidTotal(po: { payments?: { amount: number }[] }): number {
+  return (po.payments ?? []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+}
+
+/** Outstanding amount on a PO (税込 total − paid), never negative. */
+export function poRemaining(po: PurchaseOrder): number {
+  return Math.max(0, computePoTaxIncluded(po) - poPaidTotal(po))
+}
+
+/**
+ * Derive payment status from split payments when present, else fall back to the
+ * stored single-payment status. uninvoiced is preserved (no invoice yet).
+ */
+export function derivePoPaymentStatus(
+  po: PurchaseOrder,
+  stored: PurchaseOrderPaymentStatus,
+): PurchaseOrderPaymentStatus {
+  const payments = po.payments ?? []
+  if (payments.length === 0) return stored
+  const paid = poPaidTotal(po)
+  const total = computePoTaxIncluded(po)
+  if (paid <= 0) return stored === 'uninvoiced' ? 'uninvoiced' : 'unpaid'
+  if (paid >= total) return 'paid'
+  return 'partial'
 }
 
 export interface MonthlyCashFlow {
@@ -89,7 +117,19 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
     if (po.status === 'cancelled') continue
     const amount = computePoTaxIncluded(po)
     if (amount <= 0) continue
-    if (po.paymentStatus === 'paid' && po.paidDate) {
+    const payments = po.payments ?? []
+    if (payments.length > 0) {
+      // Split payments: each recorded payment is actual cash on its date.
+      for (const p of payments) {
+        if (!p.paidDate || !(p.amount > 0)) continue
+        ensure(monthKey(p.paidDate)).outActual += p.amount
+      }
+      // The unpaid remainder is expected on the due date.
+      const remaining = Math.max(0, amount - poPaidTotal(po))
+      if (remaining > 0 && po.paymentDueDate) {
+        ensure(monthKey(po.paymentDueDate)).outExpected += remaining
+      }
+    } else if (po.paymentStatus === 'paid' && po.paidDate) {
       ensure(monthKey(po.paidDate)).outActual += amount
     } else if (po.paymentDueDate) {
       ensure(monthKey(po.paymentDueDate)).outExpected += amount

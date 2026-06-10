@@ -310,7 +310,15 @@ export interface AuthUser {
 }
 
 export type PurchaseOrderStatus = 'placed' | 'shipped' | 'received' | 'cancelled'
-export type PurchaseOrderPaymentStatus = 'uninvoiced' | 'unpaid' | 'paid'
+export type PurchaseOrderPaymentStatus = 'uninvoiced' | 'unpaid' | 'partial' | 'paid'
+
+export interface PurchaseOrderPayment {
+  id: string
+  amount: number      // 税込の支払額（実際に動いた現金）
+  paidDate: string    // ISO YYYY-MM-DD
+  method?: string
+  note?: string
+}
 
 export interface PurchaseOrderInvoice {
   name: string
@@ -355,6 +363,7 @@ export interface PurchaseOrder {
   paymentStatus: PurchaseOrderPaymentStatus
   paymentDueDate?: string
   paidDate?: string
+  payments: PurchaseOrderPayment[]   // 分割支払いの明細（空なら未払/単一払い）
   invoice?: PurchaseOrderInvoice
   notes?: string
   createdAt: Date
@@ -373,6 +382,7 @@ export interface PurchaseOrderInput {
   paymentStatus?: PurchaseOrderPaymentStatus
   paymentDueDate?: string
   paidDate?: string
+  payments?: PurchaseOrderPayment[]
   invoice?: PurchaseOrderInvoice | null
   status: PurchaseOrderStatus
   notes?: string
