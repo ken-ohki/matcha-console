@@ -24,9 +24,17 @@ export interface TaxBreakdown {
   total: number             // 税込合計
 }
 
+/** Default per-line tax rate by destination: domestic = 8% (matcha), export = 免税. */
+export function defaultTaxRateForCountry(country?: string): TaxRate {
+  const c = (country ?? '').trim().toLowerCase()
+  const domestic = c === '' || c === '日本' || c === 'japan' || c === 'jp'
+  return domestic ? 8 : 0
+}
+
 /**
  * Compute a tax breakdown from line items plus fees.
- * taxRate 0 = 免税 (no tax). Fees (shipping / other) are always 10% standard.
+ * taxRate 0 = 免税 (no tax); missing taxRate defaults to 8 (matcha).
+ * Fees (shipping / other) are always 10% standard.
  */
 export function computeTaxBuckets(lines: TaxLine[], fees = 0): TaxBreakdown {
   let exempt = 0
@@ -34,7 +42,7 @@ export function computeTaxBuckets(lines: TaxLine[], fees = 0): TaxBreakdown {
   let standard = 0
   for (const line of lines) {
     const amount = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
-    const rate = Number(line.taxRate)
+    const rate = line.taxRate == null ? 8 : Number(line.taxRate)
     if (rate === 0) exempt += amount
     else if (rate === 8) reduced += amount
     else standard += amount
@@ -60,4 +68,16 @@ export function computeTaxBuckets(lines: TaxLine[], fees = 0): TaxBreakdown {
 /** Total consumption tax for the given lines + fees (bucket-floored). */
 export function computeTax(lines: TaxLine[], fees = 0): number {
   return computeTaxBuckets(lines, fees).tax
+}
+
+/**
+ * Buckets for a SALE: when every line is 免税 (an export), the fees are
+ * exempt too — the whole transaction carries no consumption tax.
+ */
+export function computeSaleTaxBuckets(lines: TaxLine[], fees = 0): TaxBreakdown {
+  const allExempt = lines.length > 0 && lines.every(l => Number(l.taxRate) === 0)
+  if (!allExempt) return computeTaxBuckets(lines, fees)
+  const b = computeTaxBuckets(lines, 0)
+  const f = Number(fees) || 0
+  return { ...b, exemptSubtotal: b.exemptSubtotal + f, subtotal: b.subtotal + f, total: b.total + f }
 }

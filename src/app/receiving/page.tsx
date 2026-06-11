@@ -12,6 +12,7 @@ import type {
 } from '@/types'
 import { PackageOpen, Check, Undo2, X, FilePlus, Trash2 } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
+import { computeTax } from '@/lib/tax'
 
 interface PendingLine {
   order: PurchaseOrder
@@ -667,7 +668,7 @@ function OrphanConvertModal({
   if (!target) return null
 
   const lineTotal = (Number(target.arrival.quantityKg) || 0) * (Number(unitPrice) || 0)
-  const tax = Math.floor(lineTotal * (taxRate === 8 ? 0.08 : 0.10))
+  const tax = computeTax([{ quantityKg: Number(target.arrival.quantityKg) || 0, unitPrice: Number(unitPrice) || 0, taxRate }])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -108,7 +108,9 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     recipientPostalCode: buyer?.shippingPostalCode ?? '',
     issueDate: todayString(),
     projectName: projectLabel,
-    taxExempt: !isJa, // English version defaults to tax-exempt (export)
+    // 輸出 default follows the data, not the language: a sale whose lines are
+    // all 免税 is an export; otherwise tax applies (English domestic included).
+    taxExempt: sale.items.length > 0 && sale.items.every(item => (item.taxRate ?? 8) === 0),
     validUntil: isJa ? '発行日より2ヶ月間' : 'Valid for 2 months from issue date',
     terms: sale.terms ?? '',
     deliveryDate: sale.dueDate ?? '',

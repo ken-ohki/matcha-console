@@ -12,6 +12,7 @@ import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
+import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry } from '@/lib/tax'
 import {
   CircleDollarSign,
   ClipboardPenLine,
@@ -238,14 +239,15 @@ function SaleModal({
   })
   const revenue = itemTotals.reduce((s, t) => s + t.revenue, 0)
   const costAmount = itemTotals.reduce((s, t) => s + t.costAmount, 0)
-  const subtotal10 = itemTotals.filter(t => t.taxRate === 10).reduce((s, t) => s + t.revenue, 0)
-  const subtotal8 = itemTotals.filter(t => t.taxRate === 8).reduce((s, t) => s + t.revenue, 0)
-  const tax10 = Math.floor(subtotal10 * 0.10)
-  const tax8 = Math.floor(subtotal8 * 0.08)
-  const taxTotal = tax10 + tax8
   const shippingFeeNum = Number(form.shippingFee) || 0
   const otherFeesNum = Number(form.otherFees) || 0
   const paymentFeeNum = Number(form.paymentFee) || 0
+  // Shared tax logic (fees taxed at 10%; fully-免税 sale = no tax at all)
+  // so the preview matches the invoice document and every list to the yen.
+  const taxBuckets = computeSaleTaxBuckets(form.items, shippingFeeNum + otherFeesNum)
+  const tax10 = taxBuckets.standardTax
+  const tax8 = taxBuckets.reducedTax
+  const taxTotal = taxBuckets.tax
   const invoiceAmount = revenue + shippingFeeNum + otherFeesNum
   const grossProfit = revenue - costAmount - paymentFeeNum
   // Stock remaining: sum across distinct products
@@ -304,7 +306,8 @@ function SaleModal({
     const defaultPrice = products[0]?.standardWholesalePrice ?? 0
     setForm(prev => ({
       ...prev,
-      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: 8 }],
+      // Domestic → 8% (matcha), export country → 免税 by default.
+      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: defaultTaxRateForCountry(prev.country) }],
     }))
   }
   const removeItem = (index: number) => {
@@ -443,8 +446,7 @@ function SaleModal({
               {form.items.map((line, index) => {
                 const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
                 const lineRate = line.taxRate ?? 8
-                const lineTax = lineRate === 0 ? 0 : Math.floor(lineRevenue * (lineRate === 8 ? 0.08 : 0.10))
-                const lineIncl = lineRevenue + lineTax
+                const lineIncl = computeTaxBuckets([line]).total
                 return (
                   <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
                     <select

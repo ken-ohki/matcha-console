@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { ClipboardList, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 import { computePoTaxIncluded } from '@/lib/cashflow'
+import { computeTaxBuckets } from '@/lib/tax'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 
@@ -264,16 +265,11 @@ function PurchaseOrderModal({
   const poShippingFee = Number(form.shippingFee) || 0
   const poOtherFees = Number(form.otherFees) || 0
   const totalAmount = itemsSubtotal + poShippingFee + poOtherFees
-  const poSubtotal10 = form.items
-    .filter(i => (i.taxRate ?? 8) === 10)
-    .reduce((s, i) => s + (Number(i.quantityKg) || 0) * (Number(i.unitPrice) || 0), 0)
-  const poSubtotal8 = form.items
-    .filter(i => (i.taxRate ?? 8) === 8)
-    .reduce((s, i) => s + (Number(i.quantityKg) || 0) * (Number(i.unitPrice) || 0), 0)
-  // Treat shipping/other fees as 10% standard rate.
-  const poTax10 = Math.floor((poSubtotal10 + poShippingFee + poOtherFees) * 0.10)
-  const poTax8 = Math.floor(poSubtotal8 * 0.08)
-  const poTaxTotal = poTax10 + poTax8
+  // Shared tax logic (fees taxed at 10%) — matches the PO document and 支払管理.
+  const poTaxBuckets = computeTaxBuckets(form.items, poShippingFee + poOtherFees)
+  const poTax10 = poTaxBuckets.standardTax
+  const poTax8 = poTaxBuckets.reducedTax
+  const poTaxTotal = poTaxBuckets.tax
 
   const updateItem = (index: number, patch: Partial<PurchaseOrderLineInput>) => {
     setForm(prev => ({

@@ -4,7 +4,7 @@ import type {
   PurchaseOrderPaymentStatus,
   SaleRecord,
 } from '@/types'
-import { computeTax } from '@/lib/tax'
+import { computeSaleTaxBuckets, computeTax } from '@/lib/tax'
 
 export type CashFlowMode = 'actual' | 'plan'
 
@@ -12,16 +12,17 @@ function monthKey(iso: string): string {
   return iso.slice(0, 7)
 }
 
-function isJpSale(sale: SaleRecord): boolean {
-  const c = (sale.country ?? '').trim()
-  return c === '' || c === '日本' || c.toLowerCase() === 'japan' || c.toLowerCase() === 'jp'
-}
-
+/**
+ * Tax-inclusive billed amount for a sale.
+ *
+ * Tax applicability is decided per line via taxRate (0 = 免税 for exports,
+ * 8/10 for domestic) — NOT by country or document language — so this always
+ * matches the printed invoice. Export sales should mark their lines 免税.
+ */
 export function computeSaleTaxIncluded(sale: SaleRecord): number {
   const base = sale.invoiceAmount > 0 ? sale.invoiceAmount : sale.revenue
-  if (!isJpSale(sale)) return base
   const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
-  return base + computeTax(sale.items ?? [], fees)
+  return base + computeSaleTaxBuckets(sale.items ?? [], fees).tax
 }
 
 export function computePoTaxIncluded(po: PurchaseOrder): number {

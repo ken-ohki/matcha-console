@@ -18,7 +18,7 @@ import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-import { computeTaxBuckets } from '@/lib/tax'
+import { computeSaleTaxBuckets } from '@/lib/tax'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
@@ -397,7 +397,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: () => void }) {
   if (!sale) return null
   const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
-  const tax = computeTaxBuckets(sale.items ?? [], fees)
+  const tax = computeSaleTaxBuckets(sale.items ?? [], fees)
   const exclTotal = saleIncomeExcl(sale)
   const inclTotal = saleIncome(sale)
 
