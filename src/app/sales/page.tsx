@@ -13,6 +13,7 @@ import { optionsForType } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry } from '@/lib/tax'
+import { formatCurrency, formatKg } from '@/lib/format'
 import {
   CircleDollarSign,
   ClipboardPenLine,
@@ -59,18 +60,6 @@ function aggregateSales(records: SaleRecord[], keyFn: (r: SaleRecord) => { key: 
     groups.set(key, existing)
   }
   return [...groups.values()]
-}
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
-
-function formatKg(value: number): string {
-  return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
 }
 
 const PAYMENT_LABELS: Record<PaymentStatus, string> = {
@@ -757,6 +746,9 @@ export default function SalesPage() {
       paymentStatus: 'uninvoiced',
       shippingStatus: 'ordering',
       dueDate: undefined,
+      paymentDate: undefined,
+      shippingDate: undefined,
+      trackingNumber: undefined,
       notes: record.notes ? `${record.notes}（複製）` : '複製',
     })
     setModalOpen(true)
@@ -1050,8 +1042,8 @@ export default function SalesPage() {
           <KPICard title="案件数" value={`${analyticsSales.length} 件`} color="default" icon={<ClipboardPenLine size={18} />} />
           <KPICard title="平均単価 / kg" value={scopeAvgUnitPrice > 0 ? formatCurrency(scopeAvgUnitPrice) : '-'} color="default" icon={<CircleDollarSign size={18} />} />
           <KPICard
-            title="未請求金額"
-            value={formatCurrency(analyticsSales.filter(r => r.paymentStatus !== 'paid').reduce((s, r) => s + r.revenue, 0))}
+            title="未入金金額(税込)"
+            value={formatCurrency(analyticsSales.filter(r => r.paymentStatus !== 'paid').reduce((s, r) => s + computeSaleTaxIncluded(r), 0))}
             color="amber"
             icon={<CircleDollarSign size={18} />}
           />
@@ -1357,7 +1349,6 @@ export default function SalesPage() {
                   <SortTh label="粗利" col="grossProfit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <th className="whitespace-nowrap px-3 py-3 font-medium">国</th>
                   <SortTh label="納期" col="dueDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <th className="whitespace-nowrap px-3 py-3 font-medium">支払期日</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">支払方法</th>
                   <SortTh label="入金日" col="paymentDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <th className="whitespace-nowrap px-3 py-3 font-medium text-right">操作</th>
@@ -1366,7 +1357,7 @@ export default function SalesPage() {
               <tbody>
                 {!loading && sortedSales.length === 0 && (
                   <tr>
-                    <td colSpan={14} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={13} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       条件に合う販売案件はありません。
                     </td>
                   </tr>
@@ -1410,7 +1401,6 @@ export default function SalesPage() {
                     <td className="whitespace-nowrap px-3 py-4">{formatCurrency(record.costAmount)}</td>
                     <td className="whitespace-nowrap px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.country}</td>
-                    <td className="whitespace-nowrap px-3 py-4">{record.dueDate || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.dueDate || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.paymentMethod || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.paymentDate || '-'}</td>

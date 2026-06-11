@@ -10,6 +10,7 @@ import { JAPAN_PREFECTURES } from '@/lib/prefectures'
 import { ExternalLink, FileText, Mail, MapPin, Phone, Save, Search, Trash2, Truck, Upload, User2, X } from 'lucide-react'
 import { uploadSupplierAttachment, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 import type { SupplierAttachment } from '@/types'
+import { formatCurrency } from '@/lib/format'
 
 function formatDate(date?: Date): string {
   if (!date) return '-'
@@ -18,14 +19,6 @@ function formatDate(date?: Date): string {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 
 function normalizeName(name: string): string {

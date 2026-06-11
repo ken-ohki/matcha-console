@@ -11,15 +11,12 @@ import type {
   SelfConsumptionUsageType,
 } from '@/types'
 import { Package2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { formatKg } from '@/lib/format'
 
 const usageLabels: Record<SelfConsumptionUsageType, string> = {
   ingredient: '原料',
   retail: '小売',
   sample: 'サンプル',
-}
-
-function formatKg(value: number): string {
-  return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
 }
 
 function formatDate(value: string): string {

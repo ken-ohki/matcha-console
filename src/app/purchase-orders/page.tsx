@@ -981,12 +981,12 @@ function PoListRow({
       <td className="whitespace-nowrap px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-right">
         <div className="font-semibold">{formatCurrency(computePoTaxIncluded(order))}</div>
-        <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(order.totalAmount)}</div>
+        <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))}</div>
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
       <td className="whitespace-nowrap px-3 py-3">
-        {canEdit ? (
+        {canEdit && (order.payments ?? []).length === 0 ? (
           <select
             value={status}
             onChange={e => setStatus(e.target.value as PurchaseOrderPaymentStatus)}
@@ -997,7 +997,12 @@ function PoListRow({
             <option value="paid">支払済</option>
           </select>
         ) : (
-          <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
+          <div>
+            <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
+            {(order.payments ?? []).length > 0 && (
+              <div className="mt-0.5 text-[10px] text-[#68756c]">支払管理で編集</div>
+            )}
+          </div>
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-3">

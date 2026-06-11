@@ -12,18 +12,7 @@ import type {
   ProductWithInventory,
 } from '@/types'
 import { CircleDollarSign, Package2, Pencil, Plus, Search, ShoppingBag, Trash2, X } from 'lucide-react'
-
-function formatKg(value: number): string {
-  return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value)} kg`
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
+import { formatCurrency, formatKg } from '@/lib/format'
 
 function formatDate(value: string): string {
   if (!value) return '-'

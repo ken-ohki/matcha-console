@@ -4,15 +4,7 @@ import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { PurchaseOrderPayment } from '@/types'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
-
-function formatCurrency(n: number): string {
-  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(n || 0)
-}
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+import { formatCurrency, todayIso } from '@/lib/format'
 
 function newId(): string {
   try {
@@ -47,6 +39,8 @@ export function PaymentsEditor({
   const addPayment = () => {
     const amount = Number(draftAmount) || 0
     if (!(amount > 0)) return
+    // Overpayment is allowed (rounding, bank fees) but confirm first.
+    if (amount > remaining && !confirm(`支払額が残額（${formatCurrency(remaining)}）を超えています。このまま追加しますか？`)) return
     onChange([
       ...payments,
       { id: newId(), amount, paidDate: draftDate || todayIso(), method: draftMethod || undefined, note: draftNote || undefined },

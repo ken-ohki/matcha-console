@@ -26,8 +26,10 @@ export function computeSaleTaxIncluded(sale: SaleRecord): number {
 }
 
 export function computePoTaxIncluded(po: PurchaseOrder): number {
+  // Stored totalAmount is items-only (税抜); fees are kept in separate fields,
+  // so the cash total is items + fees + tax-on-both.
   const fees = (po.shippingFee ?? 0) + (po.otherFees ?? 0)
-  return (po.totalAmount ?? 0) + computeTax(po.items ?? [], fees)
+  return (po.totalAmount ?? 0) + fees + computeTax(po.items ?? [], fees)
 }
 
 /** Sum of recorded split payments (税込 cash actually paid). */

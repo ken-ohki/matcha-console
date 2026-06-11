@@ -7,6 +7,7 @@ import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { Buyer, SaleRecord, ShippingStatus } from '@/types'
 import { Box, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
+import { formatKg, todayIso } from '@/lib/format'
 
 const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   ordering: '発注中',
@@ -31,15 +32,6 @@ function ShippingBadge({ status }: { status: ShippingStatus }) {
       {SHIPPING_LABELS[status]}
     </span>
   )
-}
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function formatKg(v: number): string {
-  return `${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(v)} kg`
 }
 
 type FilterChip = 'all' | 'ordering' | 'producing' | 'ready_to_ship' | 'shipped' | 'overdue'

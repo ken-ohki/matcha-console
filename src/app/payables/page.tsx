@@ -251,7 +251,7 @@ export default function PayablesPage() {
                             <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
                             <td className="px-3 py-2 text-right">
                               <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
-                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(o.totalAmount || 0)}</div>
+                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
                               {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
                                 <div className="text-[10px] text-[#9d3d28]">残額 {formatCurrency(poRemaining(o))}</div>
                               )}
@@ -376,12 +376,12 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
             <DetailRow label="支払日" value={order.paidDate || '-'} />
           </div>
           <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
-            <DetailRow label="商品代金（税抜）" value={formatCurrency(order.totalAmount - (order.shippingFee ?? 0) - (order.otherFees ?? 0))} />
+            <DetailRow label="商品代金（税抜）" value={formatCurrency(order.totalAmount)} />
             <DetailRow label="送料" value={formatCurrency(order.shippingFee ?? 0)} />
             <DetailRow label="諸経費" value={formatCurrency(order.otherFees ?? 0)} />
             <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
             <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
-            <DetailRow label="合計（税抜）" value={formatCurrency(order.totalAmount)} />
+            <DetailRow label="合計（税抜）" value={formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))} />
             <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
             <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-[#174c33] hover:underline">PDF</a> : '未添付'} />
           </div>

@@ -31,39 +31,14 @@ import {
   type CashFlowMode,
   type MonthlyCashFlow,
 } from '@/lib/cashflow'
+import { endOfMonth, formatCurrency, monthKey, startOfMonth, todayIso } from '@/lib/format'
 
 type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner' | 'products' | 'cashflow'
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(amount)
-}
 
 function fiscalYearOf(date: Date): number {
   const year = date.getFullYear()
   const month = date.getMonth()
   return month >= 3 ? year : year - 1
-}
-
-function monthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-function todayIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function startOfMonth(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-}
-
-function endOfMonth(d: Date): string {
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
 }
 
 function startOfFiscalYear(fy: number): string {
@@ -72,6 +47,11 @@ function startOfFiscalYear(fy: number): string {
 
 function endOfFiscalYear(fy: number): string {
   return `${fy + 1}-03-31`
+}
+
+// PO expense (税抜): stored totalAmount is items-only, fees live in separate fields.
+function poExpense(o: PurchaseOrder): number {
+  return (o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0)
 }
 
 function saleIncome(sale: SaleRecord): number {
@@ -207,13 +187,13 @@ export default function FinancialsPage() {
     const outstanding = filteredSales
       .filter(r => r.status === 'confirmed' && r.paymentStatus !== 'paid')
       .reduce((s, r) => s + saleIncome(r), 0)
-    const totalExpense = filteredOrders.reduce((s, o) => s + (o.totalAmount || 0), 0)
+    const totalExpense = filteredOrders.reduce((s, o) => s + poExpense(o), 0)
     const paid = filteredOrders
       .filter(o => o.paymentStatus === 'paid')
-      .reduce((s, o) => s + (o.totalAmount || 0), 0)
+      .reduce((s, o) => s + poExpense(o), 0)
     const unpaid = filteredOrders
       .filter(o => o.paymentStatus !== 'paid')
-      .reduce((s, o) => s + (o.totalAmount || 0), 0)
+      .reduce((s, o) => s + poExpense(o), 0)
     return {
       totalRevenue,
       ecRevenue: ecTotal,
@@ -249,8 +229,8 @@ export default function FinancialsPage() {
       if (!d) continue
       const k = monthKey(d)
       const row = map.get(k) ?? { key: k, label: k, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
-      row.expense += o.totalAmount || 0
-      if (o.paymentStatus === 'paid') row.paid += o.totalAmount || 0
+      row.expense += poExpense(o)
+      if (o.paymentStatus === 'paid') row.paid += poExpense(o)
       map.set(k, row)
     }
     return [...map.values()]
@@ -283,8 +263,8 @@ export default function FinancialsPage() {
       const fy = fiscalYearOf(d)
       const k = String(fy)
       const row = map.get(k) ?? { key: k, label: `FY${fy} (${fy}/04 - ${fy + 1}/03)`, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
-      row.expense += o.totalAmount || 0
-      if (o.paymentStatus === 'paid') row.paid += o.totalAmount || 0
+      row.expense += poExpense(o)
+      if (o.paymentStatus === 'paid') row.paid += poExpense(o)
       map.set(k, row)
     }
     return [...map.values()]
@@ -319,7 +299,7 @@ export default function FinancialsPage() {
       if (!d) continue
       const k = monthKey(d)
       const row = map.get(k) ?? { revenue: 0, expense: 0, profit: 0 }
-      row.expense += o.totalAmount || 0
+      row.expense += poExpense(o)
       map.set(k, row)
     }
     return map
@@ -382,7 +362,7 @@ export default function FinancialsPage() {
     for (const o of filteredOrders) {
       const key = o.supplierName || '(未設定)'
       const row = map.get(key) ?? { name: key, total: 0, settled: 0, outstanding: 0, count: 0 }
-      const amt = o.totalAmount || 0
+      const amt = poExpense(o)
       row.total += amt
       if (o.paymentStatus === 'paid') row.settled += amt
       else row.outstanding += amt
@@ -535,7 +515,7 @@ export default function FinancialsPage() {
                         {overdueOrders.map(o => (
                           <li key={o.id} className="flex items-center justify-between rounded-lg bg-[#fff0ec] px-2 py-1.5">
                             <span>{o.supplierName} - {o.items[0]?.productName ?? ''}</span>
-                            <span className="text-[#9d3d28]">{formatCurrency(o.totalAmount || 0)} / 期日 {o.paymentDueDate}</span>
+                            <span className="text-[#9d3d28]">{formatCurrency(poExpense(o))} / 期日 {o.paymentDueDate}</span>
                           </li>
                         ))}
                       </ul>

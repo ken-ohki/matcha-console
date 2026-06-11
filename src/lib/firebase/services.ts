@@ -889,8 +889,8 @@ async function syncBuyersCollection(): Promise<void> {
 function normalizePoPayments(raw: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] {
   if (!Array.isArray(raw)) return []
   return raw
-    .map(p => ({
-      id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}`,
+    .map((p, index) => ({
+      id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}-${index}`,
       amount: Number(p.amount) || 0,
       paidDate: (p.paidDate ?? '').trim(),
       method: p.method?.trim() || undefined,
@@ -943,14 +943,17 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     : 'uninvoiced'
   const payments = Array.isArray(data.payments)
     ? data.payments
-        .map((raw: unknown) => {
+        .map((raw: unknown, index: number) => {
           const obj = (raw ?? {}) as Record<string, unknown>
           const amount = Number(obj.amount ?? 0)
           if (!(amount > 0)) return null
+          const paidDate = obj.paidDate ? toIsoDate(String(obj.paidDate)) : ''
           return {
-            id: String(obj.id ?? `${Date.now()}-${amount}`),
+            // Deterministic fallback so the same doc maps to the same ids on
+            // every read (removal-by-id depends on stability).
+            id: String(obj.id ?? `${paidDate}-${amount}-${index}`),
             amount,
-            paidDate: obj.paidDate ? toIsoDate(String(obj.paidDate)) : '',
+            paidDate,
             method: obj.method ? String(obj.method) : undefined,
             note: obj.note ? String(obj.note) : undefined,
           }
@@ -2126,6 +2129,7 @@ export function createFirebaseServices(): IServices {
         actualDeliveryDate: arrival.arrivalDate,
         status: 'received' as PurchaseOrderStatus,
         paymentStatus: 'uninvoiced' as PurchaseOrderPaymentStatus,
+        payments: [] as PurchaseOrderPayment[],
         notes: input.notes?.trim() || '期首在庫から自動変換',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

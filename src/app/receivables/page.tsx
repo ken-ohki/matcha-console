@@ -115,14 +115,15 @@ export default function ReceivablesPage() {
   }, [filtered])
 
   const kpis = useMemo(() => {
-    const outstanding = sales.filter(s => s.paymentStatus !== 'paid').reduce((sum, s) => sum + saleIncome(s), 0)
+    // All KPIs share the same population as the list below (search-filtered).
+    const outstanding = filtered.filter(s => s.paymentStatus !== 'paid').reduce((sum, s) => sum + saleIncome(s), 0)
     const overdue = grouped.overdue.reduce((s, r) => s + saleIncome(r), 0)
     const thisMonth = grouped.thisMonth.reduce((s, r) => s + saleIncome(r), 0)
-    const collectedThisMonth = sales
+    const collectedThisMonth = filtered
       .filter(s => s.paymentStatus === 'paid' && (s.paymentDate ?? '').startsWith(todayIso().slice(0, 7)))
       .reduce((sum, s) => sum + saleIncome(s), 0) + ecThisMonth
     return { outstanding, overdue, thisMonth, collectedThisMonth }
-  }, [sales, grouped, ecThisMonth])
+  }, [filtered, grouped, ecThisMonth])
 
   const markPaid = async (id: string) => {
     setSavingId(id)

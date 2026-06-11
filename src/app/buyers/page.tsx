@@ -11,6 +11,7 @@ import type { Buyer, BuyerDetailsInput, MasterEntry, SaleRecord } from '@/types'
 import { optionsForType } from '@/lib/masters'
 import { Building2, ExternalLink, Mail, MapPin, Phone, Save, Search, User2, X } from 'lucide-react'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
+import { formatCurrency } from '@/lib/format'
 
 function formatDate(date?: Date): string {
   if (!date) return '-'
@@ -19,14 +20,6 @@ function formatDate(date?: Date): string {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 
 function normalizeName(name: string): string {
