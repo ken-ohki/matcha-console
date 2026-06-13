@@ -238,6 +238,21 @@ export default function ReceivablesPage() {
           const isEc = active === 'ec'
           const rows = isEc ? [] : (grouped[active as Bucket] ?? [])
           const total = rows.reduce((s, r) => s + saleIncome(r), 0)
+          // Within 要確認, keep 期限超過 and 今月期限 visually separated.
+          const todayStr = todayIso()
+          type RowItem = { type: 'header'; key: string; label: string; count: number } | { type: 'row'; sale: SaleRecord }
+          let displayItems: RowItem[]
+          if (active === 'actionNeeded') {
+            const sorted = [...rows].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
+            const over = sorted.filter(s => !!s.dueDate && s.dueDate < todayStr)
+            const due = sorted.filter(s => !(s.dueDate && s.dueDate < todayStr))
+            displayItems = [
+              ...(over.length ? [{ type: 'header', key: 'h-over', label: '期限超過', count: over.length } as RowItem, ...over.map(s => ({ type: 'row', sale: s } as RowItem))] : []),
+              ...(due.length ? [{ type: 'header', key: 'h-due', label: '今月期限', count: due.length } as RowItem, ...due.map(s => ({ type: 'row', sale: s } as RowItem))] : []),
+            ]
+          } else {
+            displayItems = rows.map(s => ({ type: 'row', sale: s } as RowItem))
+          }
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -330,7 +345,15 @@ export default function ReceivablesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map(s => {
+                      {displayItems.map(item => {
+                        if (item.type === 'header') {
+                          return (
+                            <tr key={item.key} className="bg-[#fff0ec]">
+                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold text-[#9d3d28]">{item.label}（{item.count}件）</td>
+                            </tr>
+                          )
+                        }
+                        const s = item.sale
                         const productLabel = s.items[0]?.productName + (s.items.length > 1 ? ` 他${s.items.length - 1}件` : '')
                         const isOverdue = !!s.dueDate && s.dueDate < todayIso()
                         return (

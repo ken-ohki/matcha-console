@@ -199,6 +199,21 @@ export default function PayablesPage() {
           const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
           const rows = grouped[active] ?? []
           const total = rows.reduce((s, o) => s + computePoTaxIncluded(o), 0)
+          // Within 要確認, keep 期限超過 and 今月期限 visually separated.
+          const todayStr = todayIso()
+          type RowItem = { type: 'header'; key: string; label: string; count: number } | { type: 'row'; po: PurchaseOrder }
+          let displayItems: RowItem[]
+          if (active === 'actionNeeded') {
+            const sorted = [...rows].sort((a, b) => (a.paymentDueDate || '').localeCompare(b.paymentDueDate || ''))
+            const over = sorted.filter(o => !!o.paymentDueDate && o.paymentDueDate < todayStr)
+            const due = sorted.filter(o => !(o.paymentDueDate && o.paymentDueDate < todayStr))
+            displayItems = [
+              ...(over.length ? [{ type: 'header', key: 'h-over', label: '期限超過', count: over.length } as RowItem, ...over.map(o => ({ type: 'row', po: o } as RowItem))] : []),
+              ...(due.length ? [{ type: 'header', key: 'h-due', label: '今月期限', count: due.length } as RowItem, ...due.map(o => ({ type: 'row', po: o } as RowItem))] : []),
+            ]
+          } else {
+            displayItems = rows.map(o => ({ type: 'row', po: o } as RowItem))
+          }
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -245,7 +260,15 @@ export default function PayablesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map(o => {
+                      {displayItems.map(item => {
+                        if (item.type === 'header') {
+                          return (
+                            <tr key={item.key} className="bg-[#fff0ec]">
+                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold text-[#9d3d28]">{item.label}（{item.count}件）</td>
+                            </tr>
+                          )
+                        }
+                        const o = item.po
                         const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
                         const isOverdue = !!o.paymentDueDate && o.paymentDueDate < todayIso()
                         return (
