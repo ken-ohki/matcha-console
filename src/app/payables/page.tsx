@@ -21,7 +21,7 @@ import { computePoTaxIncluded, poPaidTotal, poRemaining } from '@/lib/cashflow'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
-import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
+import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
 const PAY_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
   uninvoiced: '未請求',
@@ -46,7 +46,6 @@ export default function PayablesPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [hidePaid, setHidePaid] = useState(true)
   const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null)
   const [activeBucket, setActiveBucket] = useState<Bucket>('actionNeeded')
 
@@ -156,7 +155,7 @@ export default function PayablesPage() {
     } finally { setSavingId(null) }
   }
 
-  const bucketsToRender: Bucket[] = hidePaid ? BUCKET_ORDER_OPEN : BUCKET_ORDER_ALL
+  const bucketsToRender: Bucket[] = BUCKET_ORDER_ALL
 
   const renderPoRow = (o: PurchaseOrder) => {
     const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
@@ -285,10 +284,6 @@ export default function PayablesPage() {
             placeholder="仕入先または商品名で検索"
             className="flex-1 min-w-[200px] rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
           />
-          <label className="inline-flex items-center gap-1.5 text-xs text-[#68756c]">
-            <input type="checkbox" checked={hidePaid} onChange={e => setHidePaid(e.target.checked)} />
-            支払済を隠す
-          </label>
           {feedback && <span className="text-xs text-[#174c33]">{feedback}</span>}
         </div>
 

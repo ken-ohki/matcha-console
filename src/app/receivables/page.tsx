@@ -21,7 +21,7 @@ import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeSaleTaxBuckets } from '@/lib/tax'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
-import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
+import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
 
 // Tax-inclusive billed amount (matches the invoice document and 支払管理).
 function saleIncome(sale: SaleRecord): number {
@@ -61,7 +61,6 @@ export default function ReceivablesPage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [hidePaid, setHidePaid] = useState(true)
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
@@ -188,7 +187,7 @@ export default function ReceivablesPage() {
     } finally { setSavingId(null) }
   }
 
-  const bucketsToRender: Bucket[] = hidePaid ? BUCKET_ORDER_OPEN : BUCKET_ORDER_ALL
+  const bucketsToRender: Bucket[] = BUCKET_ORDER_ALL
 
   const renderSaleRow = (s: SaleRecord) => {
     const productLabel = s.items[0]?.productName + (s.items.length > 1 ? ` 他${s.items.length - 1}件` : '')
@@ -339,10 +338,6 @@ export default function ReceivablesPage() {
             placeholder="販売先または商品名で検索"
             className="flex-1 min-w-[200px] rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
           />
-          <label className="inline-flex items-center gap-1.5 text-xs text-[#68756c]">
-            <input type="checkbox" checked={hidePaid} onChange={e => setHidePaid(e.target.checked)} />
-            入金済を隠す
-          </label>
           {feedback && (
             <span className="text-xs text-[#174c33]">{feedback}</span>
           )}
