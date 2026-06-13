@@ -63,6 +63,8 @@ export default function ReceivablesPage() {
   const [query, setQuery] = useState('')
   const [hidePaid, setHidePaid] = useState(true)
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
+  const [confirmDate, setConfirmDate] = useState<string>(todayIso())
   const [ecOpen, setEcOpen] = useState(false)
   const [openBuckets, setOpenBuckets] = useState<Record<Bucket, boolean>>({
     overdue: true, thisMonth: true, nextMonth: true, later: false, noDate: false, paid: false,
@@ -125,13 +127,23 @@ export default function ReceivablesPage() {
     return { outstanding, overdue, thisMonth, collectedThisMonth }
   }, [filtered, grouped, ecThisMonth])
 
-  const markPaid = async (id: string) => {
+  const openConfirm = (sale: SaleRecord) => {
+    setConfirmTarget(sale)
+    setConfirmDate(todayIso())
+  }
+
+  const markPaid = async (id: string, paymentDate: string) => {
     setSavingId(id)
     setFeedback(null)
     try {
       const svc = await getServices()
-      const updated = await svc.sales.updateSaleRecord(id, { paymentStatus: 'paid', paymentDate: todayIso() })
+      const updated = await svc.sales.updateSaleRecord(id, {
+        paymentStatus: 'paid',
+        paymentDate: paymentDate || todayIso(),
+        paymentConfirmedAt: new Date().toISOString(),
+      })
       setSales(prev => prev.map(s => s.id === id ? updated : s))
+      setConfirmTarget(null)
       setFeedback('入金確認しました')
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
@@ -301,7 +313,7 @@ export default function ReceivablesPage() {
                               {s.paymentStatus !== 'paid' && (
                                 <button
                                   type="button"
-                                  onClick={() => markPaid(s.id)}
+                                  onClick={() => openConfirm(s)}
                                   disabled={savingId === s.id}
                                   className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
                                 >
@@ -382,6 +394,47 @@ export default function ReceivablesPage() {
       </main>
 
       <SaleDetailModal sale={detailSale} onClose={() => setDetailSale(null)} />
+
+      {confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={() => setConfirmTarget(null)}>
+          <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-[#173c2a]">入金を確認</h2>
+            <p className="mt-2 text-sm text-[#68756c]">
+              <span className="font-medium text-[#173c2a]">{confirmTarget.buyerName}</span> の入金を確認済みにします。
+            </p>
+            <p className="mt-1 text-sm">
+              請求額（税込）: <span className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(confirmTarget))}</span>
+            </p>
+            <label className="mt-4 block text-xs text-[#68756c]">
+              <span className="mb-1 block">入金日</span>
+              <input
+                type="date"
+                value={confirmDate}
+                onChange={e => setConfirmDate(e.target.value)}
+                className="w-full rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              />
+            </label>
+            <p className="mt-1 text-[10px] text-[#a59f8c]">確認日時（{todayIso()}）は自動で記録されます。</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmTarget(null)}
+                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={() => markPaid(confirmTarget.id, confirmDate)}
+                disabled={savingId === confirmTarget.id}
+                className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+              >
+                <CheckCircle2 size={14} /> {savingId === confirmTarget.id ? '確定中…' : '入金確認'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   )
 }
@@ -424,6 +477,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
             <DetailRow label="国" value={sale.country || '-'} />
             <DetailRow label="支払期日" value={sale.dueDate || '-'} />
             <DetailRow label="入金日" value={sale.paymentDate || '-'} />
+            <DetailRow label="入金確認日" value={sale.paymentConfirmedAt ? new Date(sale.paymentConfirmedAt).toLocaleString('ja-JP') : '-'} />
             <DetailRow label="支払方法" value={sale.paymentMethod || '-'} />
           </div>
           <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">

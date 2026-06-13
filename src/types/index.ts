@@ -120,6 +120,7 @@ export interface SaleRecord {
   notes?: string
   paymentMethod?: string
   paymentDate?: string
+  paymentConfirmedAt?: string   // 入金確認ボタンを押した日時（ISO, 自動記録）
   shippingAddress?: string
   shippingPostalCode?: string
   shippingMethod?: string
@@ -252,6 +253,7 @@ export interface SaleRecordInput {
   notes?: string
   paymentMethod?: string
   paymentDate?: string
+  paymentConfirmedAt?: string   // 入金確認ボタンを押した日時（ISO, 自動記録）
   shippingAddress?: string
   shippingPostalCode?: string
   shippingMethod?: string
