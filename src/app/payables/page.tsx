@@ -238,16 +238,16 @@ export default function PayablesPage() {
         </span>
       </div>
       <div className="overflow-x-auto border-t border-white/60">
-        <table className="min-w-full text-sm">
+        <table className="min-w-[920px] text-sm">
           <thead className="bg-white/60 text-[#173c2a]">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">期日</th>
-              <th className="px-3 py-2 text-left font-medium">仕入先</th>
-              <th className="px-3 py-2 text-left font-medium">商品</th>
-              <th className="px-3 py-2 text-right font-medium">支払額(税込)</th>
-              <th className="px-3 py-2 text-left font-medium">状態</th>
-              <th className="px-3 py-2 text-left font-medium">支払日</th>
-              <th className="px-3 py-2 text-left font-medium">請求書</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">期日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">仕入先</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">商品</th>
+              <th className="whitespace-nowrap px-3 py-2 text-right font-medium">支払額(税込)</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">状態</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">支払日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">請求書</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>

@@ -236,6 +236,9 @@ export default function ReceivablesPage() {
             className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
           />
         </td>
+        <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#68756c]">
+          {s.paymentConfirmedAt ? new Date(s.paymentConfirmedAt).toLocaleDateString('ja-JP') : '-'}
+        </td>
         <td className="px-3 py-2">
           <select
             value={s.paymentMethod ?? ''}
@@ -291,17 +294,18 @@ export default function ReceivablesPage() {
           {list.length}件 / {formatCurrency(list.reduce((s, r) => s + saleIncome(r), 0))}
         </span>
       </div>
-      <div className="overflow-x-auto border-t border-white/60">
-        <table className="min-w-full text-sm">
+      <div className="-mx-0.5 overflow-x-auto border-t border-white/60">
+        <table className="min-w-[1040px] text-sm">
           <thead className="bg-white/60 text-[#173c2a]">
             <tr>
-              <th className="px-3 py-2 text-left font-medium">期日</th>
-              <th className="px-3 py-2 text-left font-medium">販売先</th>
-              <th className="px-3 py-2 text-left font-medium">商品</th>
-              <th className="px-3 py-2 text-right font-medium">請求額(税込)</th>
-              <th className="px-3 py-2 text-left font-medium">状態</th>
-              <th className="px-3 py-2 text-left font-medium">入金日</th>
-              <th className="px-3 py-2 text-left font-medium">支払方法</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">期日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">販売先</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">商品</th>
+              <th className="whitespace-nowrap px-3 py-2 text-right font-medium">請求額(税込)</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">状態</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">入金日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">入金確認日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">支払方法</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
