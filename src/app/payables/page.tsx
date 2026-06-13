@@ -48,7 +48,7 @@ export default function PayablesPage() {
   const [query, setQuery] = useState('')
   const [hidePaid, setHidePaid] = useState(true)
   const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null)
-  const [activeBucket, setActiveBucket] = useState<Bucket>('overdue')
+  const [activeBucket, setActiveBucket] = useState<Bucket>('actionNeeded')
 
   const load = async () => {
     setLoading(true)
@@ -75,7 +75,7 @@ export default function PayablesPage() {
   }, [orders, query])
 
   const grouped = useMemo(() => {
-    const groups: Record<Bucket, PurchaseOrder[]> = { overdue: [], thisMonth: [], nextMonth: [], later: [], noDate: [], paid: [] }
+    const groups: Record<Bucket, PurchaseOrder[]> = { actionNeeded: [], nextMonth: [], later: [], noDate: [], paid: [] }
     for (const o of filtered) groups[bucketOf(o.paymentDueDate, o.paymentStatus === 'paid')].push(o)
     for (const k of Object.keys(groups) as Bucket[]) {
       groups[k].sort((a, b) => (a.paymentDueDate || '9999').localeCompare(b.paymentDueDate || '9999'))
@@ -87,8 +87,7 @@ export default function PayablesPage() {
     // Outstanding/aging use the remaining (unpaid) amount so partial payments
     // reduce the balance correctly.
     const outstanding = orders.reduce((s, o) => s + poRemaining(o), 0)
-    const overdue = grouped.overdue.reduce((s, o) => s + poRemaining(o), 0)
-    const thisMonth = grouped.thisMonth.reduce((s, o) => s + poRemaining(o), 0)
+    const actionNeeded = grouped.actionNeeded.reduce((s, o) => s + poRemaining(o), 0)
     const ym = todayIso().slice(0, 7)
     // Paid this month = split payments dated this month + legacy single payments.
     const paidThisMonth = orders.reduce((s, o) => {
@@ -97,7 +96,7 @@ export default function PayablesPage() {
         ? computePoTaxIncluded(o) : 0
       return s + splits + legacy
     }, 0)
-    return { outstanding, overdue, thisMonth, paidThisMonth }
+    return { outstanding, actionNeeded, paidThisMonth }
   }, [orders, grouped])
 
   const markPaid = async (id: string) => {
@@ -174,8 +173,7 @@ export default function PayablesPage() {
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KPICard title="未払 残高" value={formatCurrency(kpis.outstanding)} color={kpis.outstanding > 0 ? 'amber' : 'default'} icon={<Wallet size={18} />} />
-          <KPICard title="期限超過" value={formatCurrency(kpis.overdue)} color={kpis.overdue > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
-          <KPICard title="今月期限" value={formatCurrency(kpis.thisMonth)} color={kpis.thisMonth > 0 ? 'amber' : 'default'} icon={<CircleDollarSign size={18} />} />
+          <KPICard title="要確認（超過・今月）" value={formatCurrency(kpis.actionNeeded)} color={kpis.actionNeeded > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
           <KPICard title="今月支払 (確認済)" value={formatCurrency(kpis.paidThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
@@ -201,7 +199,6 @@ export default function PayablesPage() {
           const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
           const rows = grouped[active] ?? []
           const total = rows.reduce((s, o) => s + computePoTaxIncluded(o), 0)
-          const bucket = active
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -250,7 +247,7 @@ export default function PayablesPage() {
                     <tbody>
                       {rows.map(o => {
                         const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
-                        const isOverdue = bucket === 'overdue'
+                        const isOverdue = !!o.paymentDueDate && o.paymentDueDate < todayIso()
                         return (
                           <tr key={o.id} className="border-t border-white/60">
                             <td className="px-3 py-2">

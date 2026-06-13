@@ -65,7 +65,7 @@ export default function ReceivablesPage() {
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
-  const [activeBucket, setActiveBucket] = useState<Bucket | 'ec'>('overdue')
+  const [activeBucket, setActiveBucket] = useState<Bucket | 'ec'>('actionNeeded')
 
   const load = async () => {
     setLoading(true)
@@ -105,7 +105,7 @@ export default function ReceivablesPage() {
   }, [ecSales, query])
 
   const grouped = useMemo(() => {
-    const groups: Record<Bucket, SaleRecord[]> = { overdue: [], thisMonth: [], nextMonth: [], later: [], noDate: [], paid: [] }
+    const groups: Record<Bucket, SaleRecord[]> = { actionNeeded: [], nextMonth: [], later: [], noDate: [], paid: [] }
     for (const s of filtered) groups[bucketOf(s.dueDate, s.paymentStatus === 'paid')].push(s)
     for (const k of Object.keys(groups) as Bucket[]) {
       groups[k].sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
@@ -116,12 +116,11 @@ export default function ReceivablesPage() {
   const kpis = useMemo(() => {
     // All KPIs share the same population as the list below (search-filtered).
     const outstanding = filtered.filter(s => s.paymentStatus !== 'paid').reduce((sum, s) => sum + saleIncome(s), 0)
-    const overdue = grouped.overdue.reduce((s, r) => s + saleIncome(r), 0)
-    const thisMonth = grouped.thisMonth.reduce((s, r) => s + saleIncome(r), 0)
+    const actionNeeded = grouped.actionNeeded.reduce((s, r) => s + saleIncome(r), 0)
     const collectedThisMonth = filtered
       .filter(s => s.paymentStatus === 'paid' && (s.paymentDate ?? '').startsWith(todayIso().slice(0, 7)))
       .reduce((sum, s) => sum + saleIncome(s), 0) + ecThisMonth
-    return { outstanding, overdue, thisMonth, collectedThisMonth }
+    return { outstanding, actionNeeded, collectedThisMonth }
   }, [filtered, grouped, ecThisMonth])
 
   const openConfirm = (sale: SaleRecord) => {
@@ -206,8 +205,7 @@ export default function ReceivablesPage() {
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KPICard title="未入金 残高" value={formatCurrency(kpis.outstanding)} color={kpis.outstanding > 0 ? 'amber' : 'default'} icon={<Wallet size={18} />} />
-          <KPICard title="期限超過" value={formatCurrency(kpis.overdue)} color={kpis.overdue > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
-          <KPICard title="今月期限" value={formatCurrency(kpis.thisMonth)} color={kpis.thisMonth > 0 ? 'amber' : 'default'} icon={<CircleDollarSign size={18} />} />
+          <KPICard title="要確認（超過・今月）" value={formatCurrency(kpis.actionNeeded)} color={kpis.actionNeeded > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
           <KPICard title="今月入金 (確認済・EC込)" value={formatCurrency(kpis.collectedThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
@@ -240,8 +238,6 @@ export default function ReceivablesPage() {
           const isEc = active === 'ec'
           const rows = isEc ? [] : (grouped[active as Bucket] ?? [])
           const total = rows.reduce((s, r) => s + saleIncome(r), 0)
-          const bucket = active as Bucket
-          const isOverdueTab = active === 'overdue'
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -336,7 +332,7 @@ export default function ReceivablesPage() {
                     <tbody>
                       {rows.map(s => {
                         const productLabel = s.items[0]?.productName + (s.items.length > 1 ? ` 他${s.items.length - 1}件` : '')
-                        const isOverdue = bucket === 'overdue'
+                        const isOverdue = !!s.dueDate && s.dueDate < todayIso()
                         return (
                           <tr key={s.id} className="border-t border-white/60">
                             <td className="px-3 py-2">
@@ -414,7 +410,7 @@ export default function ReceivablesPage() {
                                   <Undo2 size={12} /> 入金取消
                                 </button>
                               )}
-                              {s.paymentStatus !== 'paid' && bucket === 'overdue' && (
+                              {s.paymentStatus !== 'paid' && isOverdue && (
                                 <a
                                   href={`mailto:?subject=${encodeURIComponent('お支払いのお願い')}&body=${encodeURIComponent(`${s.buyerName} 様\n\n下記の請求につきまして、ご入金状況をご確認ください。\n金額: ${formatCurrency(saleIncome(s))}\n期日: ${s.dueDate ?? ''}`)}`}
                                   className="ml-1 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
