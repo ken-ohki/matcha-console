@@ -190,6 +190,128 @@ export default function ReceivablesPage() {
 
   const bucketsToRender: Bucket[] = hidePaid ? BUCKET_ORDER_OPEN : BUCKET_ORDER_ALL
 
+  const renderSaleRow = (s: SaleRecord) => {
+    const productLabel = s.items[0]?.productName + (s.items.length > 1 ? ` 他${s.items.length - 1}件` : '')
+    const isOverdue = !!s.dueDate && s.dueDate < todayIso()
+    return (
+      <tr key={s.id} className="border-t border-white/60">
+        <td className="px-3 py-2">
+          <input
+            type="date"
+            value={s.dueDate ?? ''}
+            onChange={e => updateInline(s.id, { dueDate: e.target.value })}
+            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
+          />
+        </td>
+        <td className="px-3 py-2 text-[#173c2a]">
+          <button type="button" onClick={() => setDetailSale(s)} className="text-left hover:underline">{s.buyerName}</button>
+        </td>
+        <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
+        <td className="px-3 py-2 text-right">
+          <div className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(s))}</div>
+          <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
+          {((s.shippingFee || 0) > 0 || (s.otherFees || 0) > 0) && (
+            <div className="text-[10px] text-[#68756c]">
+              商品 {formatCurrency(s.revenue)}
+              {(s.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(s.shippingFee)}</>}
+              {(s.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(s.otherFees)}</>}
+            </div>
+          )}
+        </td>
+        <td className="px-3 py-2">
+          <select
+            value={s.paymentStatus}
+            onChange={e => updateInline(s.id, { paymentStatus: e.target.value as PaymentStatus })}
+            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+          >
+            <option value="uninvoiced">{PAYMENT_LABELS.uninvoiced}</option>
+            <option value="invoiced">{PAYMENT_LABELS.invoiced}</option>
+            <option value="paid">{PAYMENT_LABELS.paid}</option>
+          </select>
+        </td>
+        <td className="px-3 py-2">
+          <input
+            type="date"
+            value={s.paymentDate ?? ''}
+            onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
+            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+          />
+        </td>
+        <td className="px-3 py-2">
+          <select
+            value={s.paymentMethod ?? ''}
+            onChange={e => updateInline(s.id, { paymentMethod: e.target.value })}
+            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+          >
+            <option value="">未設定</option>
+            {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+            {s.paymentMethod && !PAYMENT_METHODS.includes(s.paymentMethod as never) && (
+              <option value={s.paymentMethod}>{s.paymentMethod}</option>
+            )}
+          </select>
+        </td>
+        <td className="px-3 py-2 text-right">
+          {s.paymentStatus !== 'paid' ? (
+            <button
+              type="button"
+              onClick={() => openConfirm(s)}
+              disabled={savingId === s.id}
+              className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+            >
+              <CheckCircle2 size={12} /> 入金確認
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => unconfirmPaid(s)}
+              disabled={savingId === s.id}
+              className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] font-medium text-[#9d3d28] hover:bg-red-50 disabled:opacity-60"
+            >
+              <Undo2 size={12} /> 入金取消
+            </button>
+          )}
+          {s.paymentStatus !== 'paid' && isOverdue && (
+            <a
+              href={`mailto:?subject=${encodeURIComponent('お支払いのお願い')}&body=${encodeURIComponent(`${s.buyerName} 様\n\n下記の請求につきまして、ご入金状況をご確認ください。\n金額: ${formatCurrency(saleIncome(s))}\n期日: ${s.dueDate ?? ''}`)}`}
+              className="ml-1 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+              title="督促メール下書き"
+            >
+              <Mail size={12} />
+            </a>
+          )}
+        </td>
+      </tr>
+    )
+  }
+
+  const renderSaleCard = (label: string, colorClass: string, list: SaleRecord[]) => (
+    <div className={`rounded-2xl border-2 ${colorClass}`}>
+      <div className="flex items-center gap-2 px-4 py-3">
+        <h2 className="text-sm font-semibold text-[#173c2a]">{label}</h2>
+        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
+          {list.length}件 / {formatCurrency(list.reduce((s, r) => s + saleIncome(r), 0))}
+        </span>
+      </div>
+      <div className="overflow-x-auto border-t border-white/60">
+        <table className="min-w-full text-sm">
+          <thead className="bg-white/60 text-[#173c2a]">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">期日</th>
+              <th className="px-3 py-2 text-left font-medium">販売先</th>
+              <th className="px-3 py-2 text-left font-medium">商品</th>
+              <th className="px-3 py-2 text-right font-medium">請求額(税込)</th>
+              <th className="px-3 py-2 text-left font-medium">状態</th>
+              <th className="px-3 py-2 text-left font-medium">入金日</th>
+              <th className="px-3 py-2 text-left font-medium">支払方法</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>{list.map(renderSaleRow)}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+
   return (
     <AppLayout>
       <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
@@ -237,22 +359,11 @@ export default function ReceivablesPage() {
             : (tabs.includes(activeBucket as Bucket) ? activeBucket as Bucket : tabs[0])
           const isEc = active === 'ec'
           const rows = isEc ? [] : (grouped[active as Bucket] ?? [])
-          const total = rows.reduce((s, r) => s + saleIncome(r), 0)
-          // Within 要確認, keep 期限超過 and 今月期限 visually separated.
+          // Within 要確認, split into 期限超過 (red) and 今月期限 (yellow) sections.
           const todayStr = todayIso()
-          type RowItem = { type: 'header'; key: string; label: string; count: number } | { type: 'row'; sale: SaleRecord }
-          let displayItems: RowItem[]
-          if (active === 'actionNeeded') {
-            const sorted = [...rows].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
-            const over = sorted.filter(s => !!s.dueDate && s.dueDate < todayStr)
-            const due = sorted.filter(s => !(s.dueDate && s.dueDate < todayStr))
-            displayItems = [
-              ...(over.length ? [{ type: 'header', key: 'h-over', label: '期限超過', count: over.length } as RowItem, ...over.map(s => ({ type: 'row', sale: s } as RowItem))] : []),
-              ...(due.length ? [{ type: 'header', key: 'h-due', label: '今月期限', count: due.length } as RowItem, ...due.map(s => ({ type: 'row', sale: s } as RowItem))] : []),
-            ]
-          } else {
-            displayItems = rows.map(s => ({ type: 'row', sale: s } as RowItem))
-          }
+          const sortByDue = (a: SaleRecord, b: SaleRecord) => (a.dueDate || '').localeCompare(b.dueDate || '')
+          const overGroup = active === 'actionNeeded' ? rows.filter(s => !!s.dueDate && s.dueDate < todayStr).sort(sortByDue) : []
+          const dueGroup = active === 'actionNeeded' ? rows.filter(s => !(s.dueDate && s.dueDate < todayStr)).sort(sortByDue) : []
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -322,134 +433,19 @@ export default function ReceivablesPage() {
                     )}
                   </div>
                 </div>
+              ) : active === 'actionNeeded' ? (
+                overGroup.length === 0 && dueGroup.length === 0 ? (
+                  <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">要確認の売掛はありません。</p>
+                ) : (
+                  <div className="space-y-4">
+                    {overGroup.length > 0 && renderSaleCard('期限超過', 'border-red-300 bg-red-50', overGroup)}
+                    {dueGroup.length > 0 && renderSaleCard('今月期限', 'border-amber-300 bg-amber-50', dueGroup)}
+                  </div>
+                )
               ) : rows.length === 0 ? (
                 <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active as Bucket]}の売掛はありません。</p>
               ) : (
-              <div className={`rounded-2xl border-2 ${BUCKET_COLORS[active as Bucket]}`}>
-                <div className="flex items-center gap-2 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[active as Bucket]}</h2>
-                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{rows.length}件 / {formatCurrency(total)}</span>
-                </div>
-                <div className="overflow-x-auto border-t border-white/60">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-white/60 text-[#173c2a]">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium">期日</th>
-                        <th className="px-3 py-2 text-left font-medium">販売先</th>
-                        <th className="px-3 py-2 text-left font-medium">商品</th>
-                        <th className="px-3 py-2 text-right font-medium">請求額(税込)</th>
-                        <th className="px-3 py-2 text-left font-medium">状態</th>
-                        <th className="px-3 py-2 text-left font-medium">入金日</th>
-                        <th className="px-3 py-2 text-left font-medium">支払方法</th>
-                        <th className="px-3 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayItems.map(item => {
-                        if (item.type === 'header') {
-                          return (
-                            <tr key={item.key} className="bg-[#fff0ec]">
-                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold text-[#9d3d28]">{item.label}（{item.count}件）</td>
-                            </tr>
-                          )
-                        }
-                        const s = item.sale
-                        const productLabel = s.items[0]?.productName + (s.items.length > 1 ? ` 他${s.items.length - 1}件` : '')
-                        const isOverdue = !!s.dueDate && s.dueDate < todayIso()
-                        return (
-                          <tr key={s.id} className="border-t border-white/60">
-                            <td className="px-3 py-2">
-                              <input
-                                type="date"
-                                value={s.dueDate ?? ''}
-                                onChange={e => updateInline(s.id, { dueDate: e.target.value })}
-                                className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-[#173c2a]">
-                              <button type="button" onClick={() => setDetailSale(s)} className="text-left hover:underline">{s.buyerName}</button>
-                            </td>
-                            <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-                            <td className="px-3 py-2 text-right">
-                              <div className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(s))}</div>
-                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
-                              {((s.shippingFee || 0) > 0 || (s.otherFees || 0) > 0) && (
-                                <div className="text-[10px] text-[#68756c]">
-                                  商品 {formatCurrency(s.revenue)}
-                                  {(s.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(s.shippingFee)}</>}
-                                  {(s.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(s.otherFees)}</>}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={s.paymentStatus}
-                                onChange={e => updateInline(s.id, { paymentStatus: e.target.value as PaymentStatus })}
-                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                              >
-                                <option value="uninvoiced">{PAYMENT_LABELS.uninvoiced}</option>
-                                <option value="invoiced">{PAYMENT_LABELS.invoiced}</option>
-                                <option value="paid">{PAYMENT_LABELS.paid}</option>
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="date"
-                                value={s.paymentDate ?? ''}
-                                onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
-                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={s.paymentMethod ?? ''}
-                                onChange={e => updateInline(s.id, { paymentMethod: e.target.value })}
-                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                              >
-                                <option value="">未設定</option>
-                                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                                {s.paymentMethod && !PAYMENT_METHODS.includes(s.paymentMethod as never) && (
-                                  <option value={s.paymentMethod}>{s.paymentMethod}</option>
-                                )}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {s.paymentStatus !== 'paid' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openConfirm(s)}
-                                  disabled={savingId === s.id}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
-                                >
-                                  <CheckCircle2 size={12} /> 入金確認
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => unconfirmPaid(s)}
-                                  disabled={savingId === s.id}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] font-medium text-[#9d3d28] hover:bg-red-50 disabled:opacity-60"
-                                >
-                                  <Undo2 size={12} /> 入金取消
-                                </button>
-                              )}
-                              {s.paymentStatus !== 'paid' && isOverdue && (
-                                <a
-                                  href={`mailto:?subject=${encodeURIComponent('お支払いのお願い')}&body=${encodeURIComponent(`${s.buyerName} 様\n\n下記の請求につきまして、ご入金状況をご確認ください。\n金額: ${formatCurrency(saleIncome(s))}\n期日: ${s.dueDate ?? ''}`)}`}
-                                  className="ml-1 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
-                                  title="督促メール下書き"
-                                >
-                                  <Mail size={12} />
-                                </a>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                renderSaleCard(BUCKET_LABELS[active as Bucket], BUCKET_COLORS[active as Bucket], rows)
               )}
             </div>
           )

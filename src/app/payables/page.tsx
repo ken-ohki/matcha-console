@@ -158,6 +158,106 @@ export default function PayablesPage() {
 
   const bucketsToRender: Bucket[] = hidePaid ? BUCKET_ORDER_OPEN : BUCKET_ORDER_ALL
 
+  const renderPoRow = (o: PurchaseOrder) => {
+    const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
+    const isOverdue = !!o.paymentDueDate && o.paymentDueDate < todayIso()
+    return (
+      <tr key={o.id} className="border-t border-white/60">
+        <td className="px-3 py-2">
+          <input
+            type="date"
+            value={o.paymentDueDate ?? ''}
+            onChange={e => updateInline(o.id, { paymentDueDate: e.target.value })}
+            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
+          />
+        </td>
+        <td className="px-3 py-2 text-[#173c2a]">
+          <button type="button" onClick={() => setDetailOrder(o)} className="text-left hover:underline">{o.supplierName}</button>
+        </td>
+        <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
+        <td className="px-3 py-2 text-right">
+          <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
+          <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
+          {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
+            <div className="text-[10px] text-[#9d3d28]">残額 {formatCurrency(poRemaining(o))}</div>
+          )}
+        </td>
+        <td className="px-3 py-2">
+          {(o.payments ?? []).length > 0 ? (
+            <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{PAY_LABELS[o.paymentStatus]}</span>
+          ) : (
+            <select
+              value={o.paymentStatus === 'partial' ? 'unpaid' : o.paymentStatus}
+              onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
+              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+            >
+              <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
+              <option value="unpaid">{PAY_LABELS.unpaid}</option>
+              <option value="paid">{PAY_LABELS.paid}</option>
+            </select>
+          )}
+        </td>
+        <td className="px-3 py-2">
+          <input
+            type="date"
+            value={o.paidDate ?? ''}
+            onChange={e => updateInline(o.id, { paidDate: e.target.value })}
+            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+          />
+        </td>
+        <td className="px-3 py-2">
+          {o.invoice ? (
+            <a href={o.invoice.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#174c33] hover:underline">
+              <FileText size={12} /> PDF
+            </a>
+          ) : (
+            <span className="text-[#a59f8c] text-xs">未添付</span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right">
+          {o.paymentStatus !== 'paid' && (
+            <button
+              type="button"
+              onClick={() => markPaid(o.id)}
+              disabled={savingId === o.id}
+              className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+            >
+              <CheckCircle2 size={12} /> 支払確認
+            </button>
+          )}
+        </td>
+      </tr>
+    )
+  }
+
+  const renderPoCard = (label: string, colorClass: string, list: PurchaseOrder[]) => (
+    <div className={`rounded-2xl border-2 ${colorClass}`}>
+      <div className="flex items-center gap-2 px-4 py-3">
+        <h2 className="text-sm font-semibold text-[#173c2a]">{label}</h2>
+        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
+          {list.length}件 / {formatCurrency(list.reduce((s, o) => s + computePoTaxIncluded(o), 0))}
+        </span>
+      </div>
+      <div className="overflow-x-auto border-t border-white/60">
+        <table className="min-w-full text-sm">
+          <thead className="bg-white/60 text-[#173c2a]">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">期日</th>
+              <th className="px-3 py-2 text-left font-medium">仕入先</th>
+              <th className="px-3 py-2 text-left font-medium">商品</th>
+              <th className="px-3 py-2 text-right font-medium">支払額(税込)</th>
+              <th className="px-3 py-2 text-left font-medium">状態</th>
+              <th className="px-3 py-2 text-left font-medium">支払日</th>
+              <th className="px-3 py-2 text-left font-medium">請求書</th>
+              <th className="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody>{list.map(renderPoRow)}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+
   return (
     <AppLayout>
       <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
@@ -198,22 +298,11 @@ export default function PayablesPage() {
           const tabs = bucketsToRender
           const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
           const rows = grouped[active] ?? []
-          const total = rows.reduce((s, o) => s + computePoTaxIncluded(o), 0)
-          // Within 要確認, keep 期限超過 and 今月期限 visually separated.
+          // Within 要確認, split into 期限超過 (red) and 今月期限 (yellow) sections.
           const todayStr = todayIso()
-          type RowItem = { type: 'header'; key: string; label: string; count: number } | { type: 'row'; po: PurchaseOrder }
-          let displayItems: RowItem[]
-          if (active === 'actionNeeded') {
-            const sorted = [...rows].sort((a, b) => (a.paymentDueDate || '').localeCompare(b.paymentDueDate || ''))
-            const over = sorted.filter(o => !!o.paymentDueDate && o.paymentDueDate < todayStr)
-            const due = sorted.filter(o => !(o.paymentDueDate && o.paymentDueDate < todayStr))
-            displayItems = [
-              ...(over.length ? [{ type: 'header', key: 'h-over', label: '期限超過', count: over.length } as RowItem, ...over.map(o => ({ type: 'row', po: o } as RowItem))] : []),
-              ...(due.length ? [{ type: 'header', key: 'h-due', label: '今月期限', count: due.length } as RowItem, ...due.map(o => ({ type: 'row', po: o } as RowItem))] : []),
-            ]
-          } else {
-            displayItems = rows.map(o => ({ type: 'row', po: o } as RowItem))
-          }
+          const sortByDue = (a: PurchaseOrder, b: PurchaseOrder) => (a.paymentDueDate || '').localeCompare(b.paymentDueDate || '')
+          const overGroup = active === 'actionNeeded' ? rows.filter(o => !!o.paymentDueDate && o.paymentDueDate < todayStr).sort(sortByDue) : []
+          const dueGroup = active === 'actionNeeded' ? rows.filter(o => !(o.paymentDueDate && o.paymentDueDate < todayStr)).sort(sortByDue) : []
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
@@ -237,117 +326,19 @@ export default function PayablesPage() {
                 })}
               </div>
 
-              {rows.length === 0 ? (
+              {active === 'actionNeeded' ? (
+                overGroup.length === 0 && dueGroup.length === 0 ? (
+                  <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">要確認の買掛はありません。</p>
+                ) : (
+                  <div className="space-y-4">
+                    {overGroup.length > 0 && renderPoCard('期限超過', 'border-red-300 bg-red-50', overGroup)}
+                    {dueGroup.length > 0 && renderPoCard('今月期限', 'border-amber-300 bg-amber-50', dueGroup)}
+                  </div>
+                )
+              ) : rows.length === 0 ? (
                 <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active]}の買掛はありません。</p>
               ) : (
-              <div className={`rounded-2xl border-2 ${BUCKET_COLORS[active]}`}>
-                <div className="flex items-center gap-2 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[active]}</h2>
-                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{rows.length}件 / {formatCurrency(total)}</span>
-                </div>
-                <div className="overflow-x-auto border-t border-white/60">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-white/60 text-[#173c2a]">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium">期日</th>
-                        <th className="px-3 py-2 text-left font-medium">仕入先</th>
-                        <th className="px-3 py-2 text-left font-medium">商品</th>
-                        <th className="px-3 py-2 text-right font-medium">支払額(税込)</th>
-                        <th className="px-3 py-2 text-left font-medium">状態</th>
-                        <th className="px-3 py-2 text-left font-medium">支払日</th>
-                        <th className="px-3 py-2 text-left font-medium">請求書</th>
-                        <th className="px-3 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayItems.map(item => {
-                        if (item.type === 'header') {
-                          return (
-                            <tr key={item.key} className="bg-[#fff0ec]">
-                              <td colSpan={8} className="px-3 py-1.5 text-[11px] font-semibold text-[#9d3d28]">{item.label}（{item.count}件）</td>
-                            </tr>
-                          )
-                        }
-                        const o = item.po
-                        const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
-                        const isOverdue = !!o.paymentDueDate && o.paymentDueDate < todayIso()
-                        return (
-                          <tr key={o.id} className="border-t border-white/60">
-                            <td className="px-3 py-2">
-                              <input
-                                type="date"
-                                value={o.paymentDueDate ?? ''}
-                                onChange={e => updateInline(o.id, { paymentDueDate: e.target.value })}
-                                className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-[#173c2a]">
-                              <button type="button" onClick={() => setDetailOrder(o)} className="text-left hover:underline">{o.supplierName}</button>
-                            </td>
-                            <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
-                            <td className="px-3 py-2 text-right">
-                              <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
-                              <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
-                              {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
-                                <div className="text-[10px] text-[#9d3d28]">残額 {formatCurrency(poRemaining(o))}</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              {(o.payments ?? []).length > 0 ? (
-                                <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{PAY_LABELS[o.paymentStatus]}</span>
-                              ) : (
-                                <select
-                                  value={o.paymentStatus === 'partial' ? 'unpaid' : o.paymentStatus}
-                                  onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
-                                  className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                                >
-                                  <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
-                                  <option value="unpaid">{PAY_LABELS.unpaid}</option>
-                                  <option value="paid">{PAY_LABELS.paid}</option>
-                                </select>
-                              )}
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="date"
-                                value={o.paidDate ?? ''}
-                                onChange={e => updateInline(o.id, { paidDate: e.target.value })}
-                                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              {o.invoice ? (
-                                <a
-                                  href={o.invoice.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-[#174c33] hover:underline"
-                                >
-                                  <FileText size={12} /> PDF
-                                </a>
-                              ) : (
-                                <span className="text-[#a59f8c] text-xs">未添付</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {o.paymentStatus !== 'paid' && (
-                                <button
-                                  type="button"
-                                  onClick={() => markPaid(o.id)}
-                                  disabled={savingId === o.id}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
-                                >
-                                  <CheckCircle2 size={12} /> 支払確認
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                renderPoCard(BUCKET_LABELS[active], BUCKET_COLORS[active], rows)
               )}
             </div>
           )
