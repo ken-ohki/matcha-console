@@ -65,8 +65,7 @@ export default function ReceivablesPage() {
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
-  const [ecOpen, setEcOpen] = useState(false)
-  const [activeBucket, setActiveBucket] = useState<Bucket>('overdue')
+  const [activeBucket, setActiveBucket] = useState<Bucket | 'ec'>('overdue')
 
   const load = async () => {
     setLoading(true)
@@ -231,13 +230,17 @@ export default function ReceivablesPage() {
 
         {loading && <p className="text-sm text-[#68756c]">読み込み中…</p>}
 
-        {/* バケットをタブで切り替え */}
+        {/* バケット＋ECをタブで切り替え */}
         {!loading && (() => {
           const tabs = bucketsToRender
-          const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
-          const rows = grouped[active] ?? []
+          const hasEc = ecSales.length > 0
+          const active = activeBucket === 'ec'
+            ? (hasEc ? 'ec' : tabs[0])
+            : (tabs.includes(activeBucket as Bucket) ? activeBucket as Bucket : tabs[0])
+          const isEc = active === 'ec'
+          const rows = isEc ? [] : (grouped[active as Bucket] ?? [])
           const total = rows.reduce((s, r) => s + saleIncome(r), 0)
-          const bucket = active
+          const bucket = active as Bucket
           const isOverdueTab = active === 'overdue'
           return (
             <div className="space-y-3">
@@ -260,14 +263,60 @@ export default function ReceivablesPage() {
                     </button>
                   )
                 })}
+                {hasEc && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveBucket('ec')}
+                    className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
+                      isEc ? 'border-[#174c33] text-[#173c2a]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                    }`}
+                  >
+                    EC売上
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isEc ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c]'}`}>{ecFiltered.length}</span>
+                  </button>
+                )}
               </div>
 
-              {rows.length === 0 ? (
-                <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active]}の売掛はありません。</p>
+              {isEc ? (
+                <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30">
+                  <div className="flex items-center gap-2 px-4 py-3">
+                    <h2 className="text-sm font-semibold text-[#173c2a]">EC売上（入金済・参考）</h2>
+                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{ecFiltered.length}件 / 今月 {formatCurrency(ecThisMonth)}</span>
+                  </div>
+                  <div className="overflow-x-auto border-t border-white/60">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-white/60 text-[#173c2a]">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">売上日</th>
+                          <th className="px-3 py-2 text-left font-medium">商品</th>
+                          <th className="px-3 py-2 text-left font-medium">注文番号</th>
+                          <th className="px-3 py-2 text-right font-medium">数量</th>
+                          <th className="px-3 py-2 text-right font-medium">売上</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ecFiltered.map(e => (
+                          <tr key={e.id} className="border-t border-white/60">
+                            <td className="px-3 py-2 text-[#173c2a]">{e.soldOn || '-'}</td>
+                            <td className="px-3 py-2 text-[#68756c]">{e.productName}</td>
+                            <td className="px-3 py-2 text-[#68756c]">{e.orderNumber || '-'}</td>
+                            <td className="px-3 py-2 text-right">{formatKg(e.quantityKg)}</td>
+                            <td className="px-3 py-2 text-right font-medium">{formatCurrency(ecRev(e))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {ecSales.length > ecFiltered.length && (
+                      <p className="px-4 py-2 text-[11px] text-[#68756c]">最新 {ecFiltered.length} 件のみ表示しています。</p>
+                    )}
+                  </div>
+                </div>
+              ) : rows.length === 0 ? (
+                <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active as Bucket]}の売掛はありません。</p>
               ) : (
-              <div className={`rounded-2xl border-2 ${BUCKET_COLORS[active]}`}>
+              <div className={`rounded-2xl border-2 ${BUCKET_COLORS[active as Bucket]}`}>
                 <div className="flex items-center gap-2 px-4 py-3">
-                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[active]}</h2>
+                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[active as Bucket]}</h2>
                   <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{rows.length}件 / {formatCurrency(total)}</span>
                 </div>
                 <div className="overflow-x-auto border-t border-white/60">
@@ -386,53 +435,6 @@ export default function ReceivablesPage() {
             </div>
           )
         })()}
-
-        {!loading && ecSales.length > 0 && (
-          <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30">
-            <button
-              type="button"
-              onClick={() => setEcOpen(v => !v)}
-              className="flex w-full items-center justify-between px-4 py-3 text-left"
-            >
-              <div className="flex items-center gap-2">
-                {ecOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <h2 className="text-sm font-semibold text-[#173c2a]">EC売上（入金済・参考）</h2>
-                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
-                  {ecFiltered.length}件 / 今月 {formatCurrency(ecThisMonth)}
-                </span>
-              </div>
-            </button>
-            {ecOpen && (
-              <div className="overflow-x-auto border-t border-white/60">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-white/60 text-[#173c2a]">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">売上日</th>
-                      <th className="px-3 py-2 text-left font-medium">商品</th>
-                      <th className="px-3 py-2 text-left font-medium">注文番号</th>
-                      <th className="px-3 py-2 text-right font-medium">数量</th>
-                      <th className="px-3 py-2 text-right font-medium">売上</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ecFiltered.map(e => (
-                      <tr key={e.id} className="border-t border-white/60">
-                        <td className="px-3 py-2 text-[#173c2a]">{e.soldOn || '-'}</td>
-                        <td className="px-3 py-2 text-[#68756c]">{e.productName}</td>
-                        <td className="px-3 py-2 text-[#68756c]">{e.orderNumber || '-'}</td>
-                        <td className="px-3 py-2 text-right">{formatKg(e.quantityKg)}</td>
-                        <td className="px-3 py-2 text-right font-medium">{formatCurrency(ecRev(e))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {ecSales.length > ecFiltered.length && (
-                  <p className="px-4 py-2 text-[11px] text-[#68756c]">最新 {ecFiltered.length} 件のみ表示しています。</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </main>
 
       <SaleDetailModal sale={detailSale} onClose={() => setDetailSale(null)} />
