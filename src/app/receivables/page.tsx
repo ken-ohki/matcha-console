@@ -12,7 +12,7 @@ import {
   Mail,
   Wallet,
 } from 'lucide-react'
-import { X } from 'lucide-react'
+import { X, Undo2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
@@ -130,6 +130,24 @@ export default function ReceivablesPage() {
   const openConfirm = (sale: SaleRecord) => {
     setConfirmTarget(sale)
     setConfirmDate(todayIso())
+  }
+
+  const unconfirmPaid = async (sale: SaleRecord) => {
+    if (!confirm(`${sale.buyerName} の入金確認を取り消して「請求済」に戻しますか？\n入金日・入金確認日もクリアされます。`)) return
+    setSavingId(sale.id)
+    setFeedback(null)
+    try {
+      const svc = await getServices()
+      const updated = await svc.sales.updateSaleRecord(sale.id, {
+        paymentStatus: 'invoiced',
+        paymentDate: '',
+        paymentConfirmedAt: '',
+      })
+      setSales(prev => prev.map(s => s.id === sale.id ? updated : s))
+      setFeedback('入金確認を取り消しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
+    } finally { setSavingId(null) }
   }
 
   const markPaid = async (id: string, paymentDate: string) => {
@@ -310,7 +328,7 @@ export default function ReceivablesPage() {
                               </select>
                             </td>
                             <td className="px-3 py-2 text-right">
-                              {s.paymentStatus !== 'paid' && (
+                              {s.paymentStatus !== 'paid' ? (
                                 <button
                                   type="button"
                                   onClick={() => openConfirm(s)}
@@ -318,6 +336,15 @@ export default function ReceivablesPage() {
                                   className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
                                 >
                                   <CheckCircle2 size={12} /> 入金確認
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => unconfirmPaid(s)}
+                                  disabled={savingId === s.id}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] font-medium text-[#9d3d28] hover:bg-red-50 disabled:opacity-60"
+                                >
+                                  <Undo2 size={12} /> 入金取消
                                 </button>
                               )}
                               {s.paymentStatus !== 'paid' && bucket === 'overdue' && (
