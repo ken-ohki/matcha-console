@@ -119,10 +119,16 @@ export async function POST(request: Request) {
   const soldOn = order.created_at ? order.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10)
   const orderName = order.name || `#${shopifyOrderId}`
 
-  // Compute desired records from current line items
-  const desired = []
+  // Compute desired records from current line items. Each line gets a
+  // DETERMINISTIC document id (`shopify-<orderId>-<lineIndex>`) so concurrent
+  // webhook deliveries (orders/create + orders/paid + orders/fulfilled often
+  // arrive together) converge to the same documents instead of each appending
+  // a fresh random-id copy — the race that caused duplicate EC sales.
+  const desired: { id: string; record: AnyRecord }[] = []
   const skipped: string[] = []
+  let lineIndex = -1
   for (const item of order.line_items ?? []) {
+    lineIndex++
     const sku = (item.sku ?? '').trim()
     if (!sku) continue
     const product = productBySku.get(sku)
@@ -145,28 +151,34 @@ export async function POST(request: Request) {
       channel: 'Shopify',
       shopifyOrderId,
       status: 'active',
-      createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }
     if (hasPrice) {
       record.unitPrice = unitPrice
       record.revenue = quantityKg * (unitPrice as number)
     }
-    desired.push(record)
+    desired.push({ id: `shopify-${shopifyOrderId}-${lineIndex}`, record })
   }
 
-  // Re-sync: delete only the ACTIVE records for this order (preserve cancelled
-  // history), then recreate the active set from the current line items.
+  // Re-sync idempotently: overwrite the desired line docs by deterministic id,
+  // and delete only the ACTIVE docs for this order NOT in the desired set
+  // (preserves cancelled history and lines that no longer exist).
+  const desiredIds = new Set(desired.map(d => d.id))
+  const existingIds = new Set<string>()
   const existing = await db.collection('ec_sales').where('shopifyOrderId', '==', shopifyOrderId).get()
   const batch = db.batch()
   let removed = 0
   existing.docs.forEach(doc => {
+    existingIds.add(doc.id)
     if (doc.data().status === 'cancelled') return
+    if (desiredIds.has(doc.id)) return // overwritten below
     batch.delete(doc.ref)
     removed++
   })
-  for (const record of desired) {
-    batch.set(db.collection('ec_sales').doc(), record)
+  for (const { id, record } of desired) {
+    // Set createdAt only when the doc is new; merge preserves it otherwise.
+    if (!existingIds.has(id)) record.createdAt = FieldValue.serverTimestamp()
+    batch.set(db.collection('ec_sales').doc(id), record, { merge: true })
   }
   await batch.commit()
 
@@ -174,7 +186,7 @@ export async function POST(request: Request) {
     ok: true,
     action: topic === 'orders/create' ? 'created' : 'resynced',
     items: desired.length,
-    removed: existing.size,
+    removed,
     skipped,
     order: orderName,
   })
