@@ -66,9 +66,7 @@ export default function ReceivablesPage() {
   const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
   const [ecOpen, setEcOpen] = useState(false)
-  const [openBuckets, setOpenBuckets] = useState<Record<Bucket, boolean>>({
-    overdue: true, thisMonth: true, nextMonth: true, later: false, noDate: false, paid: false,
-  })
+  const [activeBucket, setActiveBucket] = useState<Bucket>('overdue')
 
   const load = async () => {
     setLoading(true)
@@ -233,25 +231,45 @@ export default function ReceivablesPage() {
 
         {loading && <p className="text-sm text-[#68756c]">読み込み中…</p>}
 
-        {!loading && bucketsToRender.map(bucket => {
-          const rows = grouped[bucket]
-          if (rows.length === 0) return null
-          const open = openBuckets[bucket]
+        {/* バケットをタブで切り替え */}
+        {!loading && (() => {
+          const tabs = bucketsToRender
+          const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
+          const rows = grouped[active] ?? []
           const total = rows.reduce((s, r) => s + saleIncome(r), 0)
+          const bucket = active
+          const isOverdueTab = active === 'overdue'
           return (
-            <div key={bucket} className={`rounded-2xl border-2 ${BUCKET_COLORS[bucket]}`}>
-              <button
-                type="button"
-                onClick={() => setOpenBuckets(prev => ({ ...prev, [bucket]: !prev[bucket] }))}
-                className="flex w-full items-center justify-between px-4 py-3 text-left"
-              >
-                <div className="flex items-center gap-2">
-                  {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[bucket]}</h2>
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
+                {tabs.map(b => {
+                  const count = (grouped[b] ?? []).length
+                  return (
+                    <button
+                      key={b}
+                      type="button"
+                      onClick={() => setActiveBucket(b)}
+                      className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
+                        active === b
+                          ? 'border-[#174c33] text-[#173c2a]'
+                          : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                      }`}
+                    >
+                      {BUCKET_LABELS[b]}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c]'}`}>{count}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {rows.length === 0 ? (
+                <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active]}の売掛はありません。</p>
+              ) : (
+              <div className={`rounded-2xl border-2 ${BUCKET_COLORS[active]}`}>
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <h2 className="text-sm font-semibold text-[#173c2a]">{BUCKET_LABELS[active]}</h2>
                   <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{rows.length}件 / {formatCurrency(total)}</span>
                 </div>
-              </button>
-              {open && (
                 <div className="overflow-x-auto border-t border-white/60">
                   <table className="min-w-full text-sm">
                     <thead className="bg-white/60 text-[#173c2a]">
@@ -363,14 +381,11 @@ export default function ReceivablesPage() {
                     </tbody>
                   </table>
                 </div>
+              </div>
               )}
             </div>
           )
-        })}
-
-        {!loading && bucketsToRender.every(b => grouped[b].length === 0) && (
-          <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">該当の売掛はありません。</p>
-        )}
+        })()}
 
         {!loading && ecSales.length > 0 && (
           <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30">
