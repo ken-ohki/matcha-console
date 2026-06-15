@@ -307,13 +307,15 @@ export default function DocumentPage() {
                   />
                 )}
               </div>
-              <input
-                type="text"
-                value={doc.recipientPostalCode}
-                onChange={e => updateField('recipientPostalCode', e.target.value)}
-                placeholder={isJa ? '〒郵便番号' : 'Postal code'}
-                className="mt-2 w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
-              />
+              {isJa && (
+                <input
+                  type="text"
+                  value={doc.recipientPostalCode}
+                  onChange={e => updateField('recipientPostalCode', e.target.value)}
+                  placeholder="〒郵便番号"
+                  className="mt-2 w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
+                />
+              )}
               <textarea
                 rows={2}
                 value={doc.recipientAddress}
