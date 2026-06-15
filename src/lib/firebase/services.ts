@@ -1129,6 +1129,46 @@ async function createProductDoc(input: ProductInput): Promise<{ id: string; prod
   return { id: ref.id, product: mapProduct(ref.id, payload) }
 }
 
+// Build a PO line for a free-text (new) product. When the modal supplied a SKU
+// and inventory group, create the product now (0 stock) so it shows in 在庫管理
+// before receiving; otherwise keep it unlisted (productId empty) as before.
+async function buildPoLineForNewProduct(
+  line: PurchaseOrderLineInput,
+  quantityKg: number,
+  unitPrice: number,
+  taxRate: TaxRate,
+): Promise<PurchaseOrderLineItem> {
+  const productName = (line.productName ?? '').trim()
+  if (!productName) throw new Error('商品名を入力してください')
+  const sku = (line.newProductSku ?? '').trim()
+  const groupId = (line.newProductGroupId ?? '').trim()
+  if (sku && groupId) {
+    const created = await createProductDoc({
+      sku,
+      name: productName,
+      purchaseProductName: productName,
+      inventoryGroupId: groupId,
+      origins: [], cultivars: [], pluckingMethods: [], harvestSeasons: [], shadingMethods: [], certifications: [],
+      arrivalRecords: [], inventoryChecks: [], arrivalDate: '', initialStockKg: 0,
+      purchaseUnitPrice: unitPrice,
+      showInCatalog: false,
+      inquireToOrder: true,
+    })
+    return {
+      productId: created.id,
+      productSku: created.product.sku,
+      productName: created.product.purchaseProductName || created.product.name,
+      quantityKg, unitPrice, lineTotal: quantityKg * unitPrice,
+      receivedKg: Number(line.receivedKg ?? 0), taxRate,
+    }
+  }
+  return {
+    productId: '', productSku: '', productName,
+    quantityKg, unitPrice, lineTotal: quantityKg * unitPrice,
+    receivedKg: Number(line.receivedKg ?? 0), taxRate,
+  }
+}
+
 export function createFirebaseServices(): IServices {
   const db = getFirebaseDb()
   const auth = getFirebaseAuthInstance()
@@ -1779,14 +1819,15 @@ export function createFirebaseServices(): IServices {
         throw new Error('商品を1つ以上指定してください')
       }
       const products = await getAllProducts()
-      const items: PurchaseOrderLineItem[] = input.items.map(line => {
+      const items: PurchaseOrderLineItem[] = []
+      for (const line of input.items) {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
         const taxRate = coerceTaxRate(line.taxRate)
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
-          return {
+          items.push({
             productId: product.id,
             productSku: product.sku,
             productName: product.purchaseProductName || product.name,
@@ -1795,21 +1836,11 @@ export function createFirebaseServices(): IServices {
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
             taxRate,
-          }
+          })
+        } else {
+          items.push(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate))
         }
-        const productName = (line.productName ?? '').trim()
-        if (!productName) throw new Error('商品名を入力してください')
-        return {
-          productId: '',
-          productSku: '',
-          productName,
-          quantityKg,
-          unitPrice,
-          lineTotal: quantityKg * unitPrice,
-          receivedKg: Number(line.receivedKg ?? 0),
-          taxRate,
-        }
-      })
+      }
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
       const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
 
@@ -1888,14 +1919,15 @@ export function createFirebaseServices(): IServices {
       }
 
       const products = await getAllProducts()
-      const items: PurchaseOrderLineItem[] = merged.items.map(line => {
+      const items: PurchaseOrderLineItem[] = []
+      for (const line of merged.items) {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
         const taxRate = coerceTaxRate(line.taxRate)
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
-          return {
+          items.push({
             productId: product.id,
             productSku: product.sku,
             productName: product.purchaseProductName || product.name,
@@ -1904,21 +1936,11 @@ export function createFirebaseServices(): IServices {
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
             taxRate,
-          }
+          })
+        } else {
+          items.push(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate))
         }
-        const productName = (line.productName ?? '').trim()
-        if (!productName) throw new Error('商品名を入力してください')
-        return {
-          productId: '',
-          productSku: '',
-          productName,
-          quantityKg,
-          unitPrice,
-          lineTotal: quantityKg * unitPrice,
-          receivedKg: Number(line.receivedKg ?? 0),
-          taxRate,
-        }
-      })
+      }
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
       const totalAmount = items.reduce((s, i) => s + i.lineTotal, 0)
 

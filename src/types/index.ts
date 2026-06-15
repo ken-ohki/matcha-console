@@ -343,6 +343,8 @@ export interface PurchaseOrderLineItem {
 export interface PurchaseOrderLineInput {
   productId?: string       // omit for a new/unlisted product
   productName?: string     // required when productId is empty (free text)
+  newProductSku?: string        // when creating a new product at PO time
+  newProductGroupId?: string    // inventory group for the new product
   quantityKg: number
   unitPrice: number
   receivedKg?: number

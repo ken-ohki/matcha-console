@@ -6,6 +6,7 @@ import { PageTabs, PURCHASING_TABS } from '@/components/layout/PageTabs'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type {
+  InventoryGroup,
   ProductWithInventory,
   PurchaseOrder,
   PurchaseOrderInput,
@@ -173,6 +174,7 @@ function PurchaseOrderModal({
   open,
   suppliers,
   products,
+  inventoryGroups,
   initial,
   onClose,
   onSave,
@@ -180,6 +182,7 @@ function PurchaseOrderModal({
   open: boolean
   suppliers: Supplier[]
   products: ProductWithInventory[]
+  inventoryGroups: InventoryGroup[]
   initial: PurchaseOrder | null
   onClose: () => void
   onSave: (input: PurchaseOrderInput) => Promise<void>
@@ -406,7 +409,25 @@ function PurchaseOrderModal({
                         onFreeText={name => updateItem(index, { productId: '', productName: name })}
                       />
                       {!line.productId && (line.productName ?? '').trim() && (
-                        <p className="px-1 text-[11px] text-amber-700">新規商品（在庫未登録）：{line.productName}</p>
+                        <div className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                          <p className="text-[11px] font-medium text-amber-800">新規商品。SKUと在庫グループを入力すると在庫管理に登録されます（入荷前は0kg）。</p>
+                          <div className="flex gap-1.5">
+                            <input
+                              value={line.newProductSku ?? ''}
+                              onChange={e => updateItem(index, { newProductSku: e.target.value })}
+                              placeholder="SKU"
+                              className="w-1/2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                            />
+                            <select
+                              value={line.newProductGroupId ?? ''}
+                              onChange={e => updateItem(index, { newProductGroupId: e.target.value })}
+                              className="w-1/2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                            >
+                              <option value="">グループ選択</option>
+                              {inventoryGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
                       )}
                     </div>
                     <input
@@ -687,6 +708,7 @@ export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
+  const [inventoryGroups, setInventoryGroups] = useState<InventoryGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | ''>('')
@@ -699,14 +721,16 @@ export default function PurchaseOrdersPage() {
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const [nextOrders, nextSuppliers, nextProducts] = await Promise.all([
+    const [nextOrders, nextSuppliers, nextProducts, nextGroups] = await Promise.all([
       services.purchaseOrders.getPurchaseOrders(),
       services.suppliers.getSuppliers(),
       services.inventory.getProductsWithInventory(),
+      services.inventory.getInventoryGroups(),
     ])
     setOrders(nextOrders)
     setSuppliers(nextSuppliers)
     setProducts(nextProducts)
+    setInventoryGroups(nextGroups)
     setLoading(false)
   }
 
@@ -865,6 +889,7 @@ export default function PurchaseOrdersPage() {
         open={modalOpen}
         suppliers={suppliers}
         products={products}
+        inventoryGroups={inventoryGroups}
         initial={editing}
         onClose={() => { setModalOpen(false); setEditing(null) }}
         onSave={handleSave}
