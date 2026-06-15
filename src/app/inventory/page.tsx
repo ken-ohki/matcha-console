@@ -1732,7 +1732,7 @@ export default function InventoryPage() {
 
               <div className="mt-4 rounded-xl bg-[#f7f5ee] p-3">
                 <p className="text-xs text-[#68756c]">残在庫</p>
-                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatKg(product.currentStockKg)}</p>
+                <p className={`mt-1 text-lg font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{formatKg(product.currentStockKg)}</p>
               </div>
 
               {user?.role === 'admin' && (
@@ -1834,7 +1834,7 @@ export default function InventoryPage() {
                       <div className="text-xs text-[#68756c]">認証: {formatOptionList(translateValues(masters, 'certification', product.certifications))}</div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
-                      <div className="font-semibold text-[#173c2a]">{product.currentStockKg.toFixed(1)} kg</div>
+                      <div className={`font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{product.currentStockKg.toFixed(1)} kg</div>
                     </td>
                     <td className="px-4 py-4 text-gray-700">
                       {(() => {
