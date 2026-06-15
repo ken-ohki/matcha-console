@@ -436,6 +436,12 @@ function SaleModal({
                 const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
                 const lineRate = line.taxRate ?? 8
                 const lineIncl = computeTaxBuckets([line]).total
+                const lineProduct = products.find(p => p.id === line.productId)
+                const lineInitial = initial?.items.find(i => i.productId === line.productId)
+                const lineCostPerKg = lineProduct?.purchaseUnitPrice ?? lineInitial?.costPerKg ?? 0
+                const lineCost = (Number(line.quantityKg) || 0) * lineCostPerKg
+                const lineProfit = lineRevenue - lineCost
+                const lineMargin = lineRevenue > 0 ? (lineProfit / lineRevenue) * 100 : null
                 return (
                   <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
                     <select
@@ -488,6 +494,9 @@ function SaleModal({
                     <div className="flex flex-col items-end justify-center text-xs md:px-2">
                       <span className="font-medium text-[#173c2a]">{formatCurrency(lineIncl)}</span>
                       <span className="text-[10px] text-[#68756c]">税抜 {formatCurrency(lineRevenue)}</span>
+                      <span className={`text-[10px] ${lineProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        粗利 {formatCurrency(lineProfit)}{lineMargin != null && ` (${lineMargin.toFixed(1)}%)`}
+                      </span>
                     </div>
                     <button
                       type="button"
