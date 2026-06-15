@@ -671,59 +671,24 @@ function computeInventory(
 
 async function assertSufficientStock(
   nextSale: SaleRecordInput,
-  options?: { excludeSaleId?: string },
+  _options?: { excludeSaleId?: string },
 ): Promise<{ productMap: Map<string, Product> }> {
+  // Sales are allowed to drive stock negative (e.g. taking an order before the
+  // goods have arrived / been received). We therefore only resolve the product
+  // references here and do NOT block on available stock. The modal surfaces the
+  // resulting (possibly negative) remaining stock in red as a warning.
+  void _options
   if (!Array.isArray(nextSale.items) || nextSale.items.length === 0) {
     throw new Error('商品を1つ以上指定してください')
   }
-  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
-    getAllProducts(),
-    getAllSales(),
-    getAllSelfConsumptions(),
-    getAllEcSales(),
-  ])
-
-  // Sum quantity per productId within this sale (handles duplicate productIds)
-  const requestedByProduct = nextSale.items.reduce<Record<string, number>>((acc, item) => {
-    acc[item.productId] = (acc[item.productId] ?? 0) + Number(item.quantityKg ?? 0)
-    return acc
-  }, {})
-
+  const products = await getAllProducts()
   const productMap = new Map<string, Product>()
-  for (const productId of Object.keys(requestedByProduct)) {
-    const product = products.find(item => item.id === productId && item.isActive)
+  for (const item of nextSale.items) {
+    if (productMap.has(item.productId)) continue
+    const product = products.find(p => p.id === item.productId && p.isActive)
     if (!product) throw new Error('商品が見つかりません')
-    productMap.set(productId, product)
+    productMap.set(item.productId, product)
   }
-
-  const shouldValidate = isReservedSale(nextSale.status)
-  if (!shouldValidate) {
-    return { productMap }
-  }
-
-  for (const [productId, requestedKg] of Object.entries(requestedByProduct)) {
-    const product = productMap.get(productId)!
-    const reservedKg = sales
-      .filter(sale => sale.id !== options?.excludeSaleId && isReservedSale(sale.status))
-      .reduce((sum, sale) => sum + sale.items
-        .filter(item => item.productId === productId)
-        .reduce((s, item) => s + item.quantityKg, 0), 0)
-    const selfConsumedKg = selfConsumptions
-      .filter(record => record.productId === productId)
-      .reduce((sum, record) => sum + record.quantityKg, 0)
-    const ecSoldKg = ecSales
-      .filter(record => record.productId === productId && record.status !== 'cancelled')
-      .reduce((sum, record) => sum + record.quantityKg, 0)
-    const availableKg = product.initialStockKg
-      + deriveInventoryAdjustmentKg(product.inventoryChecks)
-      - reservedKg
-      - selfConsumedKg
-      - ecSoldKg
-    if (requestedKg > availableKg) {
-      throw new Error(`「${product.name}」の在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
-    }
-  }
-
   return { productMap }
 }
 

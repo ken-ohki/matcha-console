@@ -684,6 +684,9 @@ function SaleModal({
               <p className={`mt-1 text-lg font-semibold ${minRemaining < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>
                 {formatKg(minRemaining)}
               </p>
+              {minRemaining < 0 && (
+                <p className="mt-1 text-[10px] font-medium text-red-700">在庫不足（マイナス）ですが登録できます。入荷後に解消されます。</p>
+              )}
               {stockSummary.length > 1 && (
                 <p className="mt-1 text-[10px] text-[#68756c]">
                   {stockSummary.map(s => `${s.name}: ${s.remaining.toFixed(1)}kg`).join(' / ')}
