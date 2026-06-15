@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Printer, Trash2 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { ArrowLeft, Printer } from 'lucide-react'
 import { getServices } from '@/lib/services'
 import type { Buyer, SaleRecord } from '@/types'
 import type { IssuerInfo } from '@/lib/services'
@@ -104,8 +103,8 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     language,
     recipientName: sale.buyerName,
     recipientHonorific: isJa ? '御中' : '',
-    recipientAddress: buyer?.shippingAddress ?? '',
-    recipientPostalCode: buyer?.shippingPostalCode ?? '',
+    recipientAddress: sale.shippingAddress?.trim() || buyer?.shippingAddress || '',
+    recipientPostalCode: sale.shippingPostalCode?.trim() || buyer?.shippingPostalCode || '',
     issueDate: todayString(),
     projectName: projectLabel,
     // 輸出 default follows the data, not the language: a sale whose lines are
@@ -119,10 +118,10 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     paymentDestination: (overrideBankInfo && overrideBankInfo.trim()) || (isJa ? ISSUER.bankInfo : ISSUER.bankInfoEn),
     paymentTerms: isJa ? '' : DEFAULT_EN_PAYMENT_TERMS,
     lines,
-    notes:
-      type === 'invoice'
+    notes: sale.notes?.trim()
+      || (type === 'invoice'
         ? (isJa ? '・振込手数料は御社ご負担にてお願いいたします。' : 'Please note that any bank transfer fees are to be borne by the Buyer.')
-        : '',
+        : ''),
   }
 }
 
@@ -142,7 +141,6 @@ export default function DocumentPage() {
   const [includeTerms, setIncludeTerms] = useState(true)
   const [terms, setTerms] = useState<{ heading: string; body: string }[]>([])
   const [issuer, setIssuer] = useState<IssuerInfo>(ISSUER)
-  const { user } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -195,21 +193,6 @@ export default function DocumentPage() {
     )
   }
 
-  const updateField = <K extends keyof DocumentData>(key: K, value: DocumentData[K]) => {
-    setDoc(prev => prev ? { ...prev, [key]: value } : prev)
-  }
-  const updateLine = (id: string, patch: Partial<DocumentLine>) => {
-    setDoc(prev => prev ? {
-      ...prev,
-      lines: prev.lines.map(l => l.id === id ? { ...l, ...patch } : l),
-    } : prev)
-  }
-  const addLine = () => {
-    setDoc(prev => prev ? { ...prev, lines: [...prev.lines, createBlankLine()] } : prev)
-  }
-  const removeLine = (id: string) => {
-    setDoc(prev => prev ? { ...prev, lines: prev.lines.filter(l => l.id !== id) } : prev)
-  }
   const handleTypeChange = (next: DocumentType) => {
     router.replace(`/sales/${params.id}/document?type=${next}&lang=${language}`)
   }
@@ -293,47 +276,23 @@ export default function DocumentPage() {
             <div>
               <div className="flex items-baseline gap-2 border-b-2 border-[#173c2a] pb-1">
                 {!isJa && <span className="text-base text-[#173c2a]">To:</span>}
-                <EditableInput
-                  className="flex-1 text-xl font-medium text-[#173c2a]"
-                  value={doc.recipientName}
-                  onChange={v => updateField('recipientName', v)}
-                  placeholder={isJa ? 'お客様名' : 'Customer Name'}
-                />
-                {isJa && (
-                  <EditableInput
-                    className="w-16 text-base font-medium text-[#173c2a]"
-                    value={doc.recipientHonorific}
-                    onChange={v => updateField('recipientHonorific', v)}
-                  />
+                <span className="flex-1 text-xl font-medium text-[#173c2a]">{doc.recipientName}</span>
+                {isJa && doc.recipientHonorific && (
+                  <span className="w-16 text-base font-medium text-[#173c2a]">{doc.recipientHonorific}</span>
                 )}
               </div>
-              {isJa && (
-                <input
-                  type="text"
-                  value={doc.recipientPostalCode}
-                  onChange={e => updateField('recipientPostalCode', e.target.value)}
-                  placeholder="〒郵便番号"
-                  className="mt-2 w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
-                />
+              {isJa && doc.recipientPostalCode && (
+                <p className="mt-2 text-xs text-[#68756c]">{doc.recipientPostalCode}</p>
               )}
-              <textarea
-                rows={2}
-                value={doc.recipientAddress}
-                onChange={e => updateField('recipientAddress', e.target.value)}
-                placeholder={isJa ? '住所' : 'Address'}
-                className="w-full resize-none bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
-              />
+              {doc.recipientAddress && (
+                <p className="whitespace-pre-wrap text-xs text-[#68756c]">{doc.recipientAddress}</p>
+              )}
               <p className="mt-6 text-sm">{labels.intro}</p>
             </div>
             <div className="text-sm space-y-1">
               <div className="flex gap-2 justify-end">
                 <span className="text-[#68756c]">{isJa ? '発行日：' : 'Issue Date:'}</span>
-                <EditableInput
-                  type="date"
-                  className="text-right"
-                  value={doc.issueDate}
-                  onChange={v => updateField('issueDate', v)}
-                />
+                <span className="text-right">{doc.issueDate}</span>
               </div>
               <div className="mt-3 text-right">
                 <p className="font-medium text-[#173c2a]">{isJa ? issuer.company : issuer.companyEn}</p>
@@ -350,25 +309,25 @@ export default function DocumentPage() {
 
           {/* Meta rows */}
           <div className="mt-6 grid grid-cols-[120px_1fr] gap-x-3 gap-y-2 text-sm">
-            <MetaRow label={isJa ? '案件' : EN_META_LABELS.project} value={doc.projectName} onChange={v => updateField('projectName', v)} />
+            <MetaRow label={isJa ? '案件' : EN_META_LABELS.project} value={doc.projectName} />
             {type === 'quotation' && (
               <>
-                <MetaRow label={isJa ? '有効期限' : EN_META_LABELS.validUntil} value={doc.validUntil ?? ''} onChange={v => updateField('validUntil', v)} />
-                <MetaRow label={isJa ? '条件' : EN_META_LABELS.terms} value={doc.terms ?? ''} onChange={v => updateField('terms', v)} />
+                <MetaRow label={isJa ? '有効期限' : EN_META_LABELS.validUntil} value={doc.validUntil ?? ''} />
+                <MetaRow label={isJa ? '条件' : EN_META_LABELS.terms} value={doc.terms ?? ''} />
               </>
             )}
             {type === 'delivery' && (
               <>
-                <MetaRow label={isJa ? '納品日' : EN_META_LABELS.deliveryDate} value={doc.deliveryDate ?? ''} onChange={v => updateField('deliveryDate', v)} type="date" />
-                <MetaRow label={isJa ? '納品場所' : EN_META_LABELS.deliveryPlace} value={doc.deliveryPlace ?? ''} onChange={v => updateField('deliveryPlace', v)} multiline />
+                <MetaRow label={isJa ? '納品日' : EN_META_LABELS.deliveryDate} value={doc.deliveryDate ?? ''} />
+                <MetaRow label={isJa ? '納品場所' : EN_META_LABELS.deliveryPlace} value={doc.deliveryPlace ?? ''} multiline />
               </>
             )}
             {type === 'invoice' && (
               <>
-                <MetaRow label={isJa ? '支払期限' : EN_META_LABELS.paymentDueDate} value={doc.paymentDueDate ?? ''} onChange={v => updateField('paymentDueDate', v)} />
-                <MetaRow label={isJa ? '振込先' : EN_META_LABELS.paymentDestination} value={doc.paymentDestination ?? ''} onChange={v => updateField('paymentDestination', v)} multiline rows={isJa ? 2 : 4} />
+                <MetaRow label={isJa ? '支払期限' : EN_META_LABELS.paymentDueDate} value={doc.paymentDueDate ?? ''} />
+                <MetaRow label={isJa ? '振込先' : EN_META_LABELS.paymentDestination} value={doc.paymentDestination ?? ''} multiline rows={isJa ? 2 : 4} />
                 {!isJa && (
-                  <MetaRow label={EN_META_LABELS.paymentTerms} value={doc.paymentTerms ?? ''} onChange={v => updateField('paymentTerms', v)} multiline rows={2} />
+                  <MetaRow label={EN_META_LABELS.paymentTerms} value={doc.paymentTerms ?? ''} multiline rows={2} />
                 )}
               </>
             )}
@@ -396,7 +355,6 @@ export default function DocumentPage() {
                   <th className="w-14 border-b border-r border-gray-300 px-2 py-2 text-center">{isJa ? '単位' : EN_META_LABELS.unit}</th>
                   <th className="w-24 border-b border-r border-gray-300 px-2 py-2 text-right">{isJa ? '単価' : EN_META_LABELS.unitPrice}</th>
                   <th className="w-28 border-b border-gray-300 px-2 py-2 text-right">{isJa ? '金額' : EN_META_LABELS.amount}</th>
-                  <th className="w-8 border-b border-gray-300 px-1 py-2 no-print"></th>
                 </tr>
               </thead>
               <tbody>
@@ -405,76 +363,20 @@ export default function DocumentPage() {
                   return (
                     <tr key={line.id}>
                       <td className="border-r border-b border-gray-200 px-2 py-1">
-                        <EditableInput value={line.description} onChange={v => updateLine(line.id, { description: v })} className="w-full" />
+                        <span className="w-full">{line.description}</span>
                       </td>
                       {!doc.taxExempt && (
-                        <td className="border-r border-b border-gray-200 px-2 py-1 text-center">
-                          <input
-                            type="checkbox"
-                            checked={line.isReducedRate}
-                            onChange={e => updateLine(line.id, { isReducedRate: e.target.checked })}
-                            className="h-4 w-4"
-                          />
-                        </td>
+                        <td className="border-r border-b border-gray-200 px-2 py-1 text-center">{line.isReducedRate ? '✓' : ''}</td>
                       )}
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
-                        <EditableInput
-                          type="number"
-                          value={String(line.quantity)}
-                          onChange={v => updateLine(line.id, { quantity: Number(v) || 0 })}
-                          className="w-full text-right"
-                        />
-                      </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
-                        <EditableInput value={line.unit} onChange={v => updateLine(line.id, { unit: v })} className="w-full text-center" />
-                      </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
-                        <EditableInput
-                          type="number"
-                          value={String(line.unitPrice)}
-                          onChange={v => updateLine(line.id, { unitPrice: Number(v) || 0 })}
-                          className="w-full text-right"
-                        />
-                      </td>
+                      <td className="border-r border-b border-gray-200 px-2 py-1 text-right">{line.quantity}</td>
+                      <td className="border-r border-b border-gray-200 px-2 py-1 text-center">{line.unit}</td>
+                      <td className="border-r border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(Number(line.unitPrice) || 0)}</td>
                       <td className="border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(amount)}</td>
-                      <td className="border-b border-gray-200 px-1 py-1 no-print">
-                        <button
-                          type="button"
-                          onClick={() => removeLine(line.id)}
-                          aria-label="行を削除"
-                          className="rounded p-1 text-red-500 hover:bg-red-50"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-            <div className="border-t border-gray-300 bg-[#faf8f1] px-2 py-2 no-print">
-              <button
-                type="button"
-                onClick={addLine}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-[#174c33] hover:bg-[#ece8db]"
-              >
-                <Plus size={12} />
-                行を追加
-              </button>
-            </div>
-          </div>
-
-          {/* Tax exempt toggle (for EN; visible in admin UI but hidden on print) */}
-          <div className="mt-2 flex items-center gap-2 text-xs no-print">
-            <label className="inline-flex items-center gap-1 text-[#68756c]">
-              <input
-                type="checkbox"
-                checked={doc.taxExempt}
-                onChange={e => updateField('taxExempt', e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              {isJa ? '税額表示なし（輸出など）' : EN_META_LABELS.taxExempt}
-            </label>
           </div>
 
           {/* Tax summary */}
@@ -510,15 +412,12 @@ export default function DocumentPage() {
           )}
 
           {/* Notes */}
-          <div className="mt-6">
-            <p className="mb-1 text-xs font-medium text-[#68756c]">{isJa ? '備考' : EN_META_LABELS.notes}</p>
-            <textarea
-              rows={3}
-              value={doc.notes}
-              onChange={e => updateField('notes', e.target.value)}
-              className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 print:border-0 print:ring-0"
-            />
-          </div>
+          {doc.notes && (
+            <div className="mt-6">
+              <p className="mb-1 text-xs font-medium text-[#68756c]">{isJa ? '備考' : EN_META_LABELS.notes}</p>
+              <p className="whitespace-pre-wrap text-sm">{doc.notes}</p>
+            </div>
+          )}
 
           <p className="mt-10 text-center text-xs text-[#68756c]">{isJa ? '※PDF を原本とする' : '* PDF serves as the official document.'}</p>
         </div>
@@ -558,9 +457,7 @@ export default function DocumentPage() {
           </div>
         )}
 
-        {user?.role !== 'admin' && (
-          <p className="mt-3 text-center text-xs text-[#68756c] no-print">※ 編集内容は保存されません。印刷時のみ反映されます。</p>
-        )}
+        <p className="mt-3 text-center text-xs text-[#68756c] no-print">※ この帳票は販売管理の内容から自動生成されます。修正は販売管理画面で行ってください。</p>
       </main>
 
       <style jsx global>{`
@@ -606,65 +503,22 @@ export default function DocumentPage() {
   )
 }
 
-function EditableInput({
-  value,
-  onChange,
-  type,
-  className = '',
-  placeholder,
-}: {
-  value: string
-  onChange: (next: string) => void
-  type?: string
-  className?: string
-  placeholder?: string
-}) {
-  return (
-    <input
-      type={type ?? 'text'}
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`bg-transparent border-0 outline-none focus:bg-yellow-50 focus:ring-0 ${className}`}
-    />
-  )
-}
-
+// Read-only display (documents are auto-generated from the sale; edit the sale
+// in 販売管理 to change content).
 function MetaRow({
   label,
   value,
-  onChange,
   multiline,
-  type,
-  rows = 2,
 }: {
   label: string
   value: string
-  onChange: (v: string) => void
   multiline?: boolean
-  type?: string
   rows?: number
 }) {
   return (
     <>
       <div className="flex items-center justify-center bg-[#f7f5ee] px-2 py-1 text-center text-xs font-medium text-[#173c2a]">{label}</div>
-      <div className="border-b border-gray-200 px-2 py-1">
-        {multiline ? (
-          <textarea
-            rows={rows}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            className="w-full resize-none bg-transparent border-0 outline-none focus:bg-yellow-50 text-sm"
-          />
-        ) : (
-          <input
-            type={type ?? 'text'}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            className="w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-sm"
-          />
-        )}
-      </div>
+      <div className={`border-b border-gray-200 px-2 py-1 text-sm ${multiline ? 'whitespace-pre-wrap' : ''}`}>{value || '-'}</div>
     </>
   )
 }
