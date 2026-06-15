@@ -259,7 +259,7 @@ export default function SaleDetailPage() {
               <OverviewCard label="粗利" value={<span className={record.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}>{formatCurrency(record.grossProfit)}</span>} strong />
               <OverviewCard label="作成日" value={record.createdAt.toLocaleDateString('ja-JP')} />
             </div>
-            <div className="overflow-hidden rounded-2xl border border-[#e6dfcf] bg-white">
+            <div className="overflow-x-auto rounded-2xl border border-[#e6dfcf] bg-white">
               <table className="min-w-full text-sm">
                 <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
                   <tr>
@@ -268,18 +268,28 @@ export default function SaleDetailPage() {
                     <th className="px-4 py-2 font-medium text-right">数量</th>
                     <th className="px-4 py-2 font-medium text-right">単価</th>
                     <th className="px-4 py-2 font-medium text-right">小計</th>
+                    <th className="px-4 py-2 font-medium text-right">原価</th>
+                    <th className="px-4 py-2 font-medium text-right">粗利</th>
+                    <th className="px-4 py-2 font-medium text-right">利益率</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {record.items.map((item, i) => (
-                    <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
-                      <td className="px-4 py-2">{item.productName}</td>
-                      <td className="px-4 py-2 text-[#68756c]">{item.productSku}</td>
-                      <td className="px-4 py-2 text-right">{formatKg(item.quantityKg)}</td>
-                      <td className="px-4 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-4 py-2 text-right font-medium">{formatCurrency(item.revenue)}</td>
-                    </tr>
-                  ))}
+                  {record.items.map((item, i) => {
+                    const profit = item.grossProfit ?? (item.revenue - item.costAmount)
+                    const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : null
+                    return (
+                      <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                        <td className="px-4 py-2">{item.productName}</td>
+                        <td className="px-4 py-2 text-[#68756c]">{item.productSku}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right">{formatKg(item.quantityKg)}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right font-medium">{formatCurrency(item.revenue)}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-[#68756c]">{formatCurrency(item.costAmount)}</td>
+                        <td className={`whitespace-nowrap px-4 py-2 text-right font-medium ${profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(profit)}</td>
+                        <td className={`whitespace-nowrap px-4 py-2 text-right ${profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{margin != null ? `${margin.toFixed(1)}%` : '-'}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
