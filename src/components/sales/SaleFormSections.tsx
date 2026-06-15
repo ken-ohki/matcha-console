@@ -16,7 +16,7 @@ import type {
   TaxRate,
 } from '@/types'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
-import { optionsForType } from '@/lib/masters'
+import { optionsForType, type MasterOption } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry, saleFeesToTaxLines, sumSaleFees } from '@/lib/tax'
 import { formatCurrency, formatKg } from '@/lib/format'
@@ -704,7 +704,7 @@ export function SalePaymentSection({ form, setForm }: FormProps) {
   )
 }
 
-export function SaleShippingSection({ form, setForm, buyerShippingAddress }: FormProps & { buyerShippingAddress?: string }) {
+export function SaleShippingSection({ form, setForm, buyerShippingAddress, shippingMethods }: FormProps & { buyerShippingAddress?: string; shippingMethods?: MasterOption[] }) {
   return (
     <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送</p>
@@ -726,8 +726,18 @@ export function SaleShippingSection({ form, setForm, buyerShippingAddress }: For
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">発送方法</label>
-          <input value={form.shippingMethod ?? ''}
-            onChange={e => setForm(p => ({ ...p, shippingMethod: e.target.value }))} className={fieldCls} placeholder="例: ヤマト宅急便" />
+          {shippingMethods && shippingMethods.length > 0 ? (
+            <select value={form.shippingMethod ?? ''} onChange={e => setForm(p => ({ ...p, shippingMethod: e.target.value }))} className={fieldCls}>
+              <option value="">未設定</option>
+              {shippingMethods.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {form.shippingMethod && !shippingMethods.some(o => o.value === form.shippingMethod) && (
+                <option value={form.shippingMethod}>{form.shippingMethod}（未登録）</option>
+              )}
+            </select>
+          ) : (
+            <input value={form.shippingMethod ?? ''}
+              onChange={e => setForm(p => ({ ...p, shippingMethod: e.target.value }))} className={fieldCls} placeholder="例: ヤマト宅急便" />
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-700">発送日</label>

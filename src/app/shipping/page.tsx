@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { Buyer, SaleRecord, ShippingStatus } from '@/types'
-import { Box, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
+import type { Buyer, MasterEntry, SaleRecord, ShippingStatus } from '@/types'
+import { translateValue } from '@/lib/masters'
+import { Box, ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
 
 const SHIPPING_LABELS: Record<ShippingStatus, string> = {
@@ -15,16 +17,12 @@ const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   ready_to_ship: '発送準備中',
   shipped: '発送完了',
 }
-
 const SHIPPING_COLORS: Record<ShippingStatus, string> = {
   ordering: 'bg-slate-100 text-slate-700',
   producing: 'bg-blue-100 text-blue-800',
   ready_to_ship: 'bg-amber-100 text-amber-800',
   shipped: 'bg-emerald-100 text-emerald-800',
 }
-
-const STATUS_OPTIONS: ShippingStatus[] = ['ordering', 'producing', 'ready_to_ship', 'shipped']
-const SHIPPING_METHODS = ['ヤマト運輸', '佐川急便', '日本郵便', 'EMS', 'DHL', 'FedEx', '自社配送', '引取り']
 
 function ShippingBadge({ status }: { status: ShippingStatus }) {
   return (
@@ -35,42 +33,29 @@ function ShippingBadge({ status }: { status: ShippingStatus }) {
 }
 
 type FilterChip = 'all' | 'ordering' | 'producing' | 'ready_to_ship' | 'shipped' | 'overdue'
+type View = 'list' | 'history' | 'slips'
 
 export default function ShippingPage() {
+  const router = useRouter()
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
+  const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterChip, setFilterChip] = useState<FilterChip>('all')
-  const [savingId, setSavingId] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
-  // Holds the last server-saved text values so onBlur can detect real changes
-  // (local `sales` state is mutated by onChange, so we cannot compare against it).
-  const savedRef = useRef<Record<string, { shippingStatus: ShippingStatus; shippingDate: string; shippingMethod: string; trackingNumber: string; shippingAddress: string; shippingPostalCode: string }>>({})
+  const [view, setView] = useState<View>('list')
 
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const [nextSales, nextBuyers] = await Promise.all([
+    const [nextSales, nextBuyers, nextMasters] = await Promise.all([
       services.sales.getSaleRecords(),
       services.sales.getBuyers(),
+      services.masters.listMasters(),
     ])
-    const buyerMap = new Map(nextBuyers.map(b => [b.name, b]))
-    const snapshot: typeof savedRef.current = {}
-    nextSales.forEach(s => {
-      const buyer = buyerMap.get(s.buyerName)
-      snapshot[s.id] = {
-        shippingStatus: s.shippingStatus,
-        shippingDate: s.shippingDate ?? '',
-        shippingMethod: s.shippingMethod ?? '',
-        trackingNumber: s.trackingNumber ?? '',
-        shippingAddress: s.shippingAddress ?? buyer?.shippingAddress ?? '',
-        shippingPostalCode: s.shippingPostalCode ?? buyer?.shippingPostalCode ?? '',
-      }
-    })
-    savedRef.current = snapshot
     setSales(nextSales)
     setBuyers(nextBuyers)
+    setMasters(nextMasters)
     setLoading(false)
   }
 
@@ -88,6 +73,9 @@ export default function ShippingPage() {
     }
   }, [])
 
+  const openDetail = (id: string) => router.push(`/shipping/${id}`)
+  const methodLabel = (value?: string) => value ? translateValue(masters, 'shipping_method', value) : '（未設定）'
+
   // Only confirmed sales need shipping
   const targetSales = useMemo(() => sales.filter(s => s.status === 'confirmed'), [sales])
 
@@ -99,6 +87,18 @@ export default function ShippingPage() {
     return { ...byStatus, overdue }
   }, [targetSales])
 
+  const matchesSearch = (s: SaleRecord) => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      s.buyerName.toLowerCase().includes(q) ||
+      s.country.toLowerCase().includes(q) ||
+      s.items.some(i => i.productName.toLowerCase().includes(q) || i.productSku.toLowerCase().includes(q)) ||
+      (s.trackingNumber ?? '').toLowerCase().includes(q) ||
+      methodLabel(s.shippingMethod).toLowerCase().includes(q)
+    )
+  }
+
   const filtered = useMemo(() => {
     const today = todayIso()
     let list = targetSales
@@ -107,80 +107,44 @@ export default function ShippingPage() {
     } else if (filterChip !== 'all') {
       list = list.filter(s => s.shippingStatus === filterChip)
     }
-    if (search) {
-      const q = search.toLowerCase()
-      list = list.filter(s =>
-        s.buyerName.toLowerCase().includes(q) ||
-        s.country.toLowerCase().includes(q) ||
-        s.items.some(i => i.productName.toLowerCase().includes(q) || i.productSku.toLowerCase().includes(q)) ||
-        (s.trackingNumber ?? '').toLowerCase().includes(q),
-      )
-    }
-    // sort: non-shipped first by dueDate asc, then shipped by shippingDate desc
+    list = list.filter(matchesSearch)
     return [...list].sort((a, b) => {
       const aShipped = a.shippingStatus === 'shipped'
       const bShipped = b.shippingStatus === 'shipped'
       if (aShipped !== bShipped) return aShipped ? 1 : -1
-      if (!aShipped) {
-        return (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31')
-      }
+      if (!aShipped) return (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31')
       return (b.shippingDate ?? '').localeCompare(a.shippingDate ?? '')
     })
-  }, [targetSales, filterChip, search])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSales, filterChip, search, masters])
 
-  // Update only local edit state (no server write); committed via the 保存 button.
-  const updateLocal = (id: string, patch: Partial<SaleRecord>) => {
-    setSales(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
-  }
-
-  const saveRow = async (sale: SaleRecord, buyer?: Buyer) => {
-    setSavingId(sale.id)
-    setFeedback(null)
-    try {
-      const services = await getServices()
-      const patch = {
-        shippingStatus: sale.shippingStatus,
-        shippingDate: sale.shippingDate?.trim() || undefined,
-        shippingMethod: sale.shippingMethod?.trim() || undefined,
-        trackingNumber: sale.trackingNumber?.trim() || undefined,
-        shippingAddress: (sale.shippingAddress ?? buyer?.shippingAddress)?.trim() || undefined,
-        shippingPostalCode: (sale.shippingPostalCode ?? buyer?.shippingPostalCode)?.trim() || undefined,
-      }
-      await services.sales.updateSaleRecord(sale.id, patch)
-      savedRef.current[sale.id] = {
-        shippingStatus: sale.shippingStatus,
-        shippingDate: sale.shippingDate ?? '',
-        shippingMethod: sale.shippingMethod ?? '',
-        trackingNumber: sale.trackingNumber ?? '',
-        shippingAddress: sale.shippingAddress ?? buyer?.shippingAddress ?? '',
-        shippingPostalCode: sale.shippingPostalCode ?? buyer?.shippingPostalCode ?? '',
-      }
-      setFeedback({ tone: 'success', message: `${sale.buyerName} の発送情報を保存しました` })
-    } catch (err) {
-      setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
-    } finally {
-      setSavingId(null)
+  // 発送方法ごとの発送履歴（発送完了のみ）
+  const historyGroups = useMemo(() => {
+    const shipped = targetSales.filter(s => s.shippingStatus === 'shipped').filter(matchesSearch)
+    const map = new Map<string, SaleRecord[]>()
+    for (const s of shipped) {
+      const key = s.shippingMethod?.trim() || ''
+      map.set(key, [...(map.get(key) ?? []), s])
     }
-  }
+    return [...map.entries()]
+      .map(([key, items]) => ({
+        key,
+        label: methodLabel(key || undefined),
+        items: items.sort((a, b) => (b.shippingDate ?? '').localeCompare(a.shippingDate ?? '')),
+        totalKg: items.reduce((sum, s) => sum + s.quantityKg, 0),
+      }))
+      .sort((a, b) => b.items.length - a.items.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSales, search, masters])
 
-  const isRowDirty = (sale: SaleRecord, buyer?: Buyer): boolean => {
-    const snap = savedRef.current[sale.id]
-    if (!snap) return false
-    return (
-      sale.shippingStatus !== snap.shippingStatus ||
-      (sale.shippingDate ?? '') !== snap.shippingDate ||
-      (sale.shippingMethod ?? '') !== snap.shippingMethod ||
-      (sale.trackingNumber ?? '') !== snap.trackingNumber ||
-      ((sale.shippingAddress ?? buyer?.shippingAddress ?? '')) !== snap.shippingAddress ||
-      ((sale.shippingPostalCode ?? buyer?.shippingPostalCode ?? '')) !== snap.shippingPostalCode
-    )
-  }
-
-  const buyerByName = useMemo(() => {
-    const map = new Map<string, Buyer>()
-    buyers.forEach(b => map.set(b.name, b))
-    return map
-  }, [buyers])
+  // 伝票一覧: 発送伝票が添付された案件を集約
+  const slipList = useMemo(() => {
+    return targetSales
+      .filter(s => s.shippingSlip)
+      .filter(matchesSearch)
+      .sort((a, b) => (b.shippingSlip?.uploadedAt ?? '').localeCompare(a.shippingSlip?.uploadedAt ?? ''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSales, search, masters])
 
   return (
     <AppLayout>
@@ -192,7 +156,7 @@ export default function ShippingPage() {
           </div>
           <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">発送管理</h1>
           <p className="mt-2 text-sm text-[#68756c]">
-            確定済みの販売案件の発送状況を一括で管理できます。ステータスを変更すると販売管理側にも即時反映されます。
+            確定済みの販売案件の発送状況を管理できます。行をクリックすると発送内容の確認・編集ができます。
           </p>
         </div>
 
@@ -204,204 +168,228 @@ export default function ShippingPage() {
           <KPICard title="期限超過" value={`${kpis.overdue} 件`} color={kpis.overdue > 0 ? 'red' : 'default'} />
         </div>
 
+        {/* View tabs */}
+        <div className="flex gap-1 border-b border-[#e6dfcf]">
+          {([['list', '発送リスト'], ['history', '発送方法別履歴'], ['slips', '伝票一覧']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setView(key)}
+              className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+                view === key ? 'border-[#174c33] text-[#174c33]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex flex-wrap gap-1.5">
-              {([
-                ['all', `すべて (${targetSales.length})`],
-                ['ordering', `発注中 (${kpis.ordering})`],
-                ['producing', `製造中 (${kpis.producing})`],
-                ['ready_to_ship', `発送準備中 (${kpis.ready_to_ship})`],
-                ['shipped', `発送完了 (${kpis.shipped})`],
-                ['overdue', `期限超過 (${kpis.overdue})`],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setFilterChip(key as FilterChip)}
-                  className={`rounded-full border px-2.5 py-1 text-xs transition ${
-                    filterChip === key
-                      ? 'border-[#174c33] bg-[#174c33] text-white'
-                      : 'border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#f7f5ee]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {view === 'list' && (
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  ['all', `すべて (${targetSales.length})`],
+                  ['ordering', `発注中 (${kpis.ordering})`],
+                  ['producing', `製造中 (${kpis.producing})`],
+                  ['ready_to_ship', `発送準備中 (${kpis.ready_to_ship})`],
+                  ['shipped', `発送完了 (${kpis.shipped})`],
+                  ['overdue', `期限超過 (${kpis.overdue})`],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFilterChip(key as FilterChip)}
+                    className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                      filterChip === key
+                        ? 'border-[#174c33] bg-[#174c33] text-white'
+                        : 'border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#f7f5ee]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="relative ml-auto w-full sm:w-64">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="販売先・商品・追跡番号"
+                placeholder="販売先・商品・追跡番号・発送方法"
                 className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
           </div>
 
-          {feedback && (
-            <p className={`mt-3 text-sm ${feedback.tone === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
-              {feedback.message}
-            </p>
+          {view === 'list' && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                    <th className="px-3 py-3 font-medium">ステータス</th>
+                    <th className="px-3 py-3 font-medium">販売先 / 国</th>
+                    <th className="px-3 py-3 font-medium">商品</th>
+                    <th className="px-3 py-3 font-medium">メモ</th>
+                    <th className="px-3 py-3 font-medium">納期</th>
+                    <th className="px-3 py-3 font-medium">発送方法</th>
+                    <th className="px-3 py-3 font-medium">発送日</th>
+                    <th className="px-3 py-3 font-medium">追跡番号</th>
+                    <th className="px-3 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loading && filtered.length === 0 && (
+                    <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
+                  )}
+                  {filtered.map(sale => {
+                    const first = sale.items[0]
+                    const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
+                    const overdue = sale.shippingStatus !== 'shipped' && sale.dueDate && sale.dueDate < todayIso()
+                    return (
+                      <tr
+                        key={sale.id}
+                        onClick={() => openDetail(sale.id)}
+                        className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-[#faf8f2]'}`}
+                      >
+                        <td className="whitespace-nowrap px-3 py-3"><ShippingBadge status={sale.shippingStatus} /></td>
+                        <td className="px-3 py-3">
+                          <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
+                          <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="font-medium">{first?.productName ?? '-'}</div>
+                          <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest} ／ {formatKg(sale.quantityKg)}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          {sale.shippingNote
+                            ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">メモ有</span>
+                            : <span className="text-[11px] text-[#a59f8c]">-</span>}
+                        </td>
+                        <td className={`whitespace-nowrap px-3 py-3 ${overdue ? 'font-medium text-red-700' : 'text-[#68756c]'}`}>{sale.dueDate || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-[#a59f8c]">-</span>}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingDate || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.trackingNumber || '-'}</td>
+                        <td className="px-3 py-3 text-right text-gray-400"><ChevronRight size={16} className="inline" /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
-                  <th className="px-3 py-3 font-medium">ステータス</th>
-                  <th className="px-3 py-3 font-medium">販売先 / 国</th>
-                  <th className="px-3 py-3 font-medium">商品</th>
-                  <th className="px-3 py-3 font-medium">発送メモ</th>
-                  <th className="px-3 py-3 font-medium">納期</th>
-                  <th className="px-3 py-3 font-medium">発送方法</th>
-                  <th className="px-3 py-3 font-medium">発送日</th>
-                  <th className="px-3 py-3 font-medium">追跡番号</th>
-                  <th className="px-3 py-3 font-medium">郵便番号</th>
-                  <th className="px-3 py-3 font-medium">発送先</th>
-                  <th className="px-3 py-3 font-medium text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={11} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
-                )}
-                {filtered.map(sale => {
-                  const first = sale.items[0]
-                  const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
-                  const today = todayIso()
-                  const overdue = sale.shippingStatus !== 'shipped' && sale.dueDate && sale.dueDate < today
-                  const buyer = buyerByName.get(sale.buyerName)
-                  const buyerAddr = buyer?.shippingAddress ?? ''
-                  const buyerZip = buyer?.shippingPostalCode ?? ''
-                  const effectiveAddr = sale.shippingAddress ?? buyerAddr
-                  const effectiveZip = sale.shippingPostalCode ?? buyerZip
-                  const saving = savingId === sale.id
-                  return (
-                    <tr key={sale.id} className={`border-b border-[#f0ebdf] align-top ${overdue ? 'bg-red-50/50' : 'hover:bg-[#faf8f2]'}`}>
-                      <td className="px-3 py-3">
-                        <select
-                          value={sale.shippingStatus}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { shippingStatus: e.target.value as ShippingStatus })}
-                          className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs"
-                        >
-                          {STATUS_OPTIONS.map(s => (
-                            <option key={s} value={s}>{SHIPPING_LABELS[s]}</option>
-                          ))}
-                        </select>
-                        <div className="mt-1"><ShippingBadge status={sale.shippingStatus} /></div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
-                        <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium">{first?.productName ?? '-'}</div>
-                        <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
-                        <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        {sale.shippingNote
-                          ? <div className="max-w-[200px] whitespace-pre-wrap rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">{sale.shippingNote}</div>
-                          : <span className="text-[11px] text-[#a59f8c]">-</span>}
-                      </td>
-                      <td className={`px-3 py-3 ${overdue ? 'text-red-700 font-medium' : 'text-[#68756c]'}`}>{sale.dueDate || '-'}</td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          list="shipping-methods"
-                          value={sale.shippingMethod ?? ''}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { shippingMethod: e.target.value })}
-                          placeholder="ヤマト, EMS..."
-                          className="w-32 rounded-lg border border-gray-200 px-2 py-1 text-xs"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="date"
-                          value={sale.shippingDate ?? ''}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { shippingDate: e.target.value })}
-                          className="rounded-lg border border-gray-200 px-2 py-1 text-xs"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          value={sale.trackingNumber ?? ''}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { trackingNumber: e.target.value })}
-                          className="w-36 rounded-lg border border-gray-200 px-2 py-1 text-xs"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          value={effectiveZip}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { shippingPostalCode: e.target.value })}
-                          placeholder={buyerZip || '〒'}
-                          className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-xs"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <textarea
-                          rows={2}
-                          value={effectiveAddr}
-                          disabled={saving}
-                          onChange={e => updateLocal(sale.id, { shippingAddress: e.target.value })}
-                          placeholder={buyerAddr || '住所'}
-                          className="w-48 resize-none rounded-lg border border-gray-200 px-2 py-1 text-xs"
-                        />
-                        {buyerAddr && sale.shippingAddress && sale.shippingAddress !== buyerAddr && (
-                          <button
-                            type="button"
-                            onClick={() => updateLocal(sale.id, { shippingAddress: buyerAddr })}
-                            className="mt-1 text-[10px] text-[#174c33] underline"
-                          >
-                            販売先の住所を使用
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {(() => {
-                          const dirty = isRowDirty(sale, buyer)
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => saveRow(sale, buyer)}
-                              disabled={saving || !dirty}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm transition ${
-                                dirty
-                                  ? 'bg-[#174c33] text-white hover:bg-[#205f43]'
-                                  : 'cursor-not-allowed bg-gray-100 text-gray-400'
-                              }`}
+          {view === 'history' && (
+            <div className="mt-4 space-y-5">
+              {!loading && historyGroups.length === 0 && (
+                <p className="py-10 text-center text-sm text-[#68756c]">発送完了の履歴がありません。</p>
+              )}
+              {historyGroups.map(group => (
+                <div key={group.key || '(none)'} className="overflow-hidden rounded-2xl border border-[#e6dfcf]">
+                  <div className="flex items-center justify-between bg-[#faf8f1] px-4 py-2.5">
+                    <span className="text-sm font-semibold text-[#173c2a]">{group.label}</span>
+                    <span className="text-xs text-[#68756c]">{group.items.length}件 ／ {formatKg(group.totalKg)}</span>
+                  </div>
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                      <tr className="border-b border-[#f0ebdf]">
+                        <th className="px-4 py-2 font-medium">発送日</th>
+                        <th className="px-4 py-2 font-medium">販売先 / 国</th>
+                        <th className="px-4 py-2 font-medium">商品</th>
+                        <th className="px-4 py-2 font-medium">追跡番号</th>
+                        <th className="px-4 py-2 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.items.map(sale => {
+                        const first = sale.items[0]
+                        const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
+                        return (
+                          <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] last:border-b-0 transition hover:bg-[#faf8f2]">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{sale.shippingDate || '-'}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
+                              <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div>{first?.productName ?? '-'}{rest}</div>
+                              <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{sale.trackingNumber || '-'}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-400"><ChevronRight size={15} className="inline" /></td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === 'slips' && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                    <th className="px-3 py-3 font-medium">添付日</th>
+                    <th className="px-3 py-3 font-medium">販売先 / 国</th>
+                    <th className="px-3 py-3 font-medium">商品</th>
+                    <th className="px-3 py-3 font-medium">発送方法</th>
+                    <th className="px-3 py-3 font-medium">発送日</th>
+                    <th className="px-3 py-3 font-medium">伝票</th>
+                    <th className="px-3 py-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loading && slipList.length === 0 && (
+                    <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-[#68756c]">発送伝票が添付された案件がありません。</td></tr>
+                  )}
+                  {slipList.map(sale => {
+                    const first = sale.items[0]
+                    const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
+                    return (
+                      <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] transition hover:bg-[#faf8f2]">
+                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingSlip?.uploadedAt || '-'}</td>
+                        <td className="px-3 py-3">
+                          <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
+                          <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div>{first?.productName ?? '-'}{rest}</div>
+                          <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-[#a59f8c]">-</span>}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingDate || '-'}</td>
+                        <td className="px-3 py-3">
+                          {sale.shippingSlip && (
+                            <a
+                              href={sale.shippingSlip.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded-lg bg-[#f7f5ee] px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+                              title={sale.shippingSlip.name}
                             >
-                              {saving ? '保存中…' : dirty ? '保存' : '保存済'}
-                            </button>
-                          )
-                        })()}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <datalist id="shipping-methods">
-              {SHIPPING_METHODS.map(m => <option key={m} value={m} />)}
-            </datalist>
-          </div>
+                              <FileText size={12} /> 開く
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-gray-400"><ChevronRight size={16} className="inline" /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="text-xs text-[#68756c]">
-          ※発送情報の編集は「
-          <Link href="/sales" className="underline">販売管理
-          </Link>
-          」では行えません。
+          ※発送方法は「
+          <Link href="/settings/masters" className="underline">設定 → マスター管理 → 発送方法</Link>
+          」で登録できます。
         </div>
       </div>
     </AppLayout>

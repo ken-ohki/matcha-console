@@ -12,6 +12,7 @@ import type {
   EcSaleRecord,
   EcSaleRecordInput,
   IssuedDocument,
+  ShippingSlip,
   PurchaseOrder,
   PurchaseOrderInput,
   SaleRecord,
@@ -47,6 +48,7 @@ export interface ISalesService {
   deleteSaleRecord(id: string): Promise<void>
   recordSaleDocument(saleId: string, issued: IssuedDocument): Promise<IssuedDocument[]>
   deleteSaleDocument(saleId: string, docId: string): Promise<IssuedDocument[]>
+  updateShippingSlip(saleId: string, slip: ShippingSlip | null): Promise<SaleRecord>
 
 }
 

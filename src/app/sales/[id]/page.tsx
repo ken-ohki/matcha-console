@@ -10,6 +10,7 @@ import { getServices } from '@/lib/services'
 import type { Buyer, MasterEntry, ProductWithInventory, SaleRecord, SaleRecordInput } from '@/types'
 import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
+import { optionsForType } from '@/lib/masters'
 import { formatCurrency, formatKg } from '@/lib/format'
 import {
   buildSaleForm,
@@ -53,6 +54,8 @@ export default function SaleDetailPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [uploadingSlip, setUploadingSlip] = useState(false)
+  const [slipError, setSlipError] = useState('')
 
   useEffect(() => {
     let active = true
@@ -110,6 +113,43 @@ export default function SaleDetailPage() {
     const services = await getServices()
     await services.sales.deleteSaleRecord(record.id)
     router.push('/sales')
+  }
+
+  const handleUploadSlip = async (file: File) => {
+    if (!record) return
+    setSlipError('')
+    if (file.size > 30 * 1024 * 1024) { setSlipError('30MBを超えるファイルはアップロードできません'); return }
+    setUploadingSlip(true)
+    try {
+      const { uploadShippingSlip } = await import('@/lib/firebase/storage')
+      const url = await uploadShippingSlip(file, record.id)
+      if (!url) throw new Error('アップロードURLの取得に失敗しました')
+      const services = await getServices()
+      const updated = await services.sales.updateShippingSlip(record.id, { name: file.name, url, uploadedAt: new Date().toISOString().slice(0, 10), size: file.size })
+      setRecord(updated)
+    } catch (err) {
+      setSlipError(err instanceof Error ? err.message : 'アップロードに失敗しました')
+    } finally {
+      setUploadingSlip(false)
+    }
+  }
+
+  const handleRemoveSlip = async () => {
+    if (!record?.shippingSlip) return
+    if (!confirm('発送伝票を削除しますか？')) return
+    setUploadingSlip(true)
+    setSlipError('')
+    try {
+      const { deleteStorageObjectByUrl } = await import('@/lib/firebase/storage')
+      if (record.shippingSlip.url) await deleteStorageObjectByUrl(record.shippingSlip.url)
+      const services = await getServices()
+      const updated = await services.sales.updateShippingSlip(record.id, null)
+      setRecord(updated)
+    } catch (err) {
+      setSlipError(err instanceof Error ? err.message : '削除に失敗しました')
+    } finally {
+      setUploadingSlip(false)
+    }
   }
 
   const handleDeleteDocument = async (docId: string) => {
@@ -289,10 +329,37 @@ export default function SaleDetailPage() {
         )}
 
         {tab === 'shipping' && (
-          <fieldset disabled={!canEdit} className="space-y-4">
-            <SaleShippingSection form={form} setForm={setFormTyped} buyerShippingAddress={buyerShippingAddress} />
-            <p className="text-xs text-[#68756c]">※ 変更したら上部の「保存」を押してください。発送管理（/shipping）の一覧にも反映されます。</p>
-          </fieldset>
+          <div className="space-y-4">
+            <fieldset disabled={!canEdit} className="space-y-4">
+              <SaleShippingSection form={form} setForm={setFormTyped} buyerShippingAddress={buyerShippingAddress} shippingMethods={optionsForType(masters, 'shipping_method')} />
+              <p className="text-xs text-[#68756c]">※ 変更したら上部の「保存」を押してください。発送管理（/shipping）の一覧にも反映されます。</p>
+            </fieldset>
+
+            {/* 発送伝票 */}
+            <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送伝票（送り状など）</p>
+              {record.shippingSlip ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f1] px-3 py-2 text-sm">
+                  <FileText size={15} className="text-[#174c33]" />
+                  <a href={record.shippingSlip.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-[#173c2a] hover:underline">{record.shippingSlip.name}</a>
+                  {record.shippingSlip.uploadedAt && <span className="text-[10px] text-[#a59f8c]">{record.shippingSlip.uploadedAt}</span>}
+                  {canEdit && (
+                    <button type="button" onClick={handleRemoveSlip} disabled={uploadingSlip} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" aria-label="削除"><Trash2 size={14} /></button>
+                  )}
+                </div>
+              ) : canEdit ? (
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-4 py-3 text-sm font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+                  <FileText size={14} />
+                  {uploadingSlip ? 'アップロード中…' : '発送伝票をアップロード（PDF / 画像）'}
+                  <input type="file" accept="application/pdf,image/*" className="hidden" disabled={uploadingSlip}
+                    onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) await handleUploadSlip(f) }} />
+                </label>
+              ) : (
+                <span className="text-sm text-[#a59f8c]">未添付</span>
+              )}
+              {slipError && <p className="mt-2 text-xs text-red-600">{slipError}</p>}
+            </div>
+          </div>
         )}
 
         {tab === 'documents' && (

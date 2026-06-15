@@ -103,6 +103,14 @@ export interface SaleFeeItem {
   taxRate: TaxRate
 }
 
+// 発送伝票（送り状など）の添付ファイル。
+export interface ShippingSlip {
+  name: string
+  url: string
+  uploadedAt: string   // YYYY-MM-DD
+  size?: number
+}
+
 // 発行履歴: 出力したPDF帳票の記録。
 export interface IssuedDocument {
   id: string
@@ -147,6 +155,7 @@ export interface SaleRecord {
   shippingDate?: string
   trackingNumber?: string
   shippingNote?: string   // 発送担当者へのメモ
+  shippingSlip?: ShippingSlip   // 発送伝票（送り状など）の添付
   issuedDocuments?: IssuedDocument[]   // 発行したPDF帳票の履歴
   createdAt: Date
   updatedAt: Date
@@ -308,6 +317,7 @@ export type MasterType =
   | 'shading'
   | 'certification'
   | 'terms'
+  | 'shipping_method'
 
 export interface MasterEntry {
   id: string

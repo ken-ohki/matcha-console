@@ -45,6 +45,7 @@ import type {
   SaleLineItem,
   SaleFeeItem,
   IssuedDocument,
+  ShippingSlip,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
@@ -336,6 +337,19 @@ function sumFees(fees: SaleFeeItem[]): number {
   return fees.reduce((s, f) => s + (Number(f.quantity) || 0) * (Number(f.unitPrice) || 0), 0)
 }
 
+function normalizeShippingSlip(raw: unknown): ShippingSlip | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const obj = raw as Record<string, unknown>
+  const url = String(obj.url ?? '')
+  if (!url) return undefined
+  return {
+    name: String(obj.name ?? '発送伝票'),
+    url,
+    uploadedAt: String(obj.uploadedAt ?? ''),
+    size: obj.size != null ? Number(obj.size) : undefined,
+  }
+}
+
 function normalizeIssuedDocuments(raw: unknown): IssuedDocument[] {
   if (!Array.isArray(raw)) return []
   const result: IssuedDocument[] = []
@@ -510,6 +524,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     shippingDate: data.shippingDate ? String(data.shippingDate) : undefined,
     trackingNumber: data.trackingNumber ? String(data.trackingNumber) : undefined,
     shippingNote: data.shippingNote ? String(data.shippingNote) : undefined,
+    shippingSlip: normalizeShippingSlip(data.shippingSlip),
     issuedDocuments: normalizeIssuedDocuments(data.issuedDocuments),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
@@ -1780,6 +1795,14 @@ export function createFirebaseServices(): IServices {
       await updateDoc(ref, { issuedDocuments: next, updatedAt: serverTimestamp() })
       if (target?.url) await deleteStorageObjectByUrl(target.url)
       return next
+    },
+
+    async updateShippingSlip(saleId, slip) {
+      const ref = doc(db, COLLECTIONS.sales, saleId)
+      await updateDoc(ref, { shippingSlip: slip ?? deleteField(), updatedAt: serverTimestamp() })
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('販売案件が見つかりません')
+      return mapSale(snap.id, snap.data() ?? {})
     },
   }
 
