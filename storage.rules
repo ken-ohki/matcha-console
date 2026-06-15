@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Storage security rules for Matcha Console.
+// All app uploads are performed by signed-in users of the internal app.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // 商品画像
+    match /products/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+    // 仕入先の添付
+    match /suppliers/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+    // 発注（仕入）の請求書PDF
+    match /purchase-orders/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+    // 発行した帳票PDF（請求書・納品書・見積書）
+    match /sale-documents/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+    // 発送伝票（送り状など）
+    match /shipping-slips/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+  }
+}
