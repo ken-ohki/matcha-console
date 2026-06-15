@@ -70,19 +70,29 @@ export function computeTax(lines: TaxLine[], fees = 0): number {
   return computeTaxBuckets(lines, fees).tax
 }
 
+/** A sale fee line item (諸費用): name / quantity / unit / unitPrice / taxRate. */
+export interface FeeLineLike {
+  quantity?: number
+  unitPrice: number
+  taxRate?: TaxRate | number
+}
+
 /**
- * Convert free-form sale options (packaging fees, etc.) into tax lines so they
- * can be folded into the bucket calculation with their own per-option rate.
- * Missing rate defaults to 10% (standard).
+ * Convert sale fee items (諸費用: packaging, customs, etc.) into tax lines so they
+ * fold into the bucket calculation with their own per-item rate. Missing rate
+ * defaults to 10% (standard); missing quantity defaults to 1.
  */
-export function saleOptionsToTaxLines(
-  options?: { amount: number; taxRate?: TaxRate | number }[],
-): TaxLine[] {
-  return (options ?? []).map(o => ({
-    quantityKg: 1,
-    unitPrice: Number(o.amount) || 0,
-    taxRate: o.taxRate == null ? 10 : Number(o.taxRate),
+export function saleFeesToTaxLines(fees?: FeeLineLike[]): TaxLine[] {
+  return (fees ?? []).map(f => ({
+    quantityKg: f.quantity == null ? 1 : Number(f.quantity) || 0,
+    unitPrice: Number(f.unitPrice) || 0,
+    taxRate: f.taxRate == null ? 10 : Number(f.taxRate),
   }))
+}
+
+/** Tax-exclusive total of sale fee items (sum of quantity × unitPrice). */
+export function sumSaleFees(fees?: FeeLineLike[]): number {
+  return (fees ?? []).reduce((s, f) => s + (f.quantity == null ? 1 : Number(f.quantity) || 0) * (Number(f.unitPrice) || 0), 0)
 }
 
 /**

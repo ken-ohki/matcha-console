@@ -9,7 +9,7 @@ import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
 import type { Buyer, BuyerDetailsInput, MasterEntry, SaleRecord } from '@/types'
 import { optionsForType } from '@/lib/masters'
-import { Building2, ExternalLink, Mail, MapPin, Phone, Save, Search, User2, X } from 'lucide-react'
+import { Building2, ExternalLink, FileText, Mail, MapPin, Phone, Save, Search, User2, X } from 'lucide-react'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { formatCurrency } from '@/lib/format'
 
@@ -94,6 +94,20 @@ export default function BuyersPage() {
     const services = await getServices()
     const updated = await services.sales.updateBuyer(selectedBuyer.id, input)
     setBuyers(prev => prev.map(b => (b.id === updated.id ? updated : b)))
+  }
+
+  const handleRenameBuyer = async (name: string) => {
+    if (!selectedBuyer) return
+    const services = await getServices()
+    const renamed = await services.sales.renameBuyer(selectedBuyer.id, name)
+    // The buyer doc (and its id) may have changed; reload and reselect it.
+    const [nextBuyers, nextSales] = await Promise.all([
+      services.sales.getBuyers(),
+      services.sales.getSaleRecords(),
+    ])
+    setBuyers(nextBuyers)
+    setSales(nextSales)
+    setSelectedBuyerId(renamed.id)
   }
 
   return (
@@ -202,12 +216,14 @@ export default function BuyersPage() {
 
       {selectedBuyer && (
         <BuyerDetailModal
+          key={selectedBuyer.id}
           buyer={selectedBuyer}
           sales={selectedBuyerSales}
           masters={masters}
           canEdit={user?.role === 'admin'}
           onClose={() => setSelectedBuyerId(null)}
           onSave={handleSaveBuyer}
+          onRename={handleRenameBuyer}
         />
       )}
     </AppLayout>
@@ -221,6 +237,7 @@ function BuyerDetailModal({
   canEdit,
   onClose,
   onSave,
+  onRename,
 }: {
   buyer: Buyer
   sales: SaleRecord[]
@@ -228,9 +245,12 @@ function BuyerDetailModal({
   canEdit: boolean
   onClose: () => void
   onSave: (input: BuyerDetailsInput) => Promise<void>
+  onRename: (name: string) => Promise<void>
 }) {
   const termsOptions = useMemo(() => optionsForType(masters, 'terms'), [masters])
+  const [name, setName] = useState(buyer.name)
   const [form, setForm] = useState<BuyerDetailsInput>({
+    billingName: buyer.billingName ?? '',
     email: buyer.email ?? '',
     website: buyer.website ?? '',
     phone: buyer.phone ?? '',
@@ -257,10 +277,20 @@ function BuyerDetailModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setFeedback({ tone: 'error', message: '管理用の名前を入力してください' })
+      return
+    }
     setSaving(true)
     setFeedback(null)
     try {
       await onSave(form)
+      // Rename last: it cascades to sales and replaces the buyer doc, so the
+      // detail save above must target the existing doc first.
+      if (trimmedName !== buyer.name) {
+        await onRename(trimmedName)
+      }
       setFeedback({ tone: 'success', message: '販売先情報を更新しました' })
     } catch (err) {
       setFeedback({
@@ -312,6 +342,30 @@ function BuyerDetailModal({
             <section>
               <h3 className="mb-3 text-sm font-semibold text-[#173c2a]">販売先詳細</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Field icon={<Building2 size={14} />} label="管理用の名前（アプリ内・一覧で使用）">
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      className={inputClass}
+                      disabled={!canEdit}
+                    />
+                  </Field>
+                  <p className="mt-1 text-[11px] text-[#9aa39a]">変更すると、この販売先の過去の販売案件すべてに反映されます。</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <Field icon={<FileText size={14} />} label="請求用の名前（請求書・見積書に表示）">
+                    <input
+                      type="text"
+                      value={form.billingName ?? ''}
+                      onChange={e => setForm(prev => ({ ...prev, billingName: e.target.value }))}
+                      className={inputClass}
+                      placeholder="未入力の場合は管理用の名前を表示"
+                      disabled={!canEdit}
+                    />
+                  </Field>
+                </div>
                 <Field icon={<User2 size={14} />} label="担当者名">
                   <input
                     type="text"

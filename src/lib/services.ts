@@ -11,6 +11,7 @@ import type {
   BuyerDetailsInput,
   EcSaleRecord,
   EcSaleRecordInput,
+  IssuedDocument,
   PurchaseOrder,
   PurchaseOrderInput,
   SaleRecord,
@@ -40,9 +41,13 @@ export interface ISalesService {
   getSaleRecords(): Promise<SaleRecord[]>
   getBuyers(): Promise<Buyer[]>
   updateBuyer(id: string, input: BuyerDetailsInput): Promise<Buyer>
+  renameBuyer(id: string, name: string): Promise<Buyer>
   createSaleRecord(input: SaleRecordInput): Promise<SaleRecord>
   updateSaleRecord(id: string, input: Partial<SaleRecordInput>): Promise<SaleRecord>
   deleteSaleRecord(id: string): Promise<void>
+  recordSaleDocument(saleId: string, issued: IssuedDocument): Promise<IssuedDocument[]>
+  deleteSaleDocument(saleId: string, docId: string): Promise<IssuedDocument[]>
+
 }
 
 export interface IEcSalesService {

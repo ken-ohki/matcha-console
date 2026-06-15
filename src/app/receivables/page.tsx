@@ -18,7 +18,7 @@ import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-import { computeSaleTaxBuckets } from '@/lib/tax'
+import { computeSaleTaxBuckets, saleFeesToTaxLines, sumSaleFees } from '@/lib/tax'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
@@ -209,11 +209,11 @@ export default function ReceivablesPage() {
         <td className="px-3 py-2 text-right">
           <div className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(s))}</div>
           <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
-          {((s.shippingFee || 0) > 0 || (s.otherFees || 0) > 0) && (
+          {((s.shippingFee || 0) > 0 || (s.fees ?? []).length > 0) && (
             <div className="text-[10px] text-[#68756c]">
               商品 {formatCurrency(s.revenue)}
               {(s.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(s.shippingFee)}</>}
-              {(s.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(s.otherFees)}</>}
+              {(s.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(s.fees))}</>}
             </div>
           )}
         </td>
@@ -508,8 +508,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: () => void }) {
   if (!sale) return null
-  const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
-  const tax = computeSaleTaxBuckets(sale.items ?? [], fees)
+  const tax = computeSaleTaxBuckets([...(sale.items ?? []), ...saleFeesToTaxLines(sale.fees)], sale.shippingFee ?? 0)
   const exclTotal = saleIncomeExcl(sale)
   const inclTotal = saleIncome(sale)
 
@@ -541,7 +540,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
           <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
             <DetailRow label="商品代金（税抜）" value={formatCurrency(sale.revenue)} />
             <DetailRow label="送料" value={formatCurrency(sale.shippingFee ?? 0)} />
-            <DetailRow label="諸費用" value={formatCurrency(sale.otherFees ?? 0)} />
+            <DetailRow label="諸費用" value={formatCurrency(sumSaleFees(sale.fees))} />
             <DetailRow label="決済手数料" value={formatCurrency(sale.paymentFee ?? 0)} />
             <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
             <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />

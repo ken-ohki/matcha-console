@@ -43,7 +43,8 @@ import type {
   PurchaseOrderPaymentStatus,
   PurchaseOrderPayment,
   SaleLineItem,
-  SaleOption,
+  SaleFeeItem,
+  IssuedDocument,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
@@ -71,6 +72,7 @@ import type {
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
 import { ISSUER } from '../invoice'
 import { derivePoPaymentStatus } from '../cashflow'
+import { deleteStorageObjectByUrl } from './storage'
 
 const COLLECTIONS = {
   groups: 'inventory_groups',
@@ -308,23 +310,77 @@ function coerceTaxRate(value: unknown): TaxRate {
   return n === 0 ? 0 : n === 10 ? 10 : 8
 }
 
-/** Normalize free-form sale options; drop empty rows (no name and no amount). */
-function normalizeSaleOptions(raw: unknown): SaleOption[] {
+/** Normalize 諸費用 line items; drop empty rows (no name and zero amount). */
+function normalizeSaleFees(raw: unknown): SaleFeeItem[] {
   if (!Array.isArray(raw)) return []
-  const result: SaleOption[] = []
+  const result: SaleFeeItem[] = []
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue
     const obj = item as Record<string, unknown>
     const name = String(obj.name ?? '').trim()
-    const amount = Number(obj.amount) || 0
-    if (!name && amount === 0) continue
-    result.push({ name, amount, taxRate: coerceTaxRate(obj.taxRate) })
+    const quantity = obj.quantity == null ? 1 : Number(obj.quantity) || 0
+    const unitPrice = Number(obj.unitPrice) || 0
+    if (!name && quantity * unitPrice === 0) continue
+    result.push({
+      name,
+      quantity,
+      unit: String(obj.unit ?? '式').trim() || '式',
+      unitPrice,
+      taxRate: coerceTaxRate(obj.taxRate),
+    })
   }
   return result
 }
 
-function sumOptions(options: SaleOption[]): number {
-  return options.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+function sumFees(fees: SaleFeeItem[]): number {
+  return fees.reduce((s, f) => s + (Number(f.quantity) || 0) * (Number(f.unitPrice) || 0), 0)
+}
+
+function normalizeIssuedDocuments(raw: unknown): IssuedDocument[] {
+  if (!Array.isArray(raw)) return []
+  const result: IssuedDocument[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const obj = item as Record<string, unknown>
+    const url = String(obj.url ?? '')
+    if (!url) continue
+    const type = obj.type === 'delivery' || obj.type === 'quotation' ? obj.type : 'invoice'
+    result.push({
+      id: String(obj.id ?? `${obj.issuedAt ?? ''}-${url}`),
+      type,
+      language: obj.language === 'en' ? 'en' : 'ja',
+      issuedAt: String(obj.issuedAt ?? ''),
+      total: Number(obj.total) || 0,
+      name: String(obj.name ?? '帳票.pdf'),
+      url,
+    })
+  }
+  return result
+}
+
+/**
+ * Build the 諸費用 list for a sale, migrating legacy fields (options[], otherFees,
+ * otherFeesNote) into the new fee-item shape when the new `fees` array is absent.
+ */
+function resolveSaleFees(data: DocumentData): SaleFeeItem[] {
+  if (Array.isArray(data.fees)) return normalizeSaleFees(data.fees)
+  const migrated: SaleFeeItem[] = []
+  if (Array.isArray(data.options)) {
+    for (const o of data.options) {
+      if (!o || typeof o !== 'object') continue
+      const obj = o as Record<string, unknown>
+      const name = String(obj.name ?? '').trim()
+      const amount = Number(obj.amount) || 0
+      if (!name && amount === 0) continue
+      migrated.push({ name: name || 'オプション', quantity: 1, unit: '式', unitPrice: amount, taxRate: coerceTaxRate(obj.taxRate) })
+    }
+  }
+  const legacyOther = Number(data.otherFees) || 0
+  if (legacyOther !== 0) {
+    const note = data.otherFeesNote ? String(data.otherFeesNote) : ''
+    migrated.push({ name: note || '諸費用', quantity: 1, unit: '式', unitPrice: legacyOther, taxRate: 10 })
+  }
+  return migrated
 }
 
 function normalizeSaleItem(raw: unknown): SaleLineItem | null {
@@ -413,11 +469,9 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
   }
   const agg = aggregateItems(items)
   const shippingFee = Number(data.shippingFee ?? 0)
-  const otherFees = Number(data.otherFees ?? 0)
   const paymentFee = Number(data.paymentFee ?? 0)
-  const otherFeesNote = data.otherFeesNote ? String(data.otherFeesNote) : undefined
-  const options = normalizeSaleOptions(data.options)
-  const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
+  const fees = resolveSaleFees(data)
+  const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
   const grossProfit = agg.revenue - agg.costAmount - paymentFee
   return {
     id,
@@ -440,9 +494,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     costAmount: agg.costAmount,
     grossProfit,
     shippingFee,
-    otherFees,
-    otherFeesNote,
-    options,
+    fees,
     paymentFee,
     invoiceAmount,
     country: String(data.country ?? ''),
@@ -458,6 +510,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     shippingDate: data.shippingDate ? String(data.shippingDate) : undefined,
     trackingNumber: data.trackingNumber ? String(data.trackingNumber) : undefined,
     shippingNote: data.shippingNote ? String(data.shippingNote) : undefined,
+    issuedDocuments: normalizeIssuedDocuments(data.issuedDocuments),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -467,6 +520,7 @@ function mapBuyer(id: string, data: DocumentData): Buyer {
   return {
     id,
     name: String(data.name ?? ''),
+    billingName: data.billingName ? String(data.billingName) : undefined,
     normalizedName: String(data.normalizedName ?? ''),
     country: data.country ? String(data.country) : undefined,
     terms: data.terms ? String(data.terms) : undefined,
@@ -811,7 +865,7 @@ async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
     })
     const agg = aggregateItems(newItems)
     const grossProfit = agg.revenue - agg.costAmount - (sale.paymentFee || 0)
-    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + (sale.otherFees || 0) + sumOptions(sale.options ?? [])
+    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + sumFees(sale.fees ?? [])
     batch.update(doc(db, COLLECTIONS.sales, sale.id), {
       items: newItems,
       productId: agg.productId,
@@ -1394,6 +1448,7 @@ export function createFirebaseServices(): IServices {
       const ref = doc(db, COLLECTIONS.buyers, id)
       const cleaned: Record<string, unknown> = {}
       const optionalKeys = [
+        'billingName',
         'email',
         'website',
         'phone',
@@ -1415,6 +1470,61 @@ export function createFirebaseServices(): IServices {
       const snap = await getDoc(ref)
       if (!snap.exists()) throw new Error('販売先が見つかりません')
       return mapBuyer(snap.id, snap.data() ?? {})
+    },
+
+    // Rename a buyer's 管理用の名前. Buyers are derived from sales (linked by the
+    // normalized buyerName), so the rename must cascade to every linked sale or
+    // it would be regenerated on the next sync. Detail fields that the sync does
+    // not own (請求名・連絡先など) are carried over to the renamed buyer doc.
+    async renameBuyer(id, name) {
+      const trimmed = name.trim()
+      if (!trimmed) throw new Error('販売先名を入力してください')
+      const ref = doc(db, COLLECTIONS.buyers, id)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('販売先が見つかりません')
+      const current = mapBuyer(snap.id, snap.data() ?? {})
+
+      const oldNormalized = current.normalizedName || normalizeBuyerName(current.name)
+      const newNormalized = normalizeBuyerName(trimmed)
+
+      // Cascade the new name onto every sale linked to this buyer.
+      const sales = await getAllSales()
+      const linked = sales.filter(sale => normalizeBuyerName(sale.buyerName) === oldNormalized)
+      if (linked.length > 0) {
+        const batch = writeBatch(db)
+        linked.forEach(sale => {
+          batch.update(doc(db, COLLECTIONS.sales, sale.id), {
+            buyerName: trimmed,
+            updatedAt: serverTimestamp(),
+          })
+        })
+        await batch.commit()
+      }
+
+      // Regenerate the buyers collection from the updated sales.
+      await syncBuyersCollection()
+
+      // Re-apply detail fields the sync does not manage onto the renamed doc.
+      const carry = sanitizeRecord({
+        billingName: current.billingName,
+        email: current.email,
+        website: current.website,
+        phone: current.phone,
+        shippingAddress: current.shippingAddress,
+        shippingPostalCode: current.shippingPostalCode,
+        contactPersonName: current.contactPersonName,
+      })
+      const refreshed = await getAllBuyers()
+      const target = refreshed.find(b => b.normalizedName === newNormalized)
+      if (!target) throw new Error('販売先の更新に失敗しました')
+      if (Object.keys(carry).length > 0) {
+        await updateDoc(doc(db, COLLECTIONS.buyers, target.id), {
+          ...carry,
+          updatedAt: serverTimestamp(),
+        })
+      }
+      const finalSnap = await getDoc(doc(db, COLLECTIONS.buyers, target.id))
+      return mapBuyer(finalSnap.id, finalSnap.data() ?? {})
     },
 
     async createSaleRecord(input) {
@@ -1443,16 +1553,14 @@ export function createFirebaseServices(): IServices {
       })
       const agg = aggregateItems(items)
       const shippingFee = Number(input.shippingFee) || 0
-      const otherFees = Number(input.otherFees) || 0
       const paymentFee = Number(input.paymentFee) || 0
-      const otherFeesNote = input.otherFeesNote?.trim() || undefined
-      const options = normalizeSaleOptions(input.options)
-      const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
+      const fees = normalizeSaleFees(input.fees)
+      const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
       const grossProfit = agg.revenue - agg.costAmount - paymentFee
 
-      const { items: _ignoreItems, options: _ignoreOptions, ...rest } = input
+      const { items: _ignoreItems, fees: _ignoreFees, ...rest } = input
       void _ignoreItems
-      void _ignoreOptions
+      void _ignoreFees
       const payload = sanitizeRecord({
         ...rest,
         buyerName: input.buyerName.trim(),
@@ -1461,7 +1569,7 @@ export function createFirebaseServices(): IServices {
         terms: input.terms?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
         items,
-        options,
+        fees,
         productId: agg.productId,
         productSku: agg.productSku,
         productName: agg.productName,
@@ -1472,8 +1580,6 @@ export function createFirebaseServices(): IServices {
         costAmount: agg.costAmount,
         grossProfit,
         shippingFee,
-        otherFees,
-        otherFeesNote,
         paymentFee,
         invoiceAmount,
         createdAt: serverTimestamp(),
@@ -1499,9 +1605,7 @@ export function createFirebaseServices(): IServices {
         costAmount: agg.costAmount,
         grossProfit,
         shippingFee,
-        otherFees,
-        otherFeesNote,
-        options,
+        fees,
         paymentFee,
         invoiceAmount,
         country: input.country.trim(),
@@ -1541,9 +1645,7 @@ export function createFirebaseServices(): IServices {
         buyerName: input.buyerName ?? current.buyerName,
         items: mergedItems,
         shippingFee: input.shippingFee ?? current.shippingFee,
-        otherFees: input.otherFees ?? current.otherFees,
-        otherFeesNote: input.otherFeesNote ?? current.otherFeesNote,
-        options: input.options ?? current.options,
+        fees: input.fees ?? current.fees,
         paymentFee: input.paymentFee ?? current.paymentFee,
         country: input.country ?? current.country,
         dueDate: input.dueDate ?? current.dueDate,
@@ -1584,16 +1686,14 @@ export function createFirebaseServices(): IServices {
       })
       const agg = aggregateItems(items)
       const shippingFee = Number(merged.shippingFee) || 0
-      const otherFees = Number(merged.otherFees) || 0
       const paymentFee = Number(merged.paymentFee) || 0
-      const otherFeesNote = merged.otherFeesNote?.trim() || undefined
-      const options = normalizeSaleOptions(merged.options)
-      const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
+      const fees = normalizeSaleFees(merged.fees)
+      const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
       const grossProfit = agg.revenue - agg.costAmount - paymentFee
 
-      const { items: _ignoreItems, options: _ignoreOptions, ...rest } = merged
+      const { items: _ignoreItems, fees: _ignoreFees, ...rest } = merged
       void _ignoreItems
-      void _ignoreOptions
+      void _ignoreFees
       await updateDoc(doc(db, COLLECTIONS.sales, id), sanitizeRecord({
         ...rest,
         buyerName: merged.buyerName.trim(),
@@ -1602,7 +1702,7 @@ export function createFirebaseServices(): IServices {
         terms: merged.terms?.trim() || undefined,
         notes: merged.notes?.trim() || undefined,
         items,
-        options,
+        fees,
         productId: agg.productId,
         productSku: agg.productSku,
         productName: agg.productName,
@@ -1613,8 +1713,6 @@ export function createFirebaseServices(): IServices {
         costAmount: agg.costAmount,
         grossProfit,
         shippingFee,
-        otherFees,
-        otherFeesNote,
         paymentFee,
         invoiceAmount,
         updatedAt: serverTimestamp(),
@@ -1638,9 +1736,7 @@ export function createFirebaseServices(): IServices {
         costAmount: agg.costAmount,
         grossProfit,
         shippingFee,
-        otherFees,
-        otherFeesNote,
-        options,
+        fees,
         paymentFee,
         invoiceAmount,
         country: merged.country.trim(),
@@ -1663,6 +1759,27 @@ export function createFirebaseServices(): IServices {
     async deleteSaleRecord(id) {
       await deleteDoc(doc(db, COLLECTIONS.sales, id))
       await syncBuyersCollection()
+    },
+
+    async recordSaleDocument(saleId, issued) {
+      const ref = doc(db, COLLECTIONS.sales, saleId)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('販売案件が見つかりません')
+      const existing = normalizeIssuedDocuments(snap.data()?.issuedDocuments)
+      const next = [...existing, issued]
+      await updateDoc(ref, { issuedDocuments: next, updatedAt: serverTimestamp() })
+      return next
+    },
+
+    async deleteSaleDocument(saleId, docId) {
+      const ref = doc(db, COLLECTIONS.sales, saleId)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('販売案件が見つかりません')
+      const target = normalizeIssuedDocuments(snap.data()?.issuedDocuments).find(d => d.id === docId)
+      const next = normalizeIssuedDocuments(snap.data()?.issuedDocuments).filter(d => d.id !== docId)
+      await updateDoc(ref, { issuedDocuments: next, updatedAt: serverTimestamp() })
+      if (target?.url) await deleteStorageObjectByUrl(target.url)
+      return next
     },
   }
 

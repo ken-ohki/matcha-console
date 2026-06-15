@@ -1,31 +1,27 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { SaleModal } from '@/components/sales/SaleModal'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { PageTabs, SALES_TABS } from '@/components/layout/PageTabs'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
-import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineInput, SaleOption, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus, TaxRate } from '@/types'
-import { COUNTRY_OPTIONS } from '@/lib/countries'
-import { optionsForType } from '@/lib/masters'
-import { PAYMENT_METHODS } from '@/lib/payment-methods'
+import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry, saleOptionsToTaxLines } from '@/lib/tax'
+import { sumSaleFees } from '@/lib/tax'
 import { formatCurrency, formatKg } from '@/lib/format'
 import {
   CircleDollarSign,
   ClipboardPenLine,
   Copy,
-  FileText,
   Package2,
   Percent,
-  Pencil,
   Plus,
   Search,
   Trash2,
-  X,
 } from 'lucide-react'
 
 type ViewMode = 'by-month' | 'by-fiscal' | 'by-country' | 'by-product'
@@ -138,683 +134,6 @@ function statusColor(status: SaleStatus): string {
   return '#7dbb57'
 }
 
-function SaleModal({
-  open,
-  buyers,
-  products,
-  masters,
-  initial,
-  onClose,
-  onSave,
-}: {
-  open: boolean
-  buyers: Buyer[]
-  products: ProductWithInventory[]
-  masters: MasterEntry[]
-  initial: SaleRecord | null
-  onClose: () => void
-  onSave: (input: SaleRecordInput) => Promise<void>
-}) {
-  const termsOptions = useMemo(() => optionsForType(masters, 'terms'), [masters])
-  const defaultProductId = products[0]?.id ?? ''
-  const [buyerFocused, setBuyerFocused] = useState(false)
-  const [form, setForm] = useState<SaleRecordInput>({
-    status: 'negotiating',
-    paymentStatus: 'uninvoiced',
-    shippingStatus: 'ordering',
-    buyerName: '',
-    items: [{ productId: defaultProductId, quantityKg: 0, unitPrice: 0, taxRate: 8 }],
-    shippingFee: 0,
-    otherFees: 0,
-    otherFeesNote: '',
-    options: [],
-    paymentFee: 0,
-    paymentMethod: '',
-    country: '',
-    dueDate: '',
-    terms: '',
-    notes: '',
-    shippingNote: '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!open) return
-
-    const matchedBuyer = buyers.find(buyer => buyer.name === (initial?.buyerName ?? ''))
-    const initialItems: SaleLineInput[] = initial && initial.items.length > 0
-      ? initial.items.map(item => ({
-          productId: item.productId,
-          quantityKg: item.quantityKg,
-          unitPrice: item.unitPrice,
-          taxRate: item.taxRate ?? 8,
-        }))
-      : [{
-          productId: defaultProductId,
-          quantityKg: 0,
-          unitPrice: products.find(p => p.id === defaultProductId)?.standardWholesalePrice ?? 0,
-          taxRate: 10,
-        }]
-
-    setForm({
-      status: initial?.status ?? 'negotiating',
-      paymentStatus: initial?.paymentStatus ?? 'uninvoiced',
-      shippingStatus: initial?.shippingStatus ?? 'ordering',
-      buyerName: initial?.buyerName ?? '',
-      items: initialItems,
-      shippingFee: initial?.shippingFee ?? 0,
-      otherFees: initial?.otherFees ?? 0,
-      otherFeesNote: initial?.otherFeesNote ?? '',
-      options: initial?.options ? initial.options.map(o => ({ ...o })) : [],
-      paymentFee: initial?.paymentFee ?? 0,
-      paymentMethod: initial?.paymentMethod ?? '',
-      country: initial?.country ?? matchedBuyer?.country ?? '',
-      dueDate: initial?.dueDate ?? '',
-      terms: initial?.terms ?? matchedBuyer?.terms ?? '',
-      notes: initial?.notes ?? matchedBuyer?.notes ?? '',
-      shippingNote: initial?.shippingNote ?? '',
-    })
-    setError('')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initial])
-
-  const itemTotals = form.items.map(line => {
-    const product = products.find(p => p.id === line.productId)
-    const initialLine = initial?.items.find(i => i.productId === line.productId)
-    const revenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
-    const costPerKg = product?.purchaseUnitPrice ?? initialLine?.costPerKg ?? 0
-    const costAmount = (Number(line.quantityKg) || 0) * costPerKg
-    const taxRate = line.taxRate ?? 8
-    return { revenue, costAmount, product, taxRate }
-  })
-  const revenue = itemTotals.reduce((s, t) => s + t.revenue, 0)
-  const costAmount = itemTotals.reduce((s, t) => s + t.costAmount, 0)
-  const shippingFeeNum = Number(form.shippingFee) || 0
-  const otherFeesNum = Number(form.otherFees) || 0
-  const paymentFeeNum = Number(form.paymentFee) || 0
-  const optionsList = form.options ?? []
-  const optionsTotal = optionsList.reduce((s, o) => s + (Number(o.amount) || 0), 0)
-  // Shared tax logic (fees taxed at 10%; options carry their own rate; a
-  // fully-免税 sale = no tax at all) so the preview matches the invoice
-  // document and every list to the yen.
-  const taxBuckets = computeSaleTaxBuckets(
-    [...form.items, ...saleOptionsToTaxLines(optionsList)],
-    shippingFeeNum + otherFeesNum,
-  )
-  const tax10 = taxBuckets.standardTax
-  const tax8 = taxBuckets.reducedTax
-  const taxTotal = taxBuckets.tax
-  const invoiceAmount = revenue + shippingFeeNum + otherFeesNum + optionsTotal
-  const grossProfit = revenue - costAmount - paymentFeeNum
-  // Stock remaining: sum across distinct products
-  const distinctProductIds = Array.from(new Set(form.items.map(i => i.productId).filter(Boolean)))
-  const stockSummary = distinctProductIds.map(pid => {
-    const product = products.find(p => p.id === pid)
-    const requested = form.items
-      .filter(i => i.productId === pid)
-      .reduce((s, i) => s + (Number(i.quantityKg) || 0), 0)
-    const initialAllocated = initial
-      ? initial.items.filter(i => i.productId === pid).reduce((s, i) => s + i.quantityKg, 0)
-      : 0
-    const remaining = (product?.currentStockKg ?? 0) + initialAllocated - requested
-    return { productId: pid, name: product?.name ?? '', remaining }
-  })
-  const minRemaining = stockSummary.length === 0 ? 0 : Math.min(...stockSummary.map(s => s.remaining))
-  const buyerSuggestions = useMemo(() => {
-    const query = form.buyerName.trim().toLowerCase()
-    const filtered = query
-      ? buyers.filter(buyer => buyer.name.toLowerCase().includes(query))
-      : buyers
-
-    return filtered.slice(0, 8)
-  }, [buyers, form.buyerName])
-
-  const applyBuyer = (buyer: Buyer) => {
-    setForm(prev => ({
-      ...prev,
-      buyerName: buyer.name,
-      country: buyer.country ?? prev.country,
-      terms: buyer.terms ?? prev.terms,
-      notes: prev.notes || buyer.notes || '',
-    }))
-    setBuyerFocused(false)
-  }
-
-  const updateItem = (index: number, patch: Partial<SaleLineInput>) => {
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => i === index ? { ...item, ...patch } : item),
-    }))
-  }
-  const handleItemProductChange = (index: number, productId: string) => {
-    const product = products.find(item => item.id === productId)
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => i === index ? {
-        ...item,
-        productId,
-        unitPrice: product?.standardWholesalePrice ?? item.unitPrice,
-      } : item),
-    }))
-  }
-  const addItem = () => {
-    const defaultPid = products[0]?.id ?? ''
-    const defaultPrice = products[0]?.standardWholesalePrice ?? 0
-    setForm(prev => ({
-      ...prev,
-      // Domestic → 8% (matcha), export country → 免税 by default.
-      items: [...prev.items, { productId: defaultPid, quantityKg: 0, unitPrice: defaultPrice, taxRate: defaultTaxRateForCountry(prev.country) }],
-    }))
-  }
-  const removeItem = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.length <= 1 ? prev.items : prev.items.filter((_, i) => i !== index),
-    }))
-  }
-
-  const addOption = () => {
-    setForm(prev => ({
-      ...prev,
-      // Options default to 10% (standard rate); packaging etc. is rarely 軽減税率.
-      options: [...(prev.options ?? []), { name: '', amount: 0, taxRate: 10 }],
-    }))
-  }
-  const updateOption = (index: number, patch: Partial<SaleOption>) => {
-    setForm(prev => ({
-      ...prev,
-      options: (prev.options ?? []).map((o, i) => i === index ? { ...o, ...patch } : o),
-    }))
-  }
-  const removeOption = (index: number) => {
-    setForm(prev => ({
-      ...prev,
-      options: (prev.options ?? []).filter((_, i) => i !== index),
-    }))
-  }
-
-  const handleBuyerNameChange = (buyerName: string) => {
-    setForm(prev => ({ ...prev, buyerName }))
-    const matched = buyers.find(buyer => buyer.name === buyerName)
-    if (matched) applyBuyer(matched)
-  }
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setSaving(true)
-    setError('')
-
-    try {
-      if (form.items.length === 0 || form.items.some(item => !item.productId)) {
-        throw new Error('商品を選択してください')
-      }
-      if (form.items.some(item => !(Number(item.quantityKg) > 0))) {
-        throw new Error('各商品の数量を入力してください')
-      }
-      await onSave(form)
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '保存に失敗しました')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!open) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '販売案件を編集' : '販売案件を登録'}</h2>
-            <p className="text-sm text-[#68756c] mt-1">登録済みの販売先は候補から再利用できます。</p>
-          </div>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
-            <X size={18} />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">販売ステータス</label>
-              <select
-                value={form.status}
-                onChange={event => setForm(prev => ({ ...prev, status: event.target.value as SaleStatus }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                <option value="negotiating">商談中</option>
-                <option value="confirmed">確定</option>
-                <option value="cancelled">取消</option>
-              </select>
-            </div>
-            <div className="relative">
-              <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
-              <input
-                required
-                value={form.buyerName}
-                onChange={event => handleBuyerNameChange(event.target.value)}
-                onFocus={() => setBuyerFocused(true)}
-                onBlur={() => {
-                  window.setTimeout(() => setBuyerFocused(false), 120)
-                }}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                placeholder="例: Tea Atelier SORA"
-              />
-              {buyerFocused && buyerSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-[#d9d1be] bg-white shadow-lg">
-                  {buyerSuggestions.map(buyer => (
-                    <button
-                      key={buyer.id}
-                      type="button"
-                      onMouseDown={event => {
-                        event.preventDefault()
-                        applyBuyer(buyer)
-                      }}
-                      className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-[#f7f5ee]"
-                    >
-                      <span>
-                        <span className="block text-sm font-medium text-[#173c2a]">{buyer.name}</span>
-                        <span className="block text-xs text-[#68756c]">
-                          {buyer.country || '国未設定'}
-                          {buyer.terms ? ` / ${buyer.terms}` : ''}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs text-[#68756c]">{buyer.saleCount}件</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {buyers.length > 0 && (
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-[#68756c]">最近の販売先</p>
-              <div className="flex flex-wrap gap-2">
-                {buyers.slice(0, 6).map(buyer => (
-                  <button
-                    key={buyer.id}
-                    type="button"
-                    onClick={() => applyBuyer(buyer)}
-                    className="rounded-full border border-[#d9d1be] bg-[#f7f5ee] px-3 py-1.5 text-xs text-[#173c2a] transition hover:border-[#b5aa90] hover:bg-white"
-                  >
-                    {buyer.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">商品</label>
-              <span className="text-xs text-[#68756c]">合計 {formatCurrency(revenue)}</span>
-            </div>
-            <div className="space-y-2">
-              {form.items.map((line, index) => {
-                const lineRevenue = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
-                const lineRate = line.taxRate ?? 8
-                const lineIncl = computeTaxBuckets([line]).total
-                const lineProduct = products.find(p => p.id === line.productId)
-                const lineInitial = initial?.items.find(i => i.productId === line.productId)
-                const lineCostPerKg = lineProduct?.purchaseUnitPrice ?? lineInitial?.costPerKg ?? 0
-                const lineCost = (Number(line.quantityKg) || 0) * lineCostPerKg
-                const lineProfit = lineRevenue - lineCost
-                const lineMargin = lineRevenue > 0 ? (lineProfit / lineRevenue) * 100 : null
-                return (
-                  <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
-                    <select
-                      value={line.productId}
-                      onChange={event => handleItemProductChange(index, event.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    >
-                      <option value="">選択してください</option>
-                      {[...products]
-                        .sort((a, b) => a.name.localeCompare(b.name, 'en'))
-                        .map(product => (
-                          <option key={product.id} value={product.id}>
-                            {product.name} ({product.sku})
-                          </option>
-                        ))}
-                    </select>
-                    <input
-                      required
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={line.quantityKg}
-                      placeholder="数量 (kg)"
-                      onChange={event => updateItem(index, { quantityKg: Number(event.target.value) || 0 })}
-                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={line.unitPrice}
-                      placeholder="税抜単価"
-                      onChange={event => updateItem(index, { unitPrice: Number(event.target.value) || 0 })}
-                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                    <select
-                      value={lineRate}
-                      onChange={event => {
-                        const v = Number(event.target.value)
-                        updateItem(index, { taxRate: v === 0 ? 0 : v === 10 ? 10 : 8 })
-                      }}
-                      title="消費税区分"
-                      className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    >
-                      <option value={0}>免税</option>
-                      <option value={8}>8%軽減</option>
-                      <option value={10}>10%</option>
-                    </select>
-                    <div className="flex flex-col items-end justify-center text-xs md:px-2">
-                      <span className="font-medium text-[#173c2a]">{formatCurrency(lineIncl)}</span>
-                      <span className="text-[10px] text-[#68756c]">税抜 {formatCurrency(lineRevenue)}</span>
-                      <span className={`text-[10px] ${lineProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                        粗利 {formatCurrency(lineProfit)}{lineMargin != null && ` (${lineMargin.toFixed(1)}%)`}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(index)}
-                      disabled={form.items.length <= 1}
-                      aria-label="削除"
-                      className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-red-600 disabled:opacity-30"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={addItem}
-              className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]"
-            >
-              <Plus size={14} />
-              商品を追加
-            </button>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">国</label>
-              <select
-                required
-                value={form.country}
-                onChange={event => setForm(prev => ({ ...prev, country: event.target.value }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                <option value="">選択してください</option>
-                {COUNTRY_OPTIONS.map(option => (
-                  <option key={option.code} value={option.name}>{option.name}</option>
-                ))}
-                {form.country && !COUNTRY_OPTIONS.some(c => c.name === form.country) && (
-                  <option value={form.country}>{form.country}（未登録）</option>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">納期</label>
-              <input
-                type="date"
-                value={form.dueDate}
-                onChange={event => setForm(prev => ({ ...prev, dueDate: event.target.value }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">取引条件</label>
-              <select
-                value={form.terms ?? ''}
-                onChange={event => setForm(prev => ({ ...prev, terms: event.target.value }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              >
-                <option value="">未選択</option>
-                {termsOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label || option.value}
-                  </option>
-                ))}
-                {form.terms && !termsOptions.some(o => o.value === form.terms) && (
-                  <option value={form.terms}>{form.terms}（未登録）</option>
-                )}
-              </select>
-              {termsOptions.length === 0 && (
-                <p className="mt-1 text-[11px] text-amber-700">
-                  設定 → マスター管理 → 取引条件 で項目を登録してください
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">メモ</label>
-            <textarea
-              value={form.notes}
-              onChange={event => setForm(prev => ({ ...prev, notes: event.target.value }))}
-              rows={3}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              placeholder="商談の補足や条件など"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">発送担当者へのメモ</label>
-            <textarea
-              value={form.shippingNote ?? ''}
-              onChange={event => setForm(prev => ({ ...prev, shippingNote: event.target.value }))}
-              rows={2}
-              className="w-full rounded-xl border border-amber-300 bg-amber-50/40 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-              placeholder="例: ギフト包装、納品書同梱不可、冷蔵便 など（発送管理に表示されます）"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">費用・請求</p>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">送料</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.shippingFee ?? 0}
-                  onChange={event => setForm(prev => ({ ...prev, shippingFee: Number(event.target.value) || 0 }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">諸費用</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.otherFees ?? 0}
-                  onChange={event => setForm(prev => ({ ...prev, otherFees: Number(event.target.value) || 0 }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-700">諸費用メモ</label>
-                <input
-                  type="text"
-                  value={form.otherFeesNote ?? ''}
-                  onChange={event => setForm(prev => ({ ...prev, otherFeesNote: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  placeholder="例: 通関手数料、梱包資材費 など"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <label className="block text-xs font-medium text-gray-700">オプション（包装代など・請求額に加算）</label>
-                  <button
-                    type="button"
-                    onClick={addOption}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] px-2 py-1 text-xs font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> オプション追加
-                  </button>
-                </div>
-                {optionsList.length === 0 ? (
-                  <p className="text-[11px] text-[#9aa39a]">包装代やその他の費用を自由入力で追加できます。</p>
-                ) : (
-                  <div className="space-y-2">
-                    {optionsList.map((opt, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={opt.name}
-                          onChange={event => updateOption(index, { name: event.target.value })}
-                          className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                          placeholder="項目名（例: 包装代）"
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={opt.amount}
-                          onChange={event => updateOption(index, { amount: Number(event.target.value) || 0 })}
-                          className="w-28 rounded-xl border border-gray-300 px-3 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                          placeholder="金額"
-                        />
-                        <select
-                          value={opt.taxRate}
-                          onChange={event => updateOption(index, { taxRate: Number(event.target.value) as TaxRate })}
-                          className="w-24 rounded-xl border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                        >
-                          <option value={10}>10%</option>
-                          <option value={8}>8%</option>
-                          <option value={0}>免税</option>
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => removeOption(index)}
-                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                          aria-label="削除"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">支払手数料（粗利から差引）</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.paymentFee ?? 0}
-                  onChange={event => setForm(prev => ({ ...prev, paymentFee: Number(event.target.value) || 0 }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">支払い方法</label>
-                <select
-                  value={form.paymentMethod ?? ''}
-                  onChange={event => setForm(prev => ({ ...prev, paymentMethod: event.target.value || undefined }))}
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                >
-                  <option value="">未設定</option>
-                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  {form.paymentMethod && !PAYMENT_METHODS.includes(form.paymentMethod as never) && (
-                    <option value={form.paymentMethod}>{form.paymentMethod}</option>
-                  )}
-                </select>
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium text-gray-700">請求額（税抜・自動）</p>
-                <p className="mt-1 rounded-xl border border-dashed border-[#d9d1be] bg-[#f7f5ee] px-3 py-2 text-sm font-semibold text-[#173c2a]">
-                  {formatCurrency(invoiceAmount)}
-                </p>
-                <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料 + 諸費用{optionsTotal > 0 ? ' + オプション' : ''}</p>
-                <p className="mt-1 text-[10px] text-[#68756c]">
-                  消費税: 10%対象 {formatCurrency(tax10)} / 8%対象 {formatCurrency(tax8)} / 合計 {formatCurrency(taxTotal)}
-                </p>
-                <p className="mt-0.5 text-[10px] text-[#68756c]">
-                  税込目安 {formatCurrency(invoiceAmount + taxTotal)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-6">
-            <div>
-              <p className="text-xs text-[#68756c]">商品代金</p>
-              <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(revenue)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#68756c]">原価</p>
-              <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(costAmount)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#68756c]">請求額（税抜）</p>
-              <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(invoiceAmount)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#68756c]">粗利</p>
-              <p className={`mt-1 text-lg font-semibold ${grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(grossProfit)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[#68756c]">粗利率</p>
-              <p className={`mt-1 text-lg font-semibold ${grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                {revenue > 0 ? `${((grossProfit / revenue) * 100).toFixed(1)}%` : '-'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-[#68756c]">登録後の残在庫（最少）</p>
-              <p className={`mt-1 text-lg font-semibold ${minRemaining < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>
-                {formatKg(minRemaining)}
-              </p>
-              {minRemaining < 0 && (
-                <p className="mt-1 text-[10px] font-medium text-red-700">在庫不足（マイナス）ですが登録できます。入荷後に解消されます。</p>
-              )}
-              {stockSummary.length > 1 && (
-                <p className="mt-1 text-[10px] text-[#68756c]">
-                  {stockSummary.map(s => `${s.name}: ${s.remaining.toFixed(1)}kg`).join(' / ')}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 pt-1 sm:flex-row">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
-            >
-              キャンセル
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
-            >
-              {saving ? '保存中...' : '保存'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 export default function SalesPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [buyers, setBuyers] = useState<Buyer[]>([])
@@ -834,12 +153,11 @@ export default function SalesPage() {
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingSale, setEditingSale] = useState<SaleRecord | null>(null)
   const [prefillSale, setPrefillSale] = useState<SaleRecord | null>(null)
-  const [detailSaleId, setDetailSaleId] = useState<string | null>(null)
+  const router = useRouter()
+  const openDetail = (id: string) => router.push(`/sales/${id}`)
 
   const handleDuplicate = (record: SaleRecord) => {
-    setEditingSale(null)
     setPrefillSale({
       ...record,
       id: '',
@@ -1060,16 +378,11 @@ export default function SalesPage() {
     ${statusColor('cancelled')} ${((statusCounts.confirmed + statusCounts.negotiating) / Math.max(totalStatusCount, 1)) * 360}deg 360deg
   )`
 
+  // The modal is now create/duplicate only; editing happens on /sales/[id].
   const handleSave = async (input: SaleRecordInput) => {
     const services = await getServices()
-    if (editingSale) {
-      await services.sales.updateSaleRecord(editingSale.id, input)
-      setMessage('販売案件を更新しました')
-    } else {
-      await services.sales.createSaleRecord(input)
-      setMessage('販売案件を登録しました')
-    }
-    setEditingSale(null)
+    await services.sales.createSaleRecord(input)
+    setMessage('販売案件を登録しました')
     setPrefillSale(null)
     setModalOpen(false)
     await load()
@@ -1093,10 +406,7 @@ export default function SalesPage() {
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
-              onClick={() => {
-                setEditingSale(null)
-                setModalOpen(true)
-              }}
+              onClick={() => setModalOpen(true)}
               className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
             >
               <Plus size={16} />
@@ -1370,7 +680,7 @@ export default function SalesPage() {
             {sortedSales.map(record => (
               <div
                 key={record.id}
-                onClick={() => setDetailSaleId(record.id)}
+                onClick={() => openDetail(record.id)}
                 className="cursor-pointer rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4 transition hover:border-[#bcb39a]"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -1399,7 +709,7 @@ export default function SalesPage() {
                     <div className="mt-1 font-semibold text-[#173c2a]">請求額(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
                     <div className="mt-1">
                       （税抜 {formatCurrency(record.invoiceAmount || record.revenue)}
-                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0 || (record.options ?? []).length > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}{(record.options ?? []).length > 0 && <> ＋オプション {formatCurrency((record.options ?? []).reduce((s, o) => s + (o.amount || 0), 0))}</>}</>}）
+                      {((record.shippingFee || 0) > 0 || (record.fees ?? []).length > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(record.fees))}</>}</>}）
                     </div>
                     <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
                     <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
@@ -1415,15 +725,6 @@ export default function SalesPage() {
                     className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
                   >
                     <Copy size={16} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingSale(record)
-                      setModalOpen(true)
-                    }}
-                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-                  >
-                    <Pencil size={16} />
                   </button>
                   <button
                     onClick={() => handleDelete(record)}
@@ -1466,7 +767,7 @@ export default function SalesPage() {
                 {sortedSales.map(record => (
                   <tr
                     key={record.id}
-                    onClick={() => setDetailSaleId(record.id)}
+                    onClick={() => openDetail(record.id)}
                     className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
                   >
                     <td className="whitespace-nowrap px-3 py-4">
@@ -1478,25 +779,24 @@ export default function SalesPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 font-medium">{record.buyerName}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{formatDateOnly(record.createdAt)}</td>
-                    <td className="px-3 py-4">
-                      <div>
+                    <td className="px-3 py-4 align-top">
+                      <div className="line-clamp-2 max-w-[260px]">
                         {record.items[0]?.productName ?? record.productName}
                         {record.items.length > 1 && (
                           <span className="text-xs text-[#68756c]"> +他{record.items.length - 1}件</span>
                         )}
                       </div>
-                      <div className="text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
+                      <div className="truncate max-w-[260px] text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4">{formatKg(record.quantityKg)}</td>
-                    <td className="whitespace-nowrap px-3 py-4">
+                    <td className="whitespace-nowrap px-3 py-4 align-top">
                       <div className="font-semibold text-[#173c2a]">{formatCurrency(computeSaleTaxIncluded(record))}</div>
                       <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
-                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0 || (record.options ?? []).length > 0) && (
-                        <div className="text-[10px] text-[#68756c]">
+                      {((record.shippingFee || 0) > 0 || (record.fees ?? []).length > 0) && (
+                        <div className="truncate max-w-[220px] text-[10px] text-[#68756c]">
                           商品 {formatCurrency(record.revenue)}
                           {(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}
-                          {(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}
-                          {(record.options ?? []).length > 0 && <> ＋オプション {formatCurrency((record.options ?? []).reduce((s, o) => s + (o.amount || 0), 0))}</>}
+                          {(record.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(record.fees))}</>}
                         </div>
                       )}
                     </td>
@@ -1514,15 +814,6 @@ export default function SalesPage() {
                           className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
                         >
                           <Copy size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingSale(record)
-                            setModalOpen(true)
-                          }}
-                          className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-                        >
-                          <Pencil size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(record)}
@@ -1544,37 +835,13 @@ export default function SalesPage() {
           buyers={buyers}
           masters={masters}
           products={products}
-          initial={editingSale ?? prefillSale}
+          initial={prefillSale}
           onClose={() => {
             setModalOpen(false)
-            setEditingSale(null)
             setPrefillSale(null)
           }}
           onSave={handleSave}
         />
-
-        {detailSaleId && (() => {
-          const detailRecord = sales.find(s => s.id === detailSaleId)
-          if (!detailRecord) return null
-          const detailBuyer = buyers.find(b => b.name === detailRecord.buyerName)
-          return (
-            <SaleDetailModal
-              record={detailRecord}
-              buyerShippingAddress={detailBuyer?.shippingAddress ?? ''}
-              onClose={() => setDetailSaleId(null)}
-              onEdit={() => {
-                setEditingSale(detailRecord)
-                setModalOpen(true)
-                setDetailSaleId(null)
-              }}
-              onUpdate={async input => {
-                const services = await getServices()
-                await services.sales.updateSaleRecord(detailRecord.id, input)
-                await load()
-              }}
-            />
-          )
-        })()}
       </div>
     </AppLayout>
   )
@@ -1635,387 +902,6 @@ function FilterMultiSelect({
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function SaleDetailModal({
-  record,
-  buyerShippingAddress,
-  onClose,
-  onEdit,
-  onUpdate,
-}: {
-  record: SaleRecord
-  buyerShippingAddress: string
-  onClose: () => void
-  onEdit: () => void
-  onUpdate: (input: Partial<SaleRecordInput>) => Promise<void>
-}) {
-  const [shipping, setShipping] = useState({
-    shippingStatus: record.shippingStatus,
-    shippingAddress: record.shippingAddress ?? buyerShippingAddress ?? '',
-    shippingPostalCode: record.shippingPostalCode ?? '',
-    shippingMethod: record.shippingMethod ?? '',
-    shippingDate: record.shippingDate ?? '',
-    trackingNumber: record.trackingNumber ?? '',
-  })
-  const [payment, setPayment] = useState({
-    paymentStatus: record.paymentStatus,
-    paymentMethod: record.paymentMethod ?? '',
-    paymentDate: record.paymentDate ?? '',
-    dueDate: record.dueDate ?? '',
-  })
-  const [savingSection, setSavingSection] = useState<'shipping' | 'payment' | null>(null)
-  const [feedback, setFeedback] = useState<string | null>(null)
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  const shippingDirty =
-    shipping.shippingStatus !== record.shippingStatus ||
-    (shipping.shippingAddress || '') !== (record.shippingAddress ?? '') ||
-    (shipping.shippingPostalCode || '') !== (record.shippingPostalCode ?? '') ||
-    (shipping.shippingMethod || '') !== (record.shippingMethod ?? '') ||
-    (shipping.shippingDate || '') !== (record.shippingDate ?? '') ||
-    (shipping.trackingNumber || '') !== (record.trackingNumber ?? '')
-
-  const saveShipping = async () => {
-    setSavingSection('shipping')
-    setFeedback(null)
-    try {
-      await onUpdate({
-        shippingStatus: shipping.shippingStatus,
-        shippingAddress: shipping.shippingAddress.trim() || undefined,
-        shippingPostalCode: shipping.shippingPostalCode.trim() || undefined,
-        shippingMethod: shipping.shippingMethod.trim() || undefined,
-        shippingDate: shipping.shippingDate || undefined,
-        trackingNumber: shipping.trackingNumber.trim() || undefined,
-      })
-      setFeedback('発送情報を更新しました')
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
-    } finally {
-      setSavingSection(null)
-    }
-  }
-
-  const paymentDirty =
-    payment.paymentStatus !== record.paymentStatus ||
-    (payment.paymentMethod || '') !== (record.paymentMethod ?? '') ||
-    (payment.paymentDate || '') !== (record.paymentDate ?? '') ||
-    (payment.dueDate || '') !== (record.dueDate ?? '')
-
-  const savePayment = async () => {
-    setSavingSection('payment')
-    setFeedback(null)
-    try {
-      // Keep status and paymentDate consistent.
-      const status = payment.paymentDate && payment.paymentStatus !== 'paid'
-        ? 'paid'
-        : payment.paymentStatus
-      await onUpdate({
-        paymentStatus: status,
-        paymentMethod: payment.paymentMethod || undefined,
-        paymentDate: payment.paymentDate || undefined,
-        dueDate: payment.dueDate || undefined,
-      })
-      setFeedback('請求・支払い情報を更新しました')
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '保存に失敗しました')
-    } finally {
-      setSavingSection(null)
-    }
-  }
-
-  const fieldClass =
-    'w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 bg-white'
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
-        onClick={event => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="閉じる"
-          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
-        >
-          <X size={18} />
-        </button>
-        <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">販売案件</p>
-          <h2 className="mt-1 text-xl font-semibold text-[#173c2a]">{record.buyerName}</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <SalesStatusBadge status={record.status} />
-            <PaymentBadge status={record.paymentStatus} />
-            <ShippingBadge status={record.shippingStatus} />
-          </div>
-        </div>
-
-        <div className="space-y-5 px-6 py-5">
-          {/* 注文内容 */}
-          <Section title="注文内容" onEdit={onEdit}>
-            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-              <DetailField label="国" value={record.country || '-'} />
-              <DetailField label="納期" value={record.dueDate || '-'} />
-              <DetailField label="取引条件" value={record.terms || '-'} />
-              <DetailField label="作成日" value={record.createdAt.toLocaleDateString('ja-JP')} />
-              <DetailField label="商品代金" value={formatCurrency(record.revenue)} />
-              <DetailField label="送料" value={formatCurrency(record.shippingFee || 0)} />
-              <DetailField
-                label="諸費用"
-                value={`${formatCurrency(record.otherFees || 0)}${record.otherFeesNote ? ` (${record.otherFeesNote})` : ''}`}
-              />
-              {(record.options ?? []).length > 0 && (
-                <DetailField
-                  label="オプション"
-                  value={(record.options ?? []).map(o => `${o.name || 'オプション'} ${formatCurrency(o.amount)}（${o.taxRate === 0 ? '免税' : `${o.taxRate}%`}）`).join(' / ')}
-                />
-              )}
-              <DetailField label="請求額（税抜）" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
-              <DetailField label="請求額（税込）" value={formatCurrency(computeSaleTaxIncluded(record))} valueClass="font-semibold" />
-              <DetailField label="支払手数料" value={formatCurrency(record.paymentFee || 0)} />
-              <DetailField label="原価" value={formatCurrency(record.costAmount)} />
-              <DetailField label="粗利" value={formatCurrency(record.grossProfit)} valueClass="text-emerald-700 font-semibold" />
-            </div>
-            <div className="mt-3 overflow-hidden rounded-xl border border-[#ece8db]">
-              <table className="min-w-full text-sm">
-                <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">商品</th>
-                    <th className="px-3 py-2 font-medium">SKU</th>
-                    <th className="px-3 py-2 font-medium text-right">数量</th>
-                    <th className="px-3 py-2 font-medium text-right">単価</th>
-                    <th className="px-3 py-2 font-medium text-right">小計</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {record.items.map((item, i) => (
-                    <tr key={i} className="border-t border-[#ece8db] text-[#173c2a]">
-                      <td className="px-3 py-2">{item.productName}</td>
-                      <td className="px-3 py-2 text-[#68756c]">{item.productSku}</td>
-                      <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
-                      <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {record.notes && (
-              <div className="mt-3">
-                <p className="text-[11px] uppercase tracking-wider text-[#68756c]">メモ</p>
-                <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-2.5 text-sm text-[#173c2a]">{record.notes}</p>
-              </div>
-            )}
-          </Section>
-
-          {/* 支払い（直接編集可） */}
-          <Section title="請求・支払い">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払いステータス</p>
-                <select
-                  value={payment.paymentStatus}
-                  onChange={e => setPayment(p => ({ ...p, paymentStatus: e.target.value as PaymentStatus }))}
-                  className={fieldClass}
-                >
-                  <option value="uninvoiced">未請求</option>
-                  <option value="invoiced">請求済</option>
-                  <option value="paid">入金済</option>
-                </select>
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払い方法</p>
-                <select
-                  value={payment.paymentMethod}
-                  onChange={e => setPayment(p => ({ ...p, paymentMethod: e.target.value }))}
-                  className={fieldClass}
-                >
-                  <option value="">未設定</option>
-                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  {payment.paymentMethod && !PAYMENT_METHODS.includes(payment.paymentMethod as never) && (
-                    <option value={payment.paymentMethod}>{payment.paymentMethod}</option>
-                  )}
-                </select>
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">支払期日</p>
-                <input type="date" value={payment.dueDate} onChange={e => setPayment(p => ({ ...p, dueDate: e.target.value }))} className={fieldClass} />
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">入金日</p>
-                <input type="date" value={payment.paymentDate} onChange={e => setPayment(p => ({ ...p, paymentDate: e.target.value }))} className={fieldClass} />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-end gap-3">
-              <Link href="/receivables" className="text-xs text-[#68756c] hover:underline">入金管理で一覧</Link>
-              <button
-                type="button"
-                onClick={savePayment}
-                disabled={!paymentDirty || savingSection === 'payment'}
-                className="rounded-xl bg-[#174c33] px-4 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-40"
-              >
-                {savingSection === 'payment' ? '保存中…' : '請求・支払いを保存'}
-              </button>
-            </div>
-          </Section>
-
-          {/* 発送（直接編集可） */}
-          <Section title="発送">
-            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送ステータス</p>
-                <select
-                  value={shipping.shippingStatus}
-                  onChange={e => setShipping(s => ({ ...s, shippingStatus: e.target.value as ShippingStatus }))}
-                  className={fieldClass}
-                >
-                  {(Object.keys(SHIPPING_LABELS) as ShippingStatus[]).map(k => (
-                    <option key={k} value={k}>{SHIPPING_LABELS[k]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送方法</p>
-                <input value={shipping.shippingMethod} onChange={e => setShipping(s => ({ ...s, shippingMethod: e.target.value }))} className={fieldClass} placeholder="例: ヤマト宅急便" />
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送日</p>
-                <input type="date" value={shipping.shippingDate} onChange={e => setShipping(s => ({ ...s, shippingDate: e.target.value }))} className={fieldClass} />
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">追跡番号</p>
-                <input value={shipping.trackingNumber} onChange={e => setShipping(s => ({ ...s, trackingNumber: e.target.value }))} className={fieldClass} />
-              </div>
-              <div>
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">郵便番号</p>
-                <input value={shipping.shippingPostalCode} onChange={e => setShipping(s => ({ ...s, shippingPostalCode: e.target.value }))} className={fieldClass} placeholder="〒" />
-              </div>
-              <div className="sm:col-span-2">
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送先</p>
-                <textarea
-                  rows={2}
-                  value={shipping.shippingAddress}
-                  onChange={e => setShipping(s => ({ ...s, shippingAddress: e.target.value }))}
-                  className={fieldClass}
-                  placeholder={buyerShippingAddress || '住所'}
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-end gap-3">
-              <Link href="/shipping" className="text-xs text-[#68756c] hover:underline">発送管理で一覧</Link>
-              <button
-                type="button"
-                onClick={saveShipping}
-                disabled={!shippingDirty || savingSection === 'shipping'}
-                className="rounded-xl bg-[#174c33] px-4 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-40"
-              >
-                {savingSection === 'shipping' ? '保存中…' : '発送情報を保存'}
-              </button>
-            </div>
-          </Section>
-
-          {/* 書類発行 */}
-          <section className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">書類発行</p>
-            <div className="space-y-2">
-              <div>
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-[#68756c]">日本語</p>
-                <div className="flex flex-wrap gap-2">
-                  <a href={`/sales/${record.id}/document?type=invoice&lang=ja`} className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43]">
-                    <FileText size={14} /> 請求書を発行
-                  </a>
-                  <a href={`/sales/${record.id}/document?type=delivery&lang=ja`} className="inline-flex items-center gap-2 rounded-xl border border-[#174c33] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]">
-                    <FileText size={14} /> 納品書を発行
-                  </a>
-                  <a href={`/sales/${record.id}/document?type=quotation&lang=ja`} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-                    <FileText size={14} /> 見積書を発行
-                  </a>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] uppercase tracking-wider text-[#68756c]">English</p>
-                <div className="flex flex-wrap gap-2">
-                  <a href={`/sales/${record.id}/document?type=invoice&lang=en`} className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43]">
-                    <FileText size={14} /> Issue Invoice
-                  </a>
-                  <a href={`/sales/${record.id}/document?type=delivery&lang=en`} className="inline-flex items-center gap-2 rounded-xl border border-[#174c33] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]">
-                    <FileText size={14} /> Issue Delivery Note
-                  </a>
-                  <a href={`/sales/${record.id}/document?type=quotation&lang=en`} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
-                    <FileText size={14} /> Issue Quotation
-                  </a>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {feedback && (
-            <p className="text-sm text-emerald-700">{feedback}</p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              閉じる
-            </button>
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43]"
-            >
-              <Pencil size={14} />
-              すべての項目を編集
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Section({ title, onEdit, children }: { title: string; onEdit?: () => void; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-[#ece5d7] bg-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[#173c2a]">{title}</h3>
-        {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="text-xs text-[#174c33] underline-offset-2 hover:underline"
-          >
-            編集
-          </button>
-        )}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function DetailField({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
-  return (
-    <div>
-      <p className="text-[11px] uppercase tracking-wider text-[#68756c]">{label}</p>
-      <p className={`mt-0.5 text-sm text-[#173c2a] ${valueClass ?? ''}`}>{value}</p>
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { ArrowLeft, FileDown, Printer, X } from 'lucide-react'
 import { getServices } from '@/lib/services'
 import type { Buyer, SaleRecord } from '@/types'
 import type { IssuerInfo } from '@/lib/services'
@@ -74,26 +74,15 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
     unit: isJa ? '式' : 'lot',
     unitPrice: sale.shippingFee || 0,
   })
-  const otherFeesLine = (sale.otherFees || 0) > 0
-    ? createBlankLine({
-        description: sale.otherFeesNote
-          ? (isJa ? `諸費用（${sale.otherFeesNote}）` : `Other fees (${sale.otherFeesNote})`)
-          : (isJa ? '諸費用' : 'Other fees'),
-        isReducedRate: false,
-        quantity: 1,
-        unit: isJa ? '式' : 'lot',
-        unitPrice: sale.otherFees || 0,
-      })
-    : null
-  const optionLines: DocumentLine[] = (sale.options ?? [])
-    .filter(o => o.name || (Number(o.amount) || 0) !== 0)
-    .map(o => createBlankLine({
-      description: o.name || (isJa ? 'オプション' : 'Option'),
-      isReducedRate: o.taxRate === 8,
-      taxExempt: o.taxRate === 0,
-      quantity: 1,
-      unit: isJa ? '式' : 'lot',
-      unitPrice: o.amount,
+  const feeLines: DocumentLine[] = (sale.fees ?? [])
+    .filter(f => f.name || (Number(f.quantity) || 0) * (Number(f.unitPrice) || 0) !== 0)
+    .map(f => createBlankLine({
+      description: f.name || (isJa ? '諸費用' : 'Other fee'),
+      isReducedRate: f.taxRate === 8,
+      taxExempt: f.taxRate === 0,
+      quantity: Number(f.quantity) || 0,
+      unit: f.unit || (isJa ? '式' : 'lot'),
+      unitPrice: f.unitPrice,
     }))
   const lines: DocumentLine[] = [
     ...sale.items.map(item => createBlankLine({
@@ -104,15 +93,15 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
       unit: 'kg',
       unitPrice: item.unitPrice,
     })),
-    ...optionLines,
     shippingLine,
-    ...(otherFeesLine ? [otherFeesLine] : []),
+    ...feeLines,
   ]
 
   return {
     type,
     language,
-    recipientName: sale.buyerName,
+    // 請求用の名前があれば優先（請求書・見積書には正式名称を表示）。
+    recipientName: buyer?.billingName?.trim() || sale.buyerName,
     recipientHonorific: isJa ? '御中' : '',
     recipientAddress: sale.shippingAddress?.trim() || buyer?.shippingAddress || '',
     recipientPostalCode: sale.shippingPostalCode?.trim() || buyer?.shippingPostalCode || '',
@@ -192,6 +181,70 @@ export default function DocumentPage() {
 
   const totals = useMemo(() => doc ? computeTotals(doc.lines) : null, [doc])
 
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [savingPdf, setSavingPdf] = useState(false)
+  const [pdfSaved, setPdfSaved] = useState(false)
+  const [pdfError, setPdfError] = useState('')
+
+  const handleGeneratePdf = async () => {
+    if (!doc || !totals) return
+    setGenerating(true)
+    setPdfError('')
+    setPdfSaved(false)
+    try {
+      const [{ pdf }, { SaleDocumentPdf }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/sales/SaleDocumentPdf'),
+      ])
+      const blob = await pdf(
+        <SaleDocumentPdf doc={doc} totals={totals} issuer={issuer} isJa={isJa} labels={labels} type={type} includeTerms={includeTerms} terms={terms} />,
+      ).toBlob()
+      setPdfBlob(blob)
+      setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob) })
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : 'PDFの生成に失敗しました')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const closePdfPreview = () => {
+    setPdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+    setPdfBlob(null)
+    setPdfSaved(false)
+    setPdfError('')
+  }
+
+  const documentBaseName = `${type}_${language}_${doc?.issueDate ?? ''}.pdf`
+
+  const handleSavePdf = async () => {
+    if (!pdfBlob || !sale || !doc || !totals) return
+    setSavingPdf(true)
+    setPdfError('')
+    try {
+      const { uploadSaleDocumentPdf } = await import('@/lib/firebase/storage')
+      const url = await uploadSaleDocumentPdf(pdfBlob, sale.id, documentBaseName)
+      const issued = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type,
+        language,
+        issuedAt: new Date().toISOString(),
+        total: doc.taxExempt ? totals.subtotal : totals.total,
+        name: `${labels.title.replace(/　/g, '')}（${isJa ? '日本語' : 'English'}）`,
+        url,
+      }
+      const services = await getServices()
+      await services.sales.recordSaleDocument(sale.id, issued)
+      setPdfSaved(true)
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSavingPdf(false)
+    }
+  }
+
   if (loading) {
     return <div className="min-h-screen bg-[#f4f2ea] p-8 text-center text-sm text-[#68756c]">読み込み中…</div>
   }
@@ -269,14 +322,60 @@ export default function DocumentPage() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#174c33] bg-white px-3 py-2 text-sm font-medium text-[#174c33] transition hover:bg-[#ece8db]"
             >
               <Printer size={14} />
-              {isJa ? '印刷 / PDF' : 'Print / PDF'}
+              {isJa ? '印刷' : 'Print'}
+            </button>
+            <button
+              type="button"
+              onClick={handleGeneratePdf}
+              disabled={generating}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+            >
+              <FileDown size={14} />
+              {generating ? (isJa ? '生成中…' : 'Generating…') : (isJa ? 'PDFを発行' : 'Issue PDF')}
             </button>
           </div>
         </div>
       </div>
+
+      {/* PDF preview modal */}
+      {pdfUrl && (
+        <div className="no-print fixed inset-0 z-50 flex flex-col bg-black/60">
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#d9d1be] bg-white px-4 py-2.5">
+            <span className="text-sm font-medium text-[#173c2a]">{isJa ? 'PDFプレビュー' : 'PDF Preview'}</span>
+            {pdfSaved && <span className="text-xs font-medium text-emerald-700">{isJa ? '✓ 発行履歴に保存しました' : '✓ Saved to history'}</span>}
+            {pdfError && <span className="text-xs text-red-600">{pdfError}</span>}
+            <div className="ml-auto flex items-center gap-2">
+              <a
+                href={pdfUrl}
+                download={documentBaseName}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
+              >
+                {isJa ? 'ダウンロード' : 'Download'}
+              </a>
+              <button
+                type="button"
+                onClick={handleSavePdf}
+                disabled={savingPdf || pdfSaved}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+              >
+                {savingPdf ? (isJa ? '保存中…' : 'Saving…') : pdfSaved ? (isJa ? '保存済み' : 'Saved') : (isJa ? '発行（履歴に保存）' : 'Issue (save)')}
+              </button>
+              <button
+                type="button"
+                onClick={closePdfPreview}
+                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                aria-label={isJa ? '閉じる' : 'Close'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          <iframe src={pdfUrl} title="PDF" className="flex-1 bg-white" />
+        </div>
+      )}
 
       {/* Document */}
       <main className="mx-auto max-w-4xl px-4 py-6 print:p-0 print:max-w-none">

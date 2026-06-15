@@ -93,12 +93,25 @@ export interface SaleLineInput {
   taxRate?: TaxRate
 }
 
-// 包装代やその他のオプション費用（自由入力）。売上（請求額）に加算され、
-// 個別の税率で課税される。見積書・請求書にも明細として反映される。
-export interface SaleOption {
+// 諸費用（包装代・通関手数料など）。商品明細と同様に項目ごとに数量・単位・単価・
+// 税区分を持ち、売上（請求額）に加算される。見積書・請求書にも明細として反映される。
+export interface SaleFeeItem {
   name: string
-  amount: number     // 税抜金額
+  quantity: number
+  unit: string
+  unitPrice: number   // 税抜単価
   taxRate: TaxRate
+}
+
+// 発行履歴: 出力したPDF帳票の記録。
+export interface IssuedDocument {
+  id: string
+  type: 'invoice' | 'delivery' | 'quotation'
+  language: 'ja' | 'en'
+  issuedAt: string   // ISO
+  total: number      // 税込合計
+  name: string       // ファイル名
+  url: string        // Storage のダウンロードURL
 }
 
 export interface SaleRecord {
@@ -118,9 +131,7 @@ export interface SaleRecord {
   costAmount: number
   grossProfit: number
   shippingFee: number
-  otherFees: number
-  otherFeesNote?: string
-  options?: SaleOption[]
+  fees?: SaleFeeItem[]
   paymentFee: number
   invoiceAmount: number
   country: string
@@ -136,13 +147,15 @@ export interface SaleRecord {
   shippingDate?: string
   trackingNumber?: string
   shippingNote?: string   // 発送担当者へのメモ
+  issuedDocuments?: IssuedDocument[]   // 発行したPDF帳票の履歴
   createdAt: Date
   updatedAt: Date
 }
 
 export interface Buyer {
   id: string
-  name: string
+  name: string               // 管理用の名前（アプリ内・一覧で使用、受注時の販売先名）
+  billingName?: string       // 請求用の名前（請求書・見積書などに表示。未設定なら name を使用）
   normalizedName: string
   country?: string
   terms?: string
@@ -160,6 +173,7 @@ export interface Buyer {
 }
 
 export interface BuyerDetailsInput {
+  billingName?: string
   email?: string
   website?: string
   phone?: string
@@ -253,9 +267,7 @@ export interface SaleRecordInput {
   buyerName: string
   items: SaleLineInput[]
   shippingFee?: number
-  otherFees?: number
-  otherFeesNote?: string
-  options?: SaleOption[]
+  fees?: SaleFeeItem[]
   paymentFee?: number
   country: string
   dueDate?: string

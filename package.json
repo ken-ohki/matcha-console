@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.5.1",
     "firebase": "^12.11.0",
     "firebase-admin": "^13.9.0",
     "lucide-react": "^0.469.0",

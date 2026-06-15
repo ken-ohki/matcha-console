@@ -71,6 +71,18 @@ export async function uploadPurchaseOrderInvoice(file: File, orderKey: string): 
   return getDownloadURL(storageRef)
 }
 
+export async function uploadSaleDocumentPdf(blob: Blob, saleKey: string, fileName: string): Promise<string> {
+  const storage = getFirebaseStorageInstance()
+  const safeKey = saleKey || 'unsorted'
+  const path = `sale-documents/${safeKey}/${Date.now()}-${fileName}`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, blob, {
+    contentType: 'application/pdf',
+    cacheControl: 'public, max-age=31536000, immutable',
+  })
+  return getDownloadURL(storageRef)
+}
+
 export async function deleteStorageObjectByUrl(url: string): Promise<void> {
   if (!url) return
   try {
