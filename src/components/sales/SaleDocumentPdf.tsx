@@ -16,8 +16,13 @@ function ensureFonts() {
       { src: '/fonts/NotoSansJP-Bold.ttf', fontWeight: 'bold' },
     ],
   })
-  // Keep Japanese words from being split arbitrarily across lines.
-  Font.registerHyphenationCallback(word => [word])
+  // Japanese has no spaces, so without a callback long CJK strings never wrap and
+  // overflow their box. Split into break units: keep Latin/number/punctuation runs
+  // together, and make every other (CJK) character its own breakable unit.
+  Font.registerHyphenationCallback(word => {
+    const segments = word.match(/[A-Za-z0-9.,@:%/+\-_()'"#&¥$]+|\s+|[^A-Za-z0-9\s]/g)
+    return segments && segments.length > 0 ? segments : [word]
+  })
   fontsRegistered = true
 }
 
@@ -54,9 +59,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderTopWidth: 1.5, borderBottomWidth: 1.5, borderColor: INK, paddingVertical: 8, marginBottom: 14,
   },
-  amountLabel: { fontSize: 10, fontWeight: 'bold' },
-  amountValue: { fontSize: 20, fontWeight: 'bold' },
-  amountNote: { fontSize: 8, color: MUTED },
+  amountLabel: { fontSize: 10, fontWeight: 'bold', flexShrink: 0, marginRight: 8 },
+  amountValue: { fontSize: 18, fontWeight: 'bold', textAlign: 'right' },
+  amountNote: { fontSize: 8, color: MUTED, flexShrink: 0 },
   table: { borderWidth: 0.5, borderColor: LINE, borderRadius: 2 },
   th: { flexDirection: 'row', backgroundColor: '#f3f1e8', borderBottomWidth: 0.5, borderBottomColor: LINE },
   tr: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#eee' },
@@ -161,7 +166,7 @@ export function SaleDocumentPdf({ doc, totals, issuer, isJa, labels, type, inclu
 
         <View style={styles.amountBand}>
           <Text style={styles.amountLabel}>{labels.amountLabel}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexShrink: 1, justifyContent: 'flex-end' }}>
             <Text style={styles.amountValue}>¥ {formatYen(headTotal)}</Text>
             <Text style={styles.amountNote}>{amountNote}</Text>
           </View>
