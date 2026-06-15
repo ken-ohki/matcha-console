@@ -85,6 +85,16 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
         unitPrice: sale.otherFees || 0,
       })
     : null
+  const optionLines: DocumentLine[] = (sale.options ?? [])
+    .filter(o => o.name || (Number(o.amount) || 0) !== 0)
+    .map(o => createBlankLine({
+      description: o.name || (isJa ? 'オプション' : 'Option'),
+      isReducedRate: o.taxRate === 8,
+      taxExempt: o.taxRate === 0,
+      quantity: 1,
+      unit: isJa ? '式' : 'lot',
+      unitPrice: o.amount,
+    }))
   const lines: DocumentLine[] = [
     ...sale.items.map(item => createBlankLine({
       description: item.productName + (item.productSku ? ` (${item.productSku})` : ''),
@@ -94,6 +104,7 @@ function buildInitialDocument(type: DocumentType, language: DocumentLanguage, sa
       unit: 'kg',
       unitPrice: item.unitPrice,
     })),
+    ...optionLines,
     shippingLine,
     ...(otherFeesLine ? [otherFeesLine] : []),
   ]

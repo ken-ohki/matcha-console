@@ -43,6 +43,7 @@ import type {
   PurchaseOrderPaymentStatus,
   PurchaseOrderPayment,
   SaleLineItem,
+  SaleOption,
   SaleRecord,
   SaleRecordInput,
   SelfConsumptionRecord,
@@ -307,6 +308,25 @@ function coerceTaxRate(value: unknown): TaxRate {
   return n === 0 ? 0 : n === 10 ? 10 : 8
 }
 
+/** Normalize free-form sale options; drop empty rows (no name and no amount). */
+function normalizeSaleOptions(raw: unknown): SaleOption[] {
+  if (!Array.isArray(raw)) return []
+  const result: SaleOption[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const obj = item as Record<string, unknown>
+    const name = String(obj.name ?? '').trim()
+    const amount = Number(obj.amount) || 0
+    if (!name && amount === 0) continue
+    result.push({ name, amount, taxRate: coerceTaxRate(obj.taxRate) })
+  }
+  return result
+}
+
+function sumOptions(options: SaleOption[]): number {
+  return options.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+}
+
 function normalizeSaleItem(raw: unknown): SaleLineItem | null {
   if (!raw || typeof raw !== 'object') return null
   const obj = raw as Record<string, unknown>
@@ -396,7 +416,8 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
   const otherFees = Number(data.otherFees ?? 0)
   const paymentFee = Number(data.paymentFee ?? 0)
   const otherFeesNote = data.otherFeesNote ? String(data.otherFeesNote) : undefined
-  const invoiceAmount = agg.revenue + shippingFee + otherFees
+  const options = normalizeSaleOptions(data.options)
+  const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
   const grossProfit = agg.revenue - agg.costAmount - paymentFee
   return {
     id,
@@ -421,6 +442,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     shippingFee,
     otherFees,
     otherFeesNote,
+    options,
     paymentFee,
     invoiceAmount,
     country: String(data.country ?? ''),
@@ -789,7 +811,7 @@ async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
     })
     const agg = aggregateItems(newItems)
     const grossProfit = agg.revenue - agg.costAmount - (sale.paymentFee || 0)
-    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + (sale.otherFees || 0)
+    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + (sale.otherFees || 0) + sumOptions(sale.options ?? [])
     batch.update(doc(db, COLLECTIONS.sales, sale.id), {
       items: newItems,
       productId: agg.productId,
@@ -1424,11 +1446,13 @@ export function createFirebaseServices(): IServices {
       const otherFees = Number(input.otherFees) || 0
       const paymentFee = Number(input.paymentFee) || 0
       const otherFeesNote = input.otherFeesNote?.trim() || undefined
-      const invoiceAmount = agg.revenue + shippingFee + otherFees
+      const options = normalizeSaleOptions(input.options)
+      const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
       const grossProfit = agg.revenue - agg.costAmount - paymentFee
 
-      const { items: _ignoreItems, ...rest } = input
+      const { items: _ignoreItems, options: _ignoreOptions, ...rest } = input
       void _ignoreItems
+      void _ignoreOptions
       const payload = sanitizeRecord({
         ...rest,
         buyerName: input.buyerName.trim(),
@@ -1437,6 +1461,7 @@ export function createFirebaseServices(): IServices {
         terms: input.terms?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
         items,
+        options,
         productId: agg.productId,
         productSku: agg.productSku,
         productName: agg.productName,
@@ -1476,6 +1501,7 @@ export function createFirebaseServices(): IServices {
         shippingFee,
         otherFees,
         otherFeesNote,
+        options,
         paymentFee,
         invoiceAmount,
         country: input.country.trim(),
@@ -1517,6 +1543,7 @@ export function createFirebaseServices(): IServices {
         shippingFee: input.shippingFee ?? current.shippingFee,
         otherFees: input.otherFees ?? current.otherFees,
         otherFeesNote: input.otherFeesNote ?? current.otherFeesNote,
+        options: input.options ?? current.options,
         paymentFee: input.paymentFee ?? current.paymentFee,
         country: input.country ?? current.country,
         dueDate: input.dueDate ?? current.dueDate,
@@ -1560,11 +1587,13 @@ export function createFirebaseServices(): IServices {
       const otherFees = Number(merged.otherFees) || 0
       const paymentFee = Number(merged.paymentFee) || 0
       const otherFeesNote = merged.otherFeesNote?.trim() || undefined
-      const invoiceAmount = agg.revenue + shippingFee + otherFees
+      const options = normalizeSaleOptions(merged.options)
+      const invoiceAmount = agg.revenue + shippingFee + otherFees + sumOptions(options)
       const grossProfit = agg.revenue - agg.costAmount - paymentFee
 
-      const { items: _ignoreItems, ...rest } = merged
+      const { items: _ignoreItems, options: _ignoreOptions, ...rest } = merged
       void _ignoreItems
+      void _ignoreOptions
       await updateDoc(doc(db, COLLECTIONS.sales, id), sanitizeRecord({
         ...rest,
         buyerName: merged.buyerName.trim(),
@@ -1573,6 +1602,7 @@ export function createFirebaseServices(): IServices {
         terms: merged.terms?.trim() || undefined,
         notes: merged.notes?.trim() || undefined,
         items,
+        options,
         productId: agg.productId,
         productSku: agg.productSku,
         productName: agg.productName,
@@ -1610,6 +1640,7 @@ export function createFirebaseServices(): IServices {
         shippingFee,
         otherFees,
         otherFeesNote,
+        options,
         paymentFee,
         invoiceAmount,
         country: merged.country.trim(),

@@ -4,7 +4,7 @@ import type {
   PurchaseOrderPaymentStatus,
   SaleRecord,
 } from '@/types'
-import { computeSaleTaxBuckets, computeTax } from '@/lib/tax'
+import { computeSaleTaxBuckets, computeTax, saleOptionsToTaxLines } from '@/lib/tax'
 
 export type CashFlowMode = 'actual' | 'plan'
 
@@ -20,9 +20,12 @@ function monthKey(iso: string): string {
  * matches the printed invoice. Export sales should mark their lines 免税.
  */
 export function computeSaleTaxIncluded(sale: SaleRecord): number {
+  // invoiceAmount already includes options (税抜); add tax computed over items +
+  // options (each with its own rate) + fees (10%).
   const base = sale.invoiceAmount > 0 ? sale.invoiceAmount : sale.revenue
   const fees = (sale.shippingFee ?? 0) + (sale.otherFees ?? 0)
-  return base + computeSaleTaxBuckets(sale.items ?? [], fees).tax
+  const lines = [...(sale.items ?? []), ...saleOptionsToTaxLines(sale.options)]
+  return base + computeSaleTaxBuckets(lines, fees).tax
 }
 
 export function computePoTaxIncluded(po: PurchaseOrder): number {

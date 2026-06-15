@@ -71,6 +71,21 @@ export function computeTax(lines: TaxLine[], fees = 0): number {
 }
 
 /**
+ * Convert free-form sale options (packaging fees, etc.) into tax lines so they
+ * can be folded into the bucket calculation with their own per-option rate.
+ * Missing rate defaults to 10% (standard).
+ */
+export function saleOptionsToTaxLines(
+  options?: { amount: number; taxRate?: TaxRate | number }[],
+): TaxLine[] {
+  return (options ?? []).map(o => ({
+    quantityKg: 1,
+    unitPrice: Number(o.amount) || 0,
+    taxRate: o.taxRate == null ? 10 : Number(o.taxRate),
+  }))
+}
+
+/**
  * Buckets for a SALE: when every line is 免税 (an export), the fees are
  * exempt too — the whole transaction carries no consumption tax.
  */

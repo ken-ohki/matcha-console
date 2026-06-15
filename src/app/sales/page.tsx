@@ -7,12 +7,12 @@ import { PageTabs, SALES_TABS } from '@/components/layout/PageTabs'
 import { KPICard } from '@/components/ui/KPICard'
 import { SalesStatusBadge } from '@/components/ui/StatusBadge'
 import { getServices } from '@/lib/services'
-import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineInput, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus } from '@/types'
+import type { Buyer, MasterEntry, PaymentStatus, ProductWithInventory, SaleLineInput, SaleOption, SaleRecord, SaleRecordInput, SaleStatus, ShippingStatus, TaxRate } from '@/types'
 import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
-import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry } from '@/lib/tax'
+import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry, saleOptionsToTaxLines } from '@/lib/tax'
 import { formatCurrency, formatKg } from '@/lib/format'
 import {
   CircleDollarSign,
@@ -167,6 +167,7 @@ function SaleModal({
     shippingFee: 0,
     otherFees: 0,
     otherFeesNote: '',
+    options: [],
     paymentFee: 0,
     paymentMethod: '',
     country: '',
@@ -205,6 +206,7 @@ function SaleModal({
       shippingFee: initial?.shippingFee ?? 0,
       otherFees: initial?.otherFees ?? 0,
       otherFeesNote: initial?.otherFeesNote ?? '',
+      options: initial?.options ? initial.options.map(o => ({ ...o })) : [],
       paymentFee: initial?.paymentFee ?? 0,
       paymentMethod: initial?.paymentMethod ?? '',
       country: initial?.country ?? matchedBuyer?.country ?? '',
@@ -231,13 +233,19 @@ function SaleModal({
   const shippingFeeNum = Number(form.shippingFee) || 0
   const otherFeesNum = Number(form.otherFees) || 0
   const paymentFeeNum = Number(form.paymentFee) || 0
-  // Shared tax logic (fees taxed at 10%; fully-免税 sale = no tax at all)
-  // so the preview matches the invoice document and every list to the yen.
-  const taxBuckets = computeSaleTaxBuckets(form.items, shippingFeeNum + otherFeesNum)
+  const optionsList = form.options ?? []
+  const optionsTotal = optionsList.reduce((s, o) => s + (Number(o.amount) || 0), 0)
+  // Shared tax logic (fees taxed at 10%; options carry their own rate; a
+  // fully-免税 sale = no tax at all) so the preview matches the invoice
+  // document and every list to the yen.
+  const taxBuckets = computeSaleTaxBuckets(
+    [...form.items, ...saleOptionsToTaxLines(optionsList)],
+    shippingFeeNum + otherFeesNum,
+  )
   const tax10 = taxBuckets.standardTax
   const tax8 = taxBuckets.reducedTax
   const taxTotal = taxBuckets.tax
-  const invoiceAmount = revenue + shippingFeeNum + otherFeesNum
+  const invoiceAmount = revenue + shippingFeeNum + otherFeesNum + optionsTotal
   const grossProfit = revenue - costAmount - paymentFeeNum
   // Stock remaining: sum across distinct products
   const distinctProductIds = Array.from(new Set(form.items.map(i => i.productId).filter(Boolean)))
@@ -303,6 +311,26 @@ function SaleModal({
     setForm(prev => ({
       ...prev,
       items: prev.items.length <= 1 ? prev.items : prev.items.filter((_, i) => i !== index),
+    }))
+  }
+
+  const addOption = () => {
+    setForm(prev => ({
+      ...prev,
+      // Options default to 10% (standard rate); packaging etc. is rarely 軽減税率.
+      options: [...(prev.options ?? []), { name: '', amount: 0, taxRate: 10 }],
+    }))
+  }
+  const updateOption = (index: number, patch: Partial<SaleOption>) => {
+    setForm(prev => ({
+      ...prev,
+      options: (prev.options ?? []).map((o, i) => i === index ? { ...o, ...patch } : o),
+    }))
+  }
+  const removeOption = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      options: (prev.options ?? []).filter((_, i) => i !== index),
     }))
   }
 
@@ -630,6 +658,61 @@ function SaleModal({
                   placeholder="例: 通関手数料、梱包資材費 など"
                 />
               </div>
+              <div className="md:col-span-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-gray-700">オプション（包装代など・請求額に加算）</label>
+                  <button
+                    type="button"
+                    onClick={addOption}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] px-2 py-1 text-xs font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> オプション追加
+                  </button>
+                </div>
+                {optionsList.length === 0 ? (
+                  <p className="text-[11px] text-[#9aa39a]">包装代やその他の費用を自由入力で追加できます。</p>
+                ) : (
+                  <div className="space-y-2">
+                    {optionsList.map((opt, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={opt.name}
+                          onChange={event => updateOption(index, { name: event.target.value })}
+                          className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          placeholder="項目名（例: 包装代）"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={opt.amount}
+                          onChange={event => updateOption(index, { amount: Number(event.target.value) || 0 })}
+                          className="w-28 rounded-xl border border-gray-300 px-3 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          placeholder="金額"
+                        />
+                        <select
+                          value={opt.taxRate}
+                          onChange={event => updateOption(index, { taxRate: Number(event.target.value) as TaxRate })}
+                          className="w-24 rounded-xl border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        >
+                          <option value={10}>10%</option>
+                          <option value={8}>8%</option>
+                          <option value={0}>免税</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => removeOption(index)}
+                          className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label="削除"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">支払手数料（粗利から差引）</label>
                 <input
@@ -660,7 +743,7 @@ function SaleModal({
                 <p className="mt-1 rounded-xl border border-dashed border-[#d9d1be] bg-[#f7f5ee] px-3 py-2 text-sm font-semibold text-[#173c2a]">
                   {formatCurrency(invoiceAmount)}
                 </p>
-                <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料 + 諸費用</p>
+                <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料 + 諸費用{optionsTotal > 0 ? ' + オプション' : ''}</p>
                 <p className="mt-1 text-[10px] text-[#68756c]">
                   消費税: 10%対象 {formatCurrency(tax10)} / 8%対象 {formatCurrency(tax8)} / 合計 {formatCurrency(taxTotal)}
                 </p>
@@ -1316,7 +1399,7 @@ export default function SalesPage() {
                     <div className="mt-1 font-semibold text-[#173c2a]">請求額(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
                     <div className="mt-1">
                       （税抜 {formatCurrency(record.invoiceAmount || record.revenue)}
-                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}</>}）
+                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0 || (record.options ?? []).length > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}{(record.options ?? []).length > 0 && <> ＋オプション {formatCurrency((record.options ?? []).reduce((s, o) => s + (o.amount || 0), 0))}</>}</>}）
                     </div>
                     <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
                     <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
@@ -1408,11 +1491,12 @@ export default function SalesPage() {
                     <td className="whitespace-nowrap px-3 py-4">
                       <div className="font-semibold text-[#173c2a]">{formatCurrency(computeSaleTaxIncluded(record))}</div>
                       <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
-                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0) && (
+                      {((record.shippingFee || 0) > 0 || (record.otherFees || 0) > 0 || (record.options ?? []).length > 0) && (
                         <div className="text-[10px] text-[#68756c]">
                           商品 {formatCurrency(record.revenue)}
                           {(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}
                           {(record.otherFees || 0) > 0 && <> ＋諸費用 {formatCurrency(record.otherFees)}</>}
+                          {(record.options ?? []).length > 0 && <> ＋オプション {formatCurrency((record.options ?? []).reduce((s, o) => s + (o.amount || 0), 0))}</>}
                         </div>
                       )}
                     </td>
@@ -1695,6 +1779,12 @@ function SaleDetailModal({
                 label="諸費用"
                 value={`${formatCurrency(record.otherFees || 0)}${record.otherFeesNote ? ` (${record.otherFeesNote})` : ''}`}
               />
+              {(record.options ?? []).length > 0 && (
+                <DetailField
+                  label="オプション"
+                  value={(record.options ?? []).map(o => `${o.name || 'オプション'} ${formatCurrency(o.amount)}（${o.taxRate === 0 ? '免税' : `${o.taxRate}%`}）`).join(' / ')}
+                />
+              )}
               <DetailField label="請求額（税抜）" value={formatCurrency(record.invoiceAmount || record.revenue)} valueClass="font-semibold" />
               <DetailField label="請求額（税込）" value={formatCurrency(computeSaleTaxIncluded(record))} valueClass="font-semibold" />
               <DetailField label="支払手数料" value={formatCurrency(record.paymentFee || 0)} />

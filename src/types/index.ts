@@ -93,6 +93,14 @@ export interface SaleLineInput {
   taxRate?: TaxRate
 }
 
+// 包装代やその他のオプション費用（自由入力）。売上（請求額）に加算され、
+// 個別の税率で課税される。見積書・請求書にも明細として反映される。
+export interface SaleOption {
+  name: string
+  amount: number     // 税抜金額
+  taxRate: TaxRate
+}
+
 export interface SaleRecord {
   id: string
   status: SaleStatus
@@ -112,6 +120,7 @@ export interface SaleRecord {
   shippingFee: number
   otherFees: number
   otherFeesNote?: string
+  options?: SaleOption[]
   paymentFee: number
   invoiceAmount: number
   country: string
@@ -246,6 +255,7 @@ export interface SaleRecordInput {
   shippingFee?: number
   otherFees?: number
   otherFeesNote?: string
+  options?: SaleOption[]
   paymentFee?: number
   country: string
   dueDate?: string
