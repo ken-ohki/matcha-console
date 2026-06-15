@@ -662,7 +662,7 @@ function SaleModal({
             </div>
           </div>
 
-          <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-5">
+          <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-6">
             <div>
               <p className="text-xs text-[#68756c]">商品代金</p>
               <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(revenue)}</p>
@@ -677,7 +677,13 @@ function SaleModal({
             </div>
             <div>
               <p className="text-xs text-[#68756c]">粗利</p>
-              <p className="mt-1 text-lg font-semibold text-emerald-700">{formatCurrency(grossProfit)}</p>
+              <p className={`mt-1 text-lg font-semibold ${grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(grossProfit)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[#68756c]">粗利率</p>
+              <p className={`mt-1 text-lg font-semibold ${grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                {revenue > 0 ? `${((grossProfit / revenue) * 100).toFixed(1)}%` : '-'}
+              </p>
             </div>
             <div>
               <p className="text-xs text-[#68756c]">登録後の残在庫（最少）</p>
