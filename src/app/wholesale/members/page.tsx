@@ -17,7 +17,21 @@ interface Member {
   website?: string
   businessType?: string
   socialMedia?: string
+  businessStage?: string
+  annualVolumeEstimate?: string
   buyerId?: string
+}
+
+const BUSINESS_STAGE_LABEL: Record<string, string> = {
+  pre_opening: '開業前',
+  operating: '開業済',
+}
+const VOLUME_LABEL: Record<string, string> = {
+  undecided: '年間見込: 未定',
+  under_10kg: '年間見込: 10kg未満',
+  '10_50kg': '年間見込: 10〜50kg',
+  '50_100kg': '年間見込: 50〜100kg',
+  over_100kg: '年間見込: 100kg以上',
 }
 
 async function token(): Promise<string> {
@@ -157,6 +171,14 @@ function MemberCard({ m, busy, children }: { m: Member; busy: boolean; children:
           <p className="mt-1 text-xs text-[#a59f8c]">
             {[m.country, m.businessType, m.website, m.socialMedia].filter(Boolean).join(' · ')}
           </p>
+          {(m.businessStage || m.annualVolumeEstimate) && (
+            <p className="mt-1 text-xs text-[#a59f8c]">
+              {[
+                m.businessStage ? BUSINESS_STAGE_LABEL[m.businessStage] ?? m.businessStage : null,
+                m.annualVolumeEstimate ? VOLUME_LABEL[m.annualVolumeEstimate] ?? m.annualVolumeEstimate : null,
+              ].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
         <div className={`flex shrink-0 items-center gap-2 ${busy ? 'opacity-50 pointer-events-none' : ''}`}>{children}</div>
       </div>
