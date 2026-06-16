@@ -104,6 +104,7 @@ export default function SettingsTermsPage() {
           <Link href="/settings/terms" className="rounded-full bg-[#174c33] px-3 py-1.5 text-white">請求書 T&amp;C</Link>
           <Link href="/settings/bank-accounts" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">入金口座</Link>
           <Link href="/settings/issuer" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">自社情報</Link>
+          <Link href="/settings/wholesale" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">卸売設定</Link>
         </div>
 
         {feedback && (

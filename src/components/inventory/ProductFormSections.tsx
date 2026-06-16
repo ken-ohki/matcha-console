@@ -88,9 +88,9 @@ export function buildProductForm(
     flavorNotes: initial?.flavorNotes ?? '',
     imageUrl: initial?.imageUrl ?? '',
     showInCatalog: initial?.showInCatalog ?? true,
+    featured: initial?.featured ?? false,
     inquireToOrder: initial?.inquireToOrder ?? false,
     wholesaleAvailableKg: initial?.wholesaleAvailableKg,
-    wholesaleThresholdKg: initial?.wholesaleThresholdKg,
     sampleAvailable: initial?.sampleAvailable ?? false,
     samplePrice: initial?.samplePrice,
   }
@@ -163,9 +163,9 @@ export function finalizeProductInput(
     flavorNotes: form.flavorNotes?.trim() || undefined,
     imageUrl: form.imageUrl?.trim() || undefined,
     showInCatalog: form.showInCatalog,
+    featured: form.featured,
     inquireToOrder: form.inquireToOrder,
     wholesaleAvailableKg: form.wholesaleAvailableKg,
-    wholesaleThresholdKg: form.wholesaleThresholdKg,
     sampleAvailable: form.sampleAvailable,
     samplePrice: form.samplePrice,
   }
@@ -679,7 +679,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">卸売セルフ販売可能数量 (kg)</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">EC即時購入可能数量</label>
           <input
             type="number"
             min="0"
@@ -689,20 +689,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             className={fieldCls}
             placeholder="未設定なら在庫全量"
           />
-          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトでセルフ決済に開放する数量。空欄は在庫全量。</p>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">セルフ決済しきい値 (kg)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={form.wholesaleThresholdKg ?? ''}
-            onChange={event => setForm(prev => ({ ...prev, wholesaleThresholdKg: event.target.value ? Number(event.target.value) : undefined }))}
-            className={fieldCls}
-            placeholder="未設定なら全体設定の既定値"
-          />
-          <p className="mt-1 text-[11px] text-[#68756c]">この数量以上の注文は問い合わせに誘導。空欄は設定の既定値（初期10kg）。</p>
+          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトでセルフ決済に開放する数量 (kg)。空欄は在庫全量。セルフ決済しきい値は全商品共通で「設定 → 卸売設定」で指定します。</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">サンプル価格（1個 / 10g）</label>
@@ -794,6 +781,26 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
             (form.sampleAvailable ?? false) ? 'translate-x-5' : 'translate-x-0.5'
+          }`} />
+        </button>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">おすすめ商品（未ログイン公開）</p>
+          <p className="text-xs text-gray-500">卸売サイトでログインしていない訪問者にも表示されます。注文には会員ログインが必要です</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={form.featured ?? false}
+          onClick={() => setForm(prev => ({ ...prev, featured: !(prev.featured ?? false) }))}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+            (form.featured ?? false) ? 'bg-[#174c33]' : 'bg-gray-300'
+          }`}
+        >
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+            (form.featured ?? false) ? 'translate-x-5' : 'translate-x-0.5'
           }`} />
         </button>
       </div>
