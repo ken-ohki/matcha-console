@@ -58,6 +58,9 @@ export interface Product {
   isActive: boolean
   showInCatalog: boolean
   inquireToOrder: boolean
+  // 卸売サイト(wholesale.sabo-matcha.jp)向け設定
+  wholesaleAvailableKg?: number   // セルフ注文に開放する数量(kg)。未設定なら在庫全量。
+  wholesaleThresholdKg?: number   // この数量以上はセルフ決済不可→問い合わせ。未設定ならグローバル既定。
   createdAt: Date
   updatedAt: Date
 }
@@ -265,6 +268,8 @@ export interface ProductInput {
   imageUrl?: string
   showInCatalog?: boolean
   inquireToOrder?: boolean
+  wholesaleAvailableKg?: number
+  wholesaleThresholdKg?: number
 }
 
 export interface InventoryGroupInput {
@@ -308,6 +313,8 @@ export interface Settings {
   appName: string
   currency: string
   stockAlertRatio: number
+  // 卸売サイトのセルフ決済しきい値の既定値(kg)。商品個別の wholesaleThresholdKg が優先。
+  wholesaleThresholdKgDefault?: number
 }
 
 export type MasterType =

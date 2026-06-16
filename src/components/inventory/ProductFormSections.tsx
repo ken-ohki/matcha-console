@@ -89,6 +89,8 @@ export function buildProductForm(
     imageUrl: initial?.imageUrl ?? '',
     showInCatalog: initial?.showInCatalog ?? true,
     inquireToOrder: initial?.inquireToOrder ?? false,
+    wholesaleAvailableKg: initial?.wholesaleAvailableKg,
+    wholesaleThresholdKg: initial?.wholesaleThresholdKg,
   }
 }
 
@@ -160,6 +162,8 @@ export function finalizeProductInput(
     imageUrl: form.imageUrl?.trim() || undefined,
     showInCatalog: form.showInCatalog,
     inquireToOrder: form.inquireToOrder,
+    wholesaleAvailableKg: form.wholesaleAvailableKg,
+    wholesaleThresholdKg: form.wholesaleThresholdKg,
   }
 }
 
@@ -669,6 +673,32 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             onChange={event => setForm(prev => ({ ...prev, standardWholesalePrice: event.target.value ? Number(event.target.value) : undefined }))}
             className={fieldCls}
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">卸売セルフ販売可能数量 (kg)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.wholesaleAvailableKg ?? ''}
+            onChange={event => setForm(prev => ({ ...prev, wholesaleAvailableKg: event.target.value ? Number(event.target.value) : undefined }))}
+            className={fieldCls}
+            placeholder="未設定なら在庫全量"
+          />
+          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトでセルフ決済に開放する数量。空欄は在庫全量。</p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">セルフ決済しきい値 (kg)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.wholesaleThresholdKg ?? ''}
+            onChange={event => setForm(prev => ({ ...prev, wholesaleThresholdKg: event.target.value ? Number(event.target.value) : undefined }))}
+            className={fieldCls}
+            placeholder="未設定なら全体設定の既定値"
+          />
+          <p className="mt-1 text-[11px] text-[#68756c]">この数量以上の注文は問い合わせに誘導。空欄は設定の既定値（初期10kg）。</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">備考（管理用）</label>
