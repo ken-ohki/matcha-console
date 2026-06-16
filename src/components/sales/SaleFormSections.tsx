@@ -19,7 +19,7 @@ import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { optionsForType, type MasterOption } from '@/lib/masters'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeSaleTaxBuckets, computeTaxBuckets, defaultTaxRateForCountry, saleFeesToTaxLines, sumSaleFees } from '@/lib/tax'
-import { formatCurrency, formatKg } from '@/lib/format'
+import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 
 // ---- labels / badges --------------------------------------------------------
 
@@ -85,6 +85,7 @@ export function buildSaleForm(
     paymentMethod: initial?.paymentMethod ?? '',
     paymentDate: initial?.paymentDate ?? '',
     country: initial?.country ?? matchedBuyer?.country ?? '',
+    orderDate: initial?.orderDate ?? (initial ? '' : todayIso()),
     dueDate: initial?.dueDate ?? '',
     terms: initial?.terms ?? matchedBuyer?.terms ?? '',
     notes: initial?.notes ?? matchedBuyer?.notes ?? '',
@@ -459,7 +460,16 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
   const termsOptions = useMemo(() => optionsForType(masters, 'terms'), [masters])
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">発注日</label>
+          <input
+            type="date"
+            value={form.orderDate ?? ''}
+            onChange={event => setForm(prev => ({ ...prev, orderDate: event.target.value }))}
+            className={fieldCls}
+          />
+        </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">国</label>
           <select

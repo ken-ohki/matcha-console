@@ -18,6 +18,7 @@ export interface ArrivalRecord {
   id: string
   arrivalDate: string
   quantityKg: number
+  unitPrice?: number   // このロットの仕入単価（税抜・JPY/kg）。発注明細から取り込む
 }
 
 export interface InventoryCheckRecord {
@@ -143,7 +144,8 @@ export interface SaleRecord {
   paymentFee: number
   invoiceAmount: number
   country: string
-  dueDate?: string
+  orderDate?: string            // 発注日（顧客が発注した日）
+  dueDate?: string              // 納期（納品日の基準にも使用）
   terms?: string
   notes?: string
   paymentMethod?: string
@@ -279,6 +281,7 @@ export interface SaleRecordInput {
   fees?: SaleFeeItem[]
   paymentFee?: number
   country: string
+  orderDate?: string
   dueDate?: string
   terms?: string
   notes?: string

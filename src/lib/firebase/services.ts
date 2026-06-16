@@ -135,6 +135,7 @@ function normalizeArrivalRecords(records: ArrivalRecord[]): ArrivalRecord[] {
       id: String(record.id ?? '').trim(),
       arrivalDate: toIsoDate(String(record.arrivalDate ?? '')),
       quantityKg: Number(record.quantityKg ?? 0),
+      ...(record.unitPrice != null ? { unitPrice: Number(record.unitPrice) || 0 } : {}),
     }))
     .filter(record => record.arrivalDate || record.quantityKg > 0)
 }
@@ -512,6 +513,7 @@ function mapSale(id: string, data: DocumentData): SaleRecord {
     paymentFee,
     invoiceAmount,
     country: String(data.country ?? ''),
+    orderDate: data.orderDate ? String(data.orderDate) : undefined,
     dueDate: data.dueDate ? String(data.dueDate) : undefined,
     terms: data.terms ? String(data.terms) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
@@ -864,18 +866,15 @@ async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
   if (related.length === 0) return
 
   const batch = writeBatch(db)
-  const newCostPerKg = product.purchaseUnitPrice ?? 0
+  // 原価は「販売時点のスナップショット」を維持する。商品名・SKU の表示だけ同期し、
+  // costPerKg / costAmount / grossProfit は過去の値を保持する（遡及上書きしない）。
   related.forEach(sale => {
     const newItems: SaleLineItem[] = sale.items.map(item => {
       if (item.productId !== product.id) return item
-      const costAmount = item.quantityKg * newCostPerKg
       return {
         ...item,
         productSku: product.sku,
         productName: product.name,
-        costPerKg: newCostPerKg,
-        costAmount,
-        grossProfit: item.revenue - costAmount,
       }
     })
     const agg = aggregateItems(newItems)
@@ -1175,6 +1174,8 @@ async function addArrivalRecordToProduct(productId: string, record: ArrivalRecor
     arrivalRecords: next,
     arrivalDate: deriveArrivalDate(next),
     initialStockKg: deriveInitialStockKg(next),
+    // 入荷ロットに単価があれば、最新ロット単価を商品の現行仕入単価に反映（COGSは販売時にスナップショット）。
+    ...(record.unitPrice != null && record.unitPrice > 0 ? { purchaseUnitPrice: record.unitPrice } : {}),
     updatedAt: serverTimestamp(),
   })
 }
@@ -1580,6 +1581,7 @@ export function createFirebaseServices(): IServices {
         ...rest,
         buyerName: input.buyerName.trim(),
         country: input.country.trim(),
+        orderDate: input.orderDate?.trim() || undefined,
         dueDate: input.dueDate?.trim() || undefined,
         terms: input.terms?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
@@ -1624,6 +1626,7 @@ export function createFirebaseServices(): IServices {
         paymentFee,
         invoiceAmount,
         country: input.country.trim(),
+        orderDate: input.orderDate,
         dueDate: input.dueDate,
         terms: input.terms,
         notes: input.notes,
@@ -1663,6 +1666,7 @@ export function createFirebaseServices(): IServices {
         fees: input.fees ?? current.fees,
         paymentFee: input.paymentFee ?? current.paymentFee,
         country: input.country ?? current.country,
+        orderDate: input.orderDate ?? current.orderDate,
         dueDate: input.dueDate ?? current.dueDate,
         terms: input.terms ?? current.terms,
         notes: input.notes ?? current.notes,
@@ -1678,11 +1682,16 @@ export function createFirebaseServices(): IServices {
       }
 
       const { productMap } = await assertSufficientStock(merged, { excludeSaleId: id })
+      // 原価は販売時点のスナップショットを維持: 既存明細にある商品はその原価を引き継ぎ、
+      // 新規追加された商品行のみ現行の仕入単価を使う。
+      const prevCostByProduct = new Map(current.items.map(i => [i.productId, i.costPerKg]))
       const items: SaleLineItem[] = merged.items.map(line => {
         const product = productMap.get(line.productId)!
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
-        const costPerKg = product.purchaseUnitPrice ?? 0
+        const costPerKg = prevCostByProduct.has(line.productId)
+          ? (prevCostByProduct.get(line.productId) ?? 0)
+          : (product.purchaseUnitPrice ?? 0)
         const revenue = quantityKg * unitPrice
         const costAmount = quantityKg * costPerKg
         const taxRate = coerceTaxRate(line.taxRate)
@@ -1755,6 +1764,7 @@ export function createFirebaseServices(): IServices {
         paymentFee,
         invoiceAmount,
         country: merged.country.trim(),
+        orderDate: merged.orderDate,
         dueDate: merged.dueDate,
         terms: merged.terms,
         notes: merged.notes,
@@ -2201,6 +2211,7 @@ export function createFirebaseServices(): IServices {
         id: `po:${orderId}:${lineIndex}`,
         arrivalDate: opts.arrivalDate,
         quantityKg: line.quantityKg,
+        unitPrice: line.unitPrice,
       })
 
       const nextItems = order.items.map((item, idx) => (
@@ -2303,12 +2314,14 @@ export function createFirebaseServices(): IServices {
         id: `po:${newOrderRef.id}:0`,
         arrivalDate: toIsoDate(arrival.arrivalDate),
         quantityKg,
+        ...(unitPrice > 0 ? { unitPrice } : {}),
       }
       const nextArrivals = [...remaining, newArrival]
       await updateDoc(productRef, {
         arrivalRecords: nextArrivals,
         arrivalDate: deriveArrivalDate(nextArrivals),
         initialStockKg: deriveInitialStockKg(nextArrivals),
+        ...(unitPrice > 0 ? { purchaseUnitPrice: unitPrice } : {}),
         updatedAt: serverTimestamp(),
       })
 

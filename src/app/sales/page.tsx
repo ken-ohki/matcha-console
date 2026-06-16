@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 
 type ViewMode = 'by-month' | 'by-fiscal' | 'by-country' | 'by-product'
-type SortKey = 'createdAt' | 'buyerName' | 'amount' | 'grossProfit' | 'dueDate' | 'paymentDate' | 'status'
+type SortKey = 'createdAt' | 'orderDate' | 'buyerName' | 'amount' | 'grossProfit' | 'dueDate' | 'paymentDate' | 'status'
 
 interface AggregateRow {
   key: string
@@ -246,6 +246,7 @@ export default function SalesPage() {
         case 'buyerName': return r.buyerName ?? ''
         case 'amount': return computeSaleTaxIncluded(r)
         case 'grossProfit': return r.grossProfit ?? 0
+        case 'orderDate': return r.orderDate ?? ''
         case 'dueDate': return r.dueDate ?? ''
         case 'paymentDate': return r.paymentDate ?? ''
         case 'status': return STATUS_ORDER[r.status] ?? 9
@@ -743,6 +744,7 @@ export default function SalesPage() {
                 <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
                   <SortTh label="ステータス" col="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortTh label="購入者" col="buyerName" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                  <SortTh label="発注日" col="orderDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortTh label="作成日" col="createdAt" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <th className="whitespace-nowrap px-3 py-3 font-medium">商品</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">数量</th>
@@ -759,7 +761,7 @@ export default function SalesPage() {
               <tbody>
                 {!loading && sortedSales.length === 0 && (
                   <tr>
-                    <td colSpan={13} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={14} className="px-3 py-10 text-center text-sm text-[#68756c]">
                       条件に合う販売案件はありません。
                     </td>
                   </tr>
@@ -778,6 +780,7 @@ export default function SalesPage() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 font-medium">{record.buyerName}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{record.orderDate || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{formatDateOnly(record.createdAt)}</td>
                     <td className="px-3 py-4 align-top">
                       <div className="line-clamp-2 max-w-[260px]">

@@ -103,6 +103,13 @@ export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
+  // 集計の基準日: 発注日（無ければ作成日）/ 納品日（納期、無ければ発注日/作成日）
+  const [saleBasis, setSaleBasis] = useState<'order' | 'delivery'>('order')
+  const saleDate = (r: SaleRecord): Date => {
+    if (saleBasis === 'delivery' && r.dueDate) return new Date(r.dueDate)
+    if (r.orderDate) return new Date(r.orderDate)
+    return r.createdAt
+  }
 
   const load = async () => {
     setLoading(true)
@@ -148,12 +155,13 @@ export default function FinancialsPage() {
     return sales.filter(s => {
       // 収支管理は確定済み案件のみ
       if (s.status !== 'confirmed') return false
-      const t = s.createdAt.getTime()
+      const t = saleDate(s).getTime()
       if (fromTime != null && t < fromTime) return false
       if (toTime != null && t > toTime) return false
       return true
     })
-  }, [sales, fromTime, toTime])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, fromTime, toTime, saleBasis])
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
@@ -210,7 +218,7 @@ export default function FinancialsPage() {
   const monthly = useMemo<MonthlyRow[]>(() => {
     const map = new Map<string, MonthlyRow>()
     for (const r of filteredSales) {
-      const k = monthKey(r.createdAt)
+      const k = monthKey(saleDate(r))
       const row = map.get(k) ?? { key: k, label: k, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
       row.revenue += saleIncome(r)
       if (r.paymentStatus === 'paid') row.collected += saleIncome(r)
@@ -236,12 +244,13 @@ export default function FinancialsPage() {
     return [...map.values()]
       .map(r => ({ ...r, net: r.collected - r.paid }))
       .sort((a, b) => b.key.localeCompare(a.key))
-  }, [filteredSales, filteredOrders, filteredEc])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSales, filteredOrders, filteredEc, saleBasis])
 
   const fiscal = useMemo<MonthlyRow[]>(() => {
     const map = new Map<string, MonthlyRow>()
     for (const r of filteredSales) {
-      const fy = fiscalYearOf(r.createdAt)
+      const fy = fiscalYearOf(saleDate(r))
       const k = String(fy)
       const row = map.get(k) ?? { key: k, label: `FY${fy} (${fy}/04 - ${fy + 1}/03)`, revenue: 0, collected: 0, expense: 0, paid: 0, net: 0 }
       row.revenue += saleIncome(r)
@@ -270,14 +279,15 @@ export default function FinancialsPage() {
     return [...map.values()]
       .map(r => ({ ...r, net: r.collected - r.paid }))
       .sort((a, b) => b.key.localeCompare(a.key))
-  }, [filteredSales, filteredOrders, filteredEc])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSales, filteredOrders, filteredEc, saleBasis])
 
   // All-time monthly map for YoY lookups (ignores date filter).
   const monthlyAll = useMemo(() => {
     const map = new Map<string, { revenue: number; expense: number; profit: number }>()
     for (const r of sales) {
       if (r.status === 'cancelled') continue
-      const k = monthKey(r.createdAt)
+      const k = monthKey(saleDate(r))
       const row = map.get(k) ?? { revenue: 0, expense: 0, profit: 0 }
       const inc = saleIncome(r)
       row.revenue += inc
@@ -303,7 +313,8 @@ export default function FinancialsPage() {
       map.set(k, row)
     }
     return map
-  }, [sales, orders, ecSales, costByProduct])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales, orders, ecSales, costByProduct, saleBasis])
 
   const productRanking = useMemo<ProductRow[]>(() => {
     const map = new Map<string, ProductRow>()
@@ -445,6 +456,20 @@ export default function FinancialsPage() {
               <button onClick={() => applyPreset('lastMonth')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">先月</button>
               <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">今年度</button>
               <button onClick={() => applyPreset('all')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">全期間</button>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-[#68756c]">集計基準</span>
+              <div className="flex overflow-hidden rounded-full border border-[#d9d1be]">
+                {([['order', '発注日'], ['delivery', '納品日']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSaleBasis(key)}
+                    className={`px-2.5 py-1 text-[11px] transition ${saleBasis === key ? 'bg-[#174c33] text-white' : 'bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

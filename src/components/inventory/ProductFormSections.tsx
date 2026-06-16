@@ -392,9 +392,14 @@ export function ProductStockSection({
               .slice()
               .sort((a, b) => b.arrivalDate.localeCompare(a.arrivalDate))
               .map(record => (
-                <div key={record.id} className="flex items-center justify-between rounded-xl border border-[#ece5d7] bg-[#faf8f2] px-3 py-2 text-sm">
+                <div key={record.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#ece5d7] bg-[#faf8f2] px-3 py-2 text-sm">
                   <span className="text-[#173c2a]">{toIsoDateInput(record.arrivalDate) || '日付未設定'}</span>
-                  <span className="font-medium text-[#173c2a]">{record.quantityKg.toFixed(1)} kg</span>
+                  <span className="flex items-center gap-3">
+                    {record.unitPrice != null && record.unitPrice > 0 && (
+                      <span className="text-xs text-[#68756c]">@{new Intl.NumberFormat('ja-JP').format(Math.round(record.unitPrice))} 円/kg</span>
+                    )}
+                    <span className="font-medium text-[#173c2a]">{record.quantityKg.toFixed(1)} kg</span>
+                  </span>
                 </div>
               ))
           )}

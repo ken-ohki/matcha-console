@@ -251,6 +251,7 @@ export default function SaleDetailPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <OverviewCard label="販売先" value={record.buyerName} />
               <OverviewCard label="国" value={record.country || '-'} />
+              <OverviewCard label="発注日" value={record.orderDate || '-'} />
               <OverviewCard label="納期" value={record.dueDate || '-'} />
               <OverviewCard label="取引条件" value={record.terms || '-'} />
               <OverviewCard label="請求額（税込）" value={formatCurrency(taxIncl)} strong />
