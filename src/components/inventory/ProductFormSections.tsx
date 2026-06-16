@@ -91,6 +91,8 @@ export function buildProductForm(
     inquireToOrder: initial?.inquireToOrder ?? false,
     wholesaleAvailableKg: initial?.wholesaleAvailableKg,
     wholesaleThresholdKg: initial?.wholesaleThresholdKg,
+    sampleAvailable: initial?.sampleAvailable ?? false,
+    samplePrice: initial?.samplePrice,
   }
 }
 
@@ -164,6 +166,8 @@ export function finalizeProductInput(
     inquireToOrder: form.inquireToOrder,
     wholesaleAvailableKg: form.wholesaleAvailableKg,
     wholesaleThresholdKg: form.wholesaleThresholdKg,
+    sampleAvailable: form.sampleAvailable,
+    samplePrice: form.samplePrice,
   }
 }
 
@@ -701,6 +705,19 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           <p className="mt-1 text-[11px] text-[#68756c]">この数量以上の注文は問い合わせに誘導。空欄は設定の既定値（初期10kg）。</p>
         </div>
         <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">サンプル価格（1個 / 10g）</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={form.samplePrice ?? ''}
+            onChange={event => setForm(prev => ({ ...prev, samplePrice: event.target.value ? Number(event.target.value) : undefined }))}
+            className={fieldCls}
+            placeholder="例: 500"
+          />
+          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトのサンプル1個(10g)あたりの価格。サンプルは1商品2個(20g)まで注文可。</p>
+        </div>
+        <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">備考（管理用）</label>
           <textarea
             rows={4}
@@ -757,6 +774,26 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
             (form.inquireToOrder ?? false) ? 'translate-x-5' : 'translate-x-0.5'
+          }`} />
+        </button>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">サンプル販売を有効化</p>
+          <p className="text-xs text-gray-500">卸売サイトで1商品2個(20g)までサンプル注文可。上の「サンプル価格」を設定してください</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={form.sampleAvailable ?? false}
+          onClick={() => setForm(prev => ({ ...prev, sampleAvailable: !(prev.sampleAvailable ?? false) }))}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+            (form.sampleAvailable ?? false) ? 'bg-[#174c33]' : 'bg-gray-300'
+          }`}
+        >
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+            (form.sampleAvailable ?? false) ? 'translate-x-5' : 'translate-x-0.5'
           }`} />
         </button>
       </div>

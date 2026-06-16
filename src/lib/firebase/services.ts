@@ -292,6 +292,8 @@ function mapProduct(id: string, data: DocumentData): Product {
     inquireToOrder: data.inquireToOrder === true,
     wholesaleAvailableKg: data.wholesaleAvailableKg != null ? Number(data.wholesaleAvailableKg) : undefined,
     wholesaleThresholdKg: data.wholesaleThresholdKg != null ? Number(data.wholesaleThresholdKg) : undefined,
+    sampleAvailable: data.sampleAvailable === true,
+    samplePrice: data.samplePrice != null ? Number(data.samplePrice) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -1349,6 +1351,8 @@ export function createFirebaseServices(): IServices {
         inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
         wholesaleAvailableKg: input.wholesaleAvailableKg ?? current.wholesaleAvailableKg,
         wholesaleThresholdKg: input.wholesaleThresholdKg ?? current.wholesaleThresholdKg,
+        sampleAvailable: input.sampleAvailable ?? current.sampleAvailable,
+        samplePrice: input.samplePrice ?? current.samplePrice,
       }
 
       const payload = {

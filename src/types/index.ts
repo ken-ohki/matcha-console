@@ -61,6 +61,8 @@ export interface Product {
   // 卸売サイト(wholesale.sabo-matcha.jp)向け設定
   wholesaleAvailableKg?: number   // セルフ注文に開放する数量(kg)。未設定なら在庫全量。
   wholesaleThresholdKg?: number   // この数量以上はセルフ決済不可→問い合わせ。未設定ならグローバル既定。
+  sampleAvailable?: boolean       // サンプル注文の可否
+  samplePrice?: number            // サンプル1個(10g)あたりの価格(JPY)
   createdAt: Date
   updatedAt: Date
 }
@@ -270,6 +272,8 @@ export interface ProductInput {
   inquireToOrder?: boolean
   wholesaleAvailableKg?: number
   wholesaleThresholdKg?: number
+  sampleAvailable?: boolean
+  samplePrice?: number
 }
 
 export interface InventoryGroupInput {
