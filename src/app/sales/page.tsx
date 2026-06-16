@@ -149,7 +149,9 @@ export default function SalesPage() {
   const [dateTo, setDateTo] = useState<string>('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('by-month')
+  const [dashboardBasis, setDashboardBasis] = useState<'order' | 'delivery'>('order')
   const [mainTab, setMainTab] = useState<'dashboard' | 'records'>('records')
+  const [showCompleted, setShowCompleted] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [modalOpen, setModalOpen] = useState(false)
@@ -238,6 +240,10 @@ export default function SalesPage() {
   // Statistics exclude cancelled deals (取消)
   const analyticsSales = useMemo(() => filteredSales.filter(s => s.status !== 'cancelled'), [filteredSales])
 
+  // 取引完了 = 入金済み かつ 発送完了
+  const isCompletedDeal = (r: SaleRecord) => r.paymentStatus === 'paid' && r.shippingStatus === 'shipped'
+  const completedCount = useMemo(() => filteredSales.filter(isCompletedDeal).length, [filteredSales])
+
   const STATUS_ORDER: Record<SaleStatus, number> = { negotiating: 0, confirmed: 1, cancelled: 2 }
   const sortedSales = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -254,28 +260,36 @@ export default function SalesPage() {
         default: return r.createdAt.getTime()
       }
     }
-    return [...filteredSales].sort((a, b) => {
+    const base = showCompleted ? filteredSales : filteredSales.filter(r => !isCompletedDeal(r))
+    return [...base].sort((a, b) => {
       const av = val(a), bv = val(b)
       if (av < bv) return -1 * dir
       if (av > bv) return 1 * dir
       return 0
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSales, sortKey, sortDir])
+  }, [filteredSales, sortKey, sortDir, showCompleted])
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(key); setSortDir(key === 'buyerName' ? 'asc' : 'desc') }
   }
 
+  // ダッシュボードの集計基準: 発注日（無ければ作成日）/ 納品日（納期、無ければ発注日/作成日）
+  const saleDate = (r: SaleRecord): Date => {
+    if (dashboardBasis === 'delivery' && r.dueDate) return new Date(r.dueDate)
+    if (r.orderDate) return new Date(r.orderDate)
+    return r.createdAt
+  }
+
   const aggregations = useMemo(() => ({
     monthly: aggregateSales(analyticsSales, r => {
-      const d = r.createdAt
+      const d = saleDate(r)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       return { key, label: key }
     }).sort((a, b) => b.key.localeCompare(a.key)),
     fiscal: aggregateSales(analyticsSales, r => {
-      const fy = fiscalYearOf(r.createdAt)
+      const fy = fiscalYearOf(saleDate(r))
       return { key: String(fy), label: `FY${fy}（${fy}/4 - ${fy + 1}/3）` }
     }).sort((a, b) => b.key.localeCompare(a.key)),
     country: aggregateSales(analyticsSales, r => ({ key: r.country || '(未設定)', label: r.country || '(未設定)' }))
@@ -302,7 +316,8 @@ export default function SalesPage() {
       }
       return [...groups.values()].sort((a, b) => b.revenue - a.revenue)
     })(),
-  }), [analyticsSales])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [analyticsSales, dashboardBasis])
 
   const filterOptions = useMemo(() => {
     const buyers = new Set<string>()
@@ -521,7 +536,7 @@ export default function SalesPage() {
 
         <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
           {mainTab === 'dashboard' && (
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             {([
               { mode: 'by-month', label: '月別' },
               { mode: 'by-fiscal', label: '年度別' },
@@ -541,6 +556,23 @@ export default function SalesPage() {
                 {tab.label}
               </button>
             ))}
+            {(viewMode === 'by-month' || viewMode === 'by-fiscal') && (
+              <div className="ml-auto flex items-center gap-1">
+                <span className="text-[11px] text-[#68756c]">集計基準</span>
+                <div className="flex overflow-hidden rounded-full border border-[#d9d1be]">
+                  {([['order', '発注日'], ['delivery', '納品日']] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setDashboardBasis(key)}
+                      className={`px-2.5 py-1 text-[11px] transition ${dashboardBasis === key ? 'bg-[#174c33] text-white' : 'bg-white text-[#173c2a] hover:bg-[#ece8db]'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           )}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -550,7 +582,7 @@ export default function SalesPage() {
                 : viewMode === 'by-fiscal' ? '年度別集計（4月〜3月）'
                 : viewMode === 'by-country' ? '国別集計'
                 : '商品別集計'}
-              <span className="ml-2 text-sm font-normal text-[#68756c]">({filteredSales.length}件)</span>
+              <span className="ml-2 text-sm font-normal text-[#68756c]">({mainTab === 'records' ? sortedSales.length : filteredSales.length}件)</span>
             </h2>
             <div className="flex flex-wrap gap-3">
               <div className="relative">
@@ -581,6 +613,25 @@ export default function SalesPage() {
                   className="rounded-xl px-3 py-2 text-sm text-[#68756c] underline-offset-2 hover:underline"
                 >
                   リセット
+                </button>
+              )}
+              {mainTab === 'records' && (
+                <button
+                  type="button"
+                  onClick={() => setShowCompleted(prev => !prev)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                    showCompleted
+                      ? 'border-[#174c33] bg-[#174c33] text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  title="入金済み かつ 発送完了の案件"
+                >
+                  {showCompleted ? '完了案件も表示中' : '完了案件を表示'}
+                  {completedCount > 0 && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${showCompleted ? 'bg-white/25 text-white' : 'bg-[#ece8db] text-[#173c2a]'}`}>
+                      {completedCount}
+                    </span>
+                  )}
                 </button>
               )}
             </div>
