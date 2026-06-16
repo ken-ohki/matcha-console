@@ -293,6 +293,12 @@ export default function SettingsUsersPage() {
           >
             自社情報
           </Link>
+          <Link
+            href="/settings/wholesale"
+            className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+          >
+            卸売設定
+          </Link>
         </div>
 
         {feedback && (

@@ -59,8 +59,8 @@ export interface Product {
   showInCatalog: boolean
   inquireToOrder: boolean
   // 卸売サイト(wholesale.sabo-matcha.jp)向け設定
-  wholesaleAvailableKg?: number   // セルフ注文に開放する数量(kg)。未設定なら在庫全量。
-  wholesaleThresholdKg?: number   // この数量以上はセルフ決済不可→問い合わせ。未設定ならグローバル既定。
+  wholesaleAvailableKg?: number   // EC即時購入可能数量(kg)。未設定なら在庫全量。
+  featured?: boolean              // おすすめ商品。卸売サイトで未ログインでも公開。
   sampleAvailable?: boolean       // サンプル注文の可否
   samplePrice?: number            // サンプル1個(10g)あたりの価格(JPY)
   createdAt: Date
@@ -271,7 +271,7 @@ export interface ProductInput {
   showInCatalog?: boolean
   inquireToOrder?: boolean
   wholesaleAvailableKg?: number
-  wholesaleThresholdKg?: number
+  featured?: boolean
   sampleAvailable?: boolean
   samplePrice?: number
 }
@@ -317,7 +317,7 @@ export interface Settings {
   appName: string
   currency: string
   stockAlertRatio: number
-  // 卸売サイトのセルフ決済しきい値の既定値(kg)。商品個別の wholesaleThresholdKg が優先。
+  // 卸売サイトのセルフ決済しきい値(kg)。全商品共通。この数量以上の注文は問い合わせに誘導。
   wholesaleThresholdKgDefault?: number
 }
 

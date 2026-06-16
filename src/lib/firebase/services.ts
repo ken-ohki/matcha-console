@@ -236,6 +236,7 @@ function getDefaultSettings(): Settings {
     appName: 'Matcha Console',
     currency: 'JPY',
     stockAlertRatio: 0.2,
+    wholesaleThresholdKgDefault: 10,
   }
 }
 
@@ -291,7 +292,7 @@ function mapProduct(id: string, data: DocumentData): Product {
     showInCatalog: data.showInCatalog !== false,
     inquireToOrder: data.inquireToOrder === true,
     wholesaleAvailableKg: data.wholesaleAvailableKg != null ? Number(data.wholesaleAvailableKg) : undefined,
-    wholesaleThresholdKg: data.wholesaleThresholdKg != null ? Number(data.wholesaleThresholdKg) : undefined,
+    featured: data.featured === true,
     sampleAvailable: data.sampleAvailable === true,
     samplePrice: data.samplePrice != null ? Number(data.samplePrice) : undefined,
     createdAt: toDate(data.createdAt),
@@ -623,6 +624,10 @@ function mapSettings(data?: DocumentData): Settings {
     appName: String(data.appName ?? defaults.appName),
     currency: String(data.currency ?? defaults.currency),
     stockAlertRatio: Number(data.stockAlertRatio ?? defaults.stockAlertRatio),
+    wholesaleThresholdKgDefault:
+      data.wholesaleThresholdKgDefault != null
+        ? Number(data.wholesaleThresholdKgDefault)
+        : defaults.wholesaleThresholdKgDefault,
   }
 }
 
@@ -1350,7 +1355,7 @@ export function createFirebaseServices(): IServices {
         showInCatalog: input.showInCatalog ?? current.showInCatalog,
         inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
         wholesaleAvailableKg: input.wholesaleAvailableKg ?? current.wholesaleAvailableKg,
-        wholesaleThresholdKg: input.wholesaleThresholdKg ?? current.wholesaleThresholdKg,
+        featured: input.featured ?? current.featured,
         sampleAvailable: input.sampleAvailable ?? current.sampleAvailable,
         samplePrice: input.samplePrice ?? current.samplePrice,
       }
