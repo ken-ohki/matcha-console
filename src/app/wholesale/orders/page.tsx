@@ -158,15 +158,18 @@ export default function WholesaleOrdersPage() {
                     onSubmit={(fee, carrier) => quote(o.id, fee, carrier)}
                   />
                 )}
-                {o.status === 'quoted' && o.checkoutUrl && (
+                {o.status === 'quoted' && o.paymentMethod !== 'bank_transfer' && o.checkoutUrl && (
                   <p className="mt-3 text-xs text-[#68756c]">
                     支払いリンク発行済み（メール送付済み）:{' '}
                     <a href={o.checkoutUrl} target="_blank" rel="noreferrer" className="text-[#174c33] underline">リンクを開く</a>
                   </p>
                 )}
+                {o.status === 'quoted' && o.paymentMethod === 'bank_transfer' && (
+                  <p className="mt-3 text-xs text-[#68756c]">銀行振込のご案内をメール送付済み。入金後に「入金確認」を押してください。</p>
+                )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {o.status === 'pending_payment' && o.paymentMethod === 'bank_transfer' && (
+                  {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                     <button onClick={() => act(o.id, 'confirm_payment')} className="rounded-lg bg-[#174c33] px-3 py-1.5 text-sm text-white hover:opacity-90">入金確認</button>
                   )}
                   {o.status === 'paid' && (

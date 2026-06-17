@@ -58,6 +58,24 @@ async function cancelOrder(database: Firestore, orderId: string): Promise<void> 
   })
 }
 
+/** Mark an order paid and firm any 'reserved' stock holds (overseas quoted bank). */
+async function confirmOrderPaid(database: Firestore, orderId: string): Promise<void> {
+  const orderRef = database.collection('wholesale_orders').doc(orderId)
+  await database.runTransaction(async txn => {
+    const snap = await txn.get(orderRef)
+    if (!snap.exists) return
+    const data = snap.data() as { ecSaleIds?: string[] }
+    const ecRefs = (data.ecSaleIds ?? []).map(id => database.collection('ec_sales').doc(id))
+    const ecSnaps = await Promise.all(ecRefs.map(r => txn.get(r)))
+    ecSnaps.forEach((ecSnap, i) => {
+      if (ecSnap.exists && (ecSnap.data() as { status?: string }).status === 'reserved') {
+        txn.update(ecRefs[i], { status: 'active', expiresAtMs: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })
+      }
+    })
+    txn.update(orderRef, { status: 'paid', paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+  })
+}
+
 interface PatchBody {
   orderId?: string
   action?: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'quote'
@@ -110,10 +128,7 @@ export async function PATCH(request: Request) {
   const ref = database.collection('wholesale_orders').doc(body.orderId)
 
   if (body.action === 'confirm_payment') {
-    await ref.set(
-      { status: 'paid', paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    )
+    await confirmOrderPaid(database, body.orderId)
     return NextResponse.json({ ok: true, status: 'paid' })
   }
   if (body.action === 'mark_shipped') {
