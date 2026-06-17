@@ -5,13 +5,14 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
-import type { Settings } from '@/types'
-import { Save, Settings as SettingsIcon } from 'lucide-react'
+import type { Settings, ShippingTierJp } from '@/types'
+import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 
 const DEFAULT_THRESHOLD = 10
 
 export default function SettingsWholesalePage() {
   const [threshold, setThreshold] = useState<number | ''>('')
+  const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -23,6 +24,7 @@ export default function SettingsWholesalePage() {
     const services = await getServices()
     const stored = await services.settings.getSettings()
     setThreshold(stored.wholesaleThresholdKgDefault ?? DEFAULT_THRESHOLD)
+    setTiers(stored.shippingRatesJp ?? [])
     setLoading(false)
   }
 
@@ -35,12 +37,20 @@ export default function SettingsWholesalePage() {
       setFeedback({ tone: 'error', message: 'しきい値は 0 より大きい数値を入力してください' })
       return
     }
+    const cleanTiers = tiers
+      .map(t => ({ uptoKg: Number(t.uptoKg), feeJpy: Number(t.feeJpy) }))
+      .filter(t => Number.isFinite(t.uptoKg) && Number.isFinite(t.feeJpy) && t.uptoKg > 0 && t.feeJpy >= 0)
+      .sort((a, b) => a.uptoKg - b.uptoKg)
     setSaving(true)
     setFeedback(null)
     try {
       const services = await getServices()
-      const input: Partial<Settings> = { wholesaleThresholdKgDefault: Number(threshold) }
+      const input: Partial<Settings> = {
+        wholesaleThresholdKgDefault: Number(threshold),
+        shippingRatesJp: cleanTiers,
+      }
       await services.settings.updateSettings(input)
+      setTiers(cleanTiers)
       setFeedback({ tone: 'success', message: '卸売設定を保存しました' })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
@@ -111,6 +121,64 @@ export default function SettingsWholesalePage() {
               />
               <p className="mt-1 text-[11px] text-[#68756c]">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
             </div>
+          </div>
+        )}
+
+        {!loading && (
+          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-[#173c2a]">国内発送 重量別送料（税抜・全国一律）</h2>
+                <p className="mt-1 text-[11px] text-[#68756c]">
+                  注文重量（kg）が「上限kg」以下のとき、その送料を自動適用します。最大の上限を超える注文は最も上の段の送料を適用するため、十分大きな段を用意してください。海外発送は注文ごとに手動見積です。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTiers(prev => [...prev, { uptoKg: 0, feeJpy: 0 }])}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-1.5 text-sm text-[#173c2a] hover:bg-[#f4f2ea]"
+              >
+                <Plus size={14} /> 段を追加
+              </button>
+            </div>
+
+            {tiers.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-6 text-center text-sm text-[#a59f8c]">
+                送料段がありません。「段を追加」で重量階段を作成してください。
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 text-[11px] text-[#a59f8c]">
+                  <span>上限重量 (kg 以下)</span>
+                  <span>送料 (円・税抜)</span>
+                  <span />
+                </div>
+                {tiers.map((t, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_40px] items-center gap-3">
+                    <input
+                      type="number" min="0" step="0.1" value={t.uptoKg || ''}
+                      onChange={e => setTiers(prev => prev.map((x, j) => (j === i ? { ...x, uptoKg: Number(e.target.value) } : x)))}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      placeholder="例: 5"
+                    />
+                    <input
+                      type="number" min="0" step="1" value={t.feeJpy || ''}
+                      onChange={e => setTiers(prev => prev.map((x, j) => (j === i ? { ...x, feeJpy: Number(e.target.value) } : x)))}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      placeholder="例: 800"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTiers(prev => prev.filter((_, j) => j !== i))}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                      aria-label="削除"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

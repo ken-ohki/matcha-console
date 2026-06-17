@@ -313,12 +313,20 @@ export interface SelfConsumptionRecordInput {
   notes?: string
 }
 
+/** 国内発送の重量別送料(税抜)。注文重量が uptoKg 以下なら feeJpy を適用。 */
+export interface ShippingTierJp {
+  uptoKg: number
+  feeJpy: number
+}
+
 export interface Settings {
   appName: string
   currency: string
   stockAlertRatio: number
   // 卸売サイトのセルフ決済しきい値(kg)。全商品共通。この数量以上の注文は問い合わせに誘導。
   wholesaleThresholdKgDefault?: number
+  // 国内発送の重量別送料テーブル(税抜・全国一律)。uptoKg 昇順。
+  shippingRatesJp?: ShippingTierJp[]
 }
 
 export type MasterType =

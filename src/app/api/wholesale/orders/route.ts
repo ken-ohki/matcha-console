@@ -38,10 +38,6 @@ export async function GET(request: Request) {
   return NextResponse.json({ orders }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
-interface PatchBody {
-  orderId?: string
-  action?: 'confirm_payment' | 'cancel' | 'mark_shipped'
-}
 
 /** Release an order's stock reservation by cancelling its linked ec_sales docs. */
 async function cancelOrder(database: Firestore, orderId: string): Promise<void> {
@@ -62,6 +58,16 @@ async function cancelOrder(database: Firestore, orderId: string): Promise<void> 
   })
 }
 
+interface PatchBody {
+  orderId?: string
+  action?: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'quote'
+  shippingFeeJpy?: number
+  overseasCarrier?: 'ems' | 'dhl' | 'designated'
+}
+
+// Base URL of the wholesale storefront app (owns Stripe + order/stock logic).
+const WHOLESALE_BASE_URL = process.env.WHOLESALE_BASE_URL || 'https://wholesale.sabo-matcha.jp'
+
 export async function PATCH(request: Request) {
   try {
     await requireAdmin(request)
@@ -75,6 +81,30 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
   }
   if (!body.orderId) return NextResponse.json({ error: 'missing_order_id' }, { status: 400 })
+
+  // Overseas quote: delegate to the wholesale app (it owns Stripe + stock holds).
+  // Forward the staff token; the wholesale endpoint re-verifies it.
+  if (body.action === 'quote') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/quote`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify({
+          orderId: body.orderId,
+          shippingFeeJpy: body.shippingFeeJpy,
+          overseasCarrier: body.overseasCarrier,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json(
+        { error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' },
+        { status: 502 },
+      )
+    }
+  }
 
   const database = db()
   const ref = database.collection('wholesale_orders').doc(body.orderId)

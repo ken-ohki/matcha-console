@@ -52,6 +52,7 @@ import type {
   SelfConsumptionRecordInput,
   SelfConsumptionUsageType,
   Settings,
+  ShippingTierJp,
   StockStatus,
   Supplier,
   SupplierDetailsInput,
@@ -237,7 +238,19 @@ function getDefaultSettings(): Settings {
     currency: 'JPY',
     stockAlertRatio: 0.2,
     wholesaleThresholdKgDefault: 10,
+    shippingRatesJp: [],
   }
+}
+
+function mapShippingRatesJp(value: unknown): ShippingTierJp[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(v => {
+      const r = v as Record<string, unknown>
+      return { uptoKg: Number(r.uptoKg), feeJpy: Number(r.feeJpy) }
+    })
+    .filter(r => Number.isFinite(r.uptoKg) && Number.isFinite(r.feeJpy) && r.uptoKg > 0 && r.feeJpy >= 0)
+    .sort((a, b) => a.uptoKg - b.uptoKg)
 }
 
 function mapProduct(id: string, data: DocumentData): Product {
@@ -628,6 +641,7 @@ function mapSettings(data?: DocumentData): Settings {
       data.wholesaleThresholdKgDefault != null
         ? Number(data.wholesaleThresholdKgDefault)
         : defaults.wholesaleThresholdKgDefault,
+    shippingRatesJp: mapShippingRatesJp(data.shippingRatesJp),
   }
 }
 
