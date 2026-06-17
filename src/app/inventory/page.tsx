@@ -898,6 +898,9 @@ export default function InventoryPage() {
                   <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利</th>
                   <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利率</th>
                   <SortableTh label="状態" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">カタログ</th>
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">おすすめ</th>
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">サンプル</th>
                   {user?.role === 'admin' && <th className="px-3 py-3 text-right font-medium text-[#68756c]">操作</th>}
                 </tr>
               </thead>
@@ -947,6 +950,21 @@ export default function InventoryPage() {
                     <td className={`px-3 py-3 text-right ${margin == null ? 'text-[#68756c]' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>
                     <td className={`px-3 py-3 text-right text-xs ${marginRate == null ? 'text-[#68756c]' : marginRate < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{marginRate == null ? '-' : `${marginRate.toFixed(1)}%`}</td>
                     <td className="px-3 py-3"><StockStatusBadge status={product.stockStatus} /></td>
+                    <td className="px-3 py-3">
+                      {product.showInCatalog !== false
+                        ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">表示</span>
+                        : <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">非表示</span>}
+                    </td>
+                    <td className="px-3 py-3">
+                      {product.featured
+                        ? <span className="rounded-full bg-[#ece8ff] px-2 py-0.5 text-xs text-[#5e44a8]">おすすめ</span>
+                        : <span className="text-xs text-[#a59f8c]">—</span>}
+                    </td>
+                    <td className="px-3 py-3">
+                      {product.sampleAvailable
+                        ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">可</span>
+                        : <span className="text-xs text-[#a59f8c]">不可</span>}
+                    </td>
                     {user?.role === 'admin' && (
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
@@ -971,7 +989,7 @@ export default function InventoryPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={user?.role === 'admin' ? 17 : 15} className="px-4 py-12 text-center text-[#68756c]">
+                    <td colSpan={user?.role === 'admin' ? 20 : 18} className="px-4 py-12 text-center text-[#68756c]">
                       商品がありません
                     </td>
                   </tr>
