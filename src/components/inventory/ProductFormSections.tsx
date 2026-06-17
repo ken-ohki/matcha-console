@@ -94,6 +94,7 @@ export function buildProductForm(
     inquireToOrder: initial?.inquireToOrder ?? false,
     wholesaleAvailableKg: initial?.wholesaleAvailableKg,
     standardPackageKg: initial?.standardPackageKg,
+    wholesaleOptions: initial?.wholesaleOptions,
     sampleAvailable: initial?.sampleAvailable ?? false,
     samplePrice: initial?.samplePrice,
   }
@@ -170,6 +171,7 @@ export function finalizeProductInput(
     inquireToOrder: form.inquireToOrder,
     wholesaleAvailableKg: form.wholesaleAvailableKg,
     standardPackageKg: form.standardPackageKg,
+    wholesaleOptions: form.wholesaleOptions,
     sampleAvailable: form.sampleAvailable,
     samplePrice: form.samplePrice,
   }
