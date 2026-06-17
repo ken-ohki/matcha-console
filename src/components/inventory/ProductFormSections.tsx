@@ -91,6 +91,7 @@ export function buildProductForm(
     featured: initial?.featured ?? false,
     inquireToOrder: initial?.inquireToOrder ?? false,
     wholesaleAvailableKg: initial?.wholesaleAvailableKg,
+    standardPackageKg: initial?.standardPackageKg,
     sampleAvailable: initial?.sampleAvailable ?? false,
     samplePrice: initial?.samplePrice,
   }
@@ -166,6 +167,7 @@ export function finalizeProductInput(
     featured: form.featured,
     inquireToOrder: form.inquireToOrder,
     wholesaleAvailableKg: form.wholesaleAvailableKg,
+    standardPackageKg: form.standardPackageKg,
     sampleAvailable: form.sampleAvailable,
     samplePrice: form.samplePrice,
   }
@@ -690,6 +692,19 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             placeholder="未設定なら在庫全量"
           />
           <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトでセルフ決済に開放する数量 (kg)。空欄は在庫全量。セルフ決済しきい値は全商品共通で「設定 → 卸売設定」で指定します。</p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">標準包装単位 (kg)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={form.standardPackageKg ?? ''}
+            onChange={event => setForm(prev => ({ ...prev, standardPackageKg: event.target.value ? Number(event.target.value) : undefined }))}
+            className={fieldCls}
+            placeholder="未設定なら1kg"
+          />
+          <p className="mt-1 text-[11px] text-[#68756c]">標準の包装形態 (kg)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">サンプル価格（1個 / 10g）</label>
