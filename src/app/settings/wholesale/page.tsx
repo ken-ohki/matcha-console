@@ -5,14 +5,17 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
-import type { Settings, ShippingTierJp } from '@/types'
+import type { Settings, ShippingTierJp, WholesaleOption } from '@/types'
 import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 
 const DEFAULT_THRESHOLD = 10
+const uid = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)
 
 export default function SettingsWholesalePage() {
   const [threshold, setThreshold] = useState<number | ''>('')
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
+  const [options, setOptions] = useState<WholesaleOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -25,6 +28,7 @@ export default function SettingsWholesalePage() {
     const stored = await services.settings.getSettings()
     setThreshold(stored.wholesaleThresholdKgDefault ?? DEFAULT_THRESHOLD)
     setTiers(stored.shippingRatesJp ?? [])
+    setOptions(stored.wholesaleOptions ?? [])
     setLoading(false)
   }
 
@@ -45,12 +49,23 @@ export default function SettingsWholesalePage() {
     setFeedback(null)
     try {
       const services = await getServices()
+      const cleanOptions: WholesaleOption[] = options
+        .map(o => ({
+          ...o,
+          name: o.name.trim(),
+          tiers: o.tiers
+            .map(t => ({ ...t, label: t.label.trim(), portionKg: Number(t.portionKg), pricePerBagJpy: Number(t.pricePerBagJpy) }))
+            .filter(t => t.label && Number.isFinite(t.portionKg) && t.portionKg > 0 && Number.isFinite(t.pricePerBagJpy) && t.pricePerBagJpy >= 0),
+        }))
+        .filter(o => o.name)
       const input: Partial<Settings> = {
         wholesaleThresholdKgDefault: Number(threshold),
         shippingRatesJp: cleanTiers,
+        wholesaleOptions: cleanOptions,
       }
       await services.settings.updateSettings(input)
       setTiers(cleanTiers)
+      setOptions(cleanOptions)
       setFeedback({ tone: 'success', message: '卸売設定を保存しました' })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
@@ -175,6 +190,131 @@ export default function SettingsWholesalePage() {
                     >
                       <Trash2 size={14} />
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!loading && (
+          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-[#173c2a]">注文オプション（小分けサービス等）</h2>
+                <p className="mt-1 text-[11px] text-[#68756c]">
+                  卸売サイトで選べる注文オプションを定義します。小分けは「袋数 × 1袋単価」で課金（注文重量 ÷ 内容量＝袋数）。商品ごとの有効化は各商品の編集画面で行います。
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOptions(prev => [...prev, { id: uid(), type: 'repackage', name: '小分けサービス', unitLabel: '袋', active: true, tiers: [] }])}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-1.5 text-sm text-[#173c2a] hover:bg-[#f4f2ea]"
+              >
+                <Plus size={14} /> オプションを追加
+              </button>
+            </div>
+
+            {options.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-6 text-center text-sm text-[#a59f8c]">
+                オプションがありません。「オプションを追加」で小分けサービスを作成してください。
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {options.map((o, oi) => (
+                  <div key={o.id} className="rounded-2xl border border-[#e7e1d2] p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="flex-1 min-w-[160px]">
+                        <span className="mb-1 block text-[11px] text-[#a59f8c]">オプション名</span>
+                        <input
+                          value={o.name}
+                          onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, name: e.target.value } : x)))}
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          placeholder="小分けサービス"
+                        />
+                      </label>
+                      <label className="w-24">
+                        <span className="mb-1 block text-[11px] text-[#a59f8c]">数量単位</span>
+                        <input
+                          value={o.unitLabel ?? ''}
+                          onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, unitLabel: e.target.value } : x)))}
+                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          placeholder="袋"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 pb-2 text-sm text-[#173c2a]">
+                        <input
+                          type="checkbox"
+                          checked={o.active}
+                          onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, active: e.target.checked } : x)))}
+                          className="h-4 w-4 accent-[#174c33]"
+                        />
+                        有効
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOptions(prev => prev.filter((_, j) => j !== oi))}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                        aria-label="オプション削除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    <div className="mt-3 border-t border-[#f0ece0] pt-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-[#68756c]">小分けサイズ</span>
+                        <button
+                          type="button"
+                          onClick={() => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: [...x.tiers, { id: uid(), label: '', portionKg: 0, pricePerBagJpy: 0 }] } : x)))}
+                          className="inline-flex items-center gap-1 text-xs text-[#174c33] hover:underline"
+                        >
+                          <Plus size={12} /> サイズを追加
+                        </button>
+                      </div>
+                      {o.tiers.length === 0 ? (
+                        <p className="text-[11px] text-[#a59f8c]">サイズが未設定です。「サイズを追加」で 1kg・100g 等を作成してください。</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-[1fr_1fr_1fr_36px] gap-2 px-1 text-[10px] text-[#a59f8c]">
+                            <span>表示名（例: 100g）</span>
+                            <span>内容量 (kg/袋)</span>
+                            <span>単価 (円/袋・税抜)</span>
+                            <span />
+                          </div>
+                          {o.tiers.map((t, ti) => (
+                            <div key={t.id} className="grid grid-cols-[1fr_1fr_1fr_36px] items-center gap-2">
+                              <input
+                                value={t.label}
+                                onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, label: e.target.value } : y)) } : x)))}
+                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                placeholder="100g"
+                              />
+                              <input
+                                type="number" min="0" step="0.01" value={t.portionKg || ''}
+                                onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, portionKg: Number(e.target.value) } : y)) } : x)))}
+                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                placeholder="0.1"
+                              />
+                              <input
+                                type="number" min="0" step="1" value={t.pricePerBagJpy || ''}
+                                onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, pricePerBagJpy: Number(e.target.value) } : y)) } : x)))}
+                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                placeholder="150"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.filter((_, k) => k !== ti) } : x)))}
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                                aria-label="サイズ削除"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

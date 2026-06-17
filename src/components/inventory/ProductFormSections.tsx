@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ImagePlus, Trash2, X } from 'lucide-react'
 import { optionsForType, type MasterOption } from '@/lib/masters'
 import type {
@@ -10,7 +10,9 @@ import type {
   MasterEntry,
   ProductInput,
   ProductWithInventory,
+  WholesaleOption,
 } from '@/types'
+import { getServices } from '@/lib/services'
 import { uploadProductImage } from '@/lib/firebase/storage'
 
 // ---- helpers (kept local so detail page + modal render identically) ---------
@@ -654,6 +656,43 @@ export function ProductMasterSection({
 }
 
 export function ProductPricingSection({ form, setForm }: FormProps) {
+  const [masterOptions, setMasterOptions] = useState<WholesaleOption[]>([])
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const services = await getServices()
+        const settings = await services.settings.getSettings()
+        if (active) setMasterOptions((settings.wholesaleOptions ?? []).filter(o => o.active))
+      } catch {
+        /* ignore — options simply unavailable */
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const configs = form.wholesaleOptions ?? []
+  const configFor = (optionId: string) => configs.find(c => c.optionId === optionId)
+  const setConfigs = (next: typeof configs) => setForm(prev => ({ ...prev, wholesaleOptions: next }))
+
+  const toggleOption = (opt: WholesaleOption, on: boolean) => {
+    if (on) setConfigs([...configs.filter(c => c.optionId !== opt.id), { optionId: opt.id, tierIds: opt.tiers.map(t => t.id) }])
+    else setConfigs(configs.filter(c => c.optionId !== opt.id))
+  }
+  const toggleTier = (optionId: string, tierId: string, on: boolean) => {
+    setConfigs(
+      configs.map(c => {
+        if (c.optionId !== optionId) return c
+        const set = new Set(c.tierIds)
+        if (on) set.add(tierId)
+        else set.delete(tierId)
+        return { ...c, tierIds: [...set] }
+      }),
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
       <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#68756c]">価格・販売設定</p>
@@ -819,6 +858,43 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           }`} />
         </button>
       </div>
+
+      {/* 注文オプション（小分けサービス等）— 商品ごとに有効化・許可サイズ選択 */}
+      {masterOptions.length > 0 && (
+        <div className="mt-4 border-t border-[#f0ece0] pt-4">
+          <p className="mb-2 text-sm font-medium text-gray-700">注文オプション</p>
+          <p className="mb-3 text-[11px] text-[#68756c]">この商品で利用できる注文オプションと、許可する小分けサイズを選びます（マスタは「設定 → 卸売設定」で編集）。</p>
+          <div className="space-y-3">
+            {masterOptions.map(opt => {
+              const cfg = configFor(opt.id)
+              const on = !!cfg
+              return (
+                <div key={opt.id} className="rounded-xl border border-[#e7e1d2] p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-[#173c2a]">
+                    <input type="checkbox" checked={on} onChange={e => toggleOption(opt, e.target.checked)} className="h-4 w-4 accent-[#174c33]" />
+                    {opt.name}
+                  </label>
+                  {on && opt.tiers.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-3 pl-6">
+                      {opt.tiers.map(t => (
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-[#68756c]">
+                          <input
+                            type="checkbox"
+                            checked={cfg!.tierIds.length === 0 || cfg!.tierIds.includes(t.id)}
+                            onChange={e => toggleTier(opt.id, t.id, e.target.checked)}
+                            className="h-3.5 w-3.5 accent-[#174c33]"
+                          />
+                          {t.label}（¥{t.pricePerBagJpy.toLocaleString()}/{opt.unitLabel ?? '袋'}）
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

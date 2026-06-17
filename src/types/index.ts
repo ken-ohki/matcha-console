@@ -61,6 +61,7 @@ export interface Product {
   // 卸売サイト(wholesale.sabo-matcha.jp)向け設定
   wholesaleAvailableKg?: number   // EC即時購入可能数量(kg)。未設定なら在庫全量。
   standardPackageKg?: number      // 標準包装単位(kg)。注文はこの倍数のみ。未設定なら1kg。
+  wholesaleOptions?: ProductOptionConfig[] // 有効化する注文オプション（小分け等）と許可サイズ。
   featured?: boolean              // おすすめ商品。卸売サイトで未ログインでも公開。
   sampleAvailable?: boolean       // サンプル注文の可否
   samplePrice?: number            // サンプル1個(10g)あたりの価格(JPY)
@@ -273,6 +274,7 @@ export interface ProductInput {
   inquireToOrder?: boolean
   wholesaleAvailableKg?: number
   standardPackageKg?: number
+  wholesaleOptions?: ProductOptionConfig[]
   featured?: boolean
   sampleAvailable?: boolean
   samplePrice?: number
@@ -321,6 +323,22 @@ export interface ShippingTierJp {
   feeJpy: number
 }
 
+/** 注文オプション（小分けサービス等）。マスタは設定で編集、商品ごとに有効/無効。 */
+export interface WholesaleOptionTier {
+  id: string
+  label: string          // 表示名（例: "1kg", "100g"）
+  portionKg: number      // 1袋あたりの内容量(kg)。例: 0.1
+  pricePerBagJpy: number // 1袋あたりの加工単価(税抜)
+}
+export interface WholesaleOption {
+  id: string
+  type: 'repackage'      // 現状は小分けサービスのみ
+  name: string           // 表示名（例: 小分けサービス）
+  unitLabel?: string     // 数量単位の表示（例: 袋）
+  active: boolean        // マスタ全体の有効/無効
+  tiers: WholesaleOptionTier[]
+}
+
 export interface Settings {
   appName: string
   currency: string
@@ -329,6 +347,14 @@ export interface Settings {
   wholesaleThresholdKgDefault?: number
   // 国内発送の重量別送料テーブル(税抜・全国一律)。uptoKg 昇順。
   shippingRatesJp?: ShippingTierJp[]
+  // 注文オプションのマスタ。
+  wholesaleOptions?: WholesaleOption[]
+}
+
+/** 商品ごとのオプション有効化設定。tierIds 空配列＝全サイズ許可。 */
+export interface ProductOptionConfig {
+  optionId: string
+  tierIds: string[]
 }
 
 export type MasterType =

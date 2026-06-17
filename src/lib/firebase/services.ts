@@ -53,6 +53,7 @@ import type {
   SelfConsumptionUsageType,
   Settings,
   ShippingTierJp,
+  WholesaleOption,
   StockStatus,
   Supplier,
   SupplierDetailsInput,
@@ -239,6 +240,7 @@ function getDefaultSettings(): Settings {
     stockAlertRatio: 0.2,
     wholesaleThresholdKgDefault: 10,
     shippingRatesJp: [],
+    wholesaleOptions: [],
   }
 }
 
@@ -306,6 +308,11 @@ function mapProduct(id: string, data: DocumentData): Product {
     inquireToOrder: data.inquireToOrder === true,
     wholesaleAvailableKg: data.wholesaleAvailableKg != null ? Number(data.wholesaleAvailableKg) : undefined,
     standardPackageKg: data.standardPackageKg != null ? Number(data.standardPackageKg) : undefined,
+    wholesaleOptions: Array.isArray(data.wholesaleOptions)
+      ? (data.wholesaleOptions as Record<string, unknown>[])
+          .map(o => ({ optionId: String(o.optionId ?? ''), tierIds: Array.isArray(o.tierIds) ? o.tierIds.map(String) : [] }))
+          .filter(o => o.optionId)
+      : undefined,
     featured: data.featured === true,
     sampleAvailable: data.sampleAvailable === true,
     samplePrice: data.samplePrice != null ? Number(data.samplePrice) : undefined,
@@ -631,6 +638,33 @@ function mapMaster(id: string, data: DocumentData): MasterEntry {
   }
 }
 
+function mapWholesaleOptions(value: unknown): WholesaleOption[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(v => {
+      const o = v as Record<string, unknown>
+      const tiers = Array.isArray(o.tiers)
+        ? (o.tiers as Record<string, unknown>[])
+            .map(t => ({
+              id: String(t.id ?? ''),
+              label: String(t.label ?? ''),
+              portionKg: Number(t.portionKg),
+              pricePerBagJpy: Number(t.pricePerBagJpy),
+            }))
+            .filter(t => t.id && t.label && Number.isFinite(t.portionKg) && t.portionKg > 0 && Number.isFinite(t.pricePerBagJpy) && t.pricePerBagJpy >= 0)
+        : []
+      return {
+        id: String(o.id ?? ''),
+        type: 'repackage' as const,
+        name: String(o.name ?? ''),
+        unitLabel: o.unitLabel != null ? String(o.unitLabel) : undefined,
+        active: o.active !== false,
+        tiers,
+      }
+    })
+    .filter(o => o.id && o.name)
+}
+
 function mapSettings(data?: DocumentData): Settings {
   const defaults = getDefaultSettings()
   if (!data) return defaults
@@ -643,6 +677,7 @@ function mapSettings(data?: DocumentData): Settings {
         ? Number(data.wholesaleThresholdKgDefault)
         : defaults.wholesaleThresholdKgDefault,
     shippingRatesJp: mapShippingRatesJp(data.shippingRatesJp),
+    wholesaleOptions: mapWholesaleOptions(data.wholesaleOptions),
   }
 }
 
@@ -1371,6 +1406,7 @@ export function createFirebaseServices(): IServices {
         inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
         wholesaleAvailableKg: input.wholesaleAvailableKg ?? current.wholesaleAvailableKg,
         standardPackageKg: input.standardPackageKg ?? current.standardPackageKg,
+        wholesaleOptions: input.wholesaleOptions ?? current.wholesaleOptions,
         featured: input.featured ?? current.featured,
         sampleAvailable: input.sampleAvailable ?? current.sampleAvailable,
         samplePrice: input.samplePrice ?? current.samplePrice,
