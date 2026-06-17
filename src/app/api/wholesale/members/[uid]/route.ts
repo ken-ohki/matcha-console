@@ -25,6 +25,39 @@ interface ActionBody {
   reason?: string
 }
 
+/** Member detail + purchase history for the customer page. */
+export async function GET(request: Request, context: { params: Promise<{ uid: string }> }) {
+  try {
+    await requireAdmin(request)
+  } catch (err) {
+    return handleAuthError(err)
+  }
+
+  const { uid } = await context.params
+  const database = db()
+
+  const snap = await database.collection('wholesale_members').doc(uid).get()
+  if (!snap.exists) return NextResponse.json({ error: 'member_not_found' }, { status: 404 })
+  const data = snap.data() as Record<string, unknown>
+  const { createdAt: _c, updatedAt: _u, approvedAt: _a, ...rest } = data
+  const member = {
+    uid,
+    ...rest,
+    createdAtMs: typeof data.createdAtMs === 'number' ? data.createdAtMs : 0,
+  }
+
+  const ordersSnap = await database.collection('wholesale_orders').where('memberUid', '==', uid).get()
+  const orders = ordersSnap.docs
+    .map(d => {
+      const o = d.data() as Record<string, unknown>
+      const { createdAt: _oc, updatedAt: _ou, paidAt: _op, cancelledAt: _ox, ...orest } = o
+      return { ...orest, id: d.id, createdAtMs: typeof o.createdAtMs === 'number' ? o.createdAtMs : 0 } as Record<string, unknown> & { id: string; createdAtMs: number }
+    })
+    .sort((a, b) => b.createdAtMs - a.createdAtMs)
+
+  return NextResponse.json({ member, orders }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
 export async function POST(request: Request, context: { params: Promise<{ uid: string }> }) {
   let staff
   try {
