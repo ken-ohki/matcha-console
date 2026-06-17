@@ -20,10 +20,18 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-interface ActionBody {
-  action?: 'approve' | 'reject' | 'suspend'
-  reason?: string
+/** Escape member-supplied text before interpolating into email HTML. */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 }
+
+interface ActionBody {
+  action?: 'approve' | 'reject' | 'suspend' | 'set_rank'
+  reason?: string
+  rank?: string
+}
+
+const RANKS = ['standard', 'premium', 'exclusive']
 
 /** Member detail + purchase history for the customer page. */
 export async function GET(request: Request, context: { params: Promise<{ uid: string }> }) {
@@ -86,6 +94,13 @@ export async function POST(request: Request, context: { params: Promise<{ uid: s
     return NextResponse.json({ error: 'staff_account_conflict' }, { status: 409 })
   }
 
+  if (body.action === 'set_rank') {
+    const rank = String(body.rank ?? '')
+    if (!RANKS.includes(rank)) return NextResponse.json({ error: 'invalid_rank' }, { status: 400 })
+    await memberRef.set({ rank, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    return NextResponse.json({ ok: true, rank })
+  }
+
   if (body.action === 'reject') {
     await memberRef.set(
       { status: 'rejected', rejectedReason: body.reason ?? null, updatedAt: FieldValue.serverTimestamp() },
@@ -141,7 +156,7 @@ export async function POST(request: Request, context: { params: Promise<{ uid: s
         to: member.email,
         message: {
           subject: 'SABO Wholesale — お申し込みが承認されました / Your account is approved',
-          html: `<p>${member.companyName ?? ''} 様</p><p>SABO 卸売サイトのご登録が承認されました。下記よりログインしてご利用ください。<br/>Your SABO wholesale account has been approved. Please log in:</p><p><a href="https://wholesale.sabo-matcha.jp/login">https://wholesale.sabo-matcha.jp/login</a></p>`,
+          html: `<p>${escapeHtml(String(member.companyName ?? ''))} 様</p><p>SABO 卸売サイトのご登録が承認されました。下記よりログインしてご利用ください。<br/>Your SABO wholesale account has been approved. Please log in:</p><p><a href="https://wholesale.sabo-matcha.jp/login">https://wholesale.sabo-matcha.jp/login</a></p>`,
         },
       })
     }

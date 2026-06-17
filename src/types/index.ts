@@ -349,6 +349,17 @@ export interface Settings {
   shippingRatesJp?: ShippingTierJp[]
   // 注文オプションのマスタ。
   wholesaleOptions?: WholesaleOption[]
+  // サンプル手数料(税抜・円)。サンプル価格 = 卸売単価×0.01(10g相当) + この手数料。
+  wholesaleSampleFeeJpy?: number
+  // 顧客ランク別の割引率(%)。卸売商品価格に適用。
+  wholesaleRankDiscounts?: WholesaleRankDiscounts
+}
+
+export type WholesaleRank = 'standard' | 'premium' | 'exclusive'
+export interface WholesaleRankDiscounts {
+  standard: number
+  premium: number
+  exclusive: number
 }
 
 /** 商品ごとのオプション有効化設定。tierIds 空配列＝全サイズ許可。 */

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, Leaf, MessageSquare, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, MessageSquare, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LucideIcon } from 'lucide-react'
 
@@ -15,6 +15,12 @@ interface NavItem {
 }
 
 const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'ホーム',
+    items: [
+      { href: '/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+    ],
+  },
   {
     label: '倉庫',
     items: [
@@ -42,7 +48,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: '卸売サイト',
     items: [
-      { href: '/wholesale/members', label: '会員承認', icon: UserCheck },
+      { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
       { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
       { href: '/wholesale/inquiries', label: '問い合わせ', icon: MessageSquare },
     ],

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
-import type { Settings, ShippingTierJp, WholesaleOption } from '@/types'
+import type { Settings, ShippingTierJp, WholesaleOption, WholesaleRankDiscounts } from '@/types'
 import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 
 const DEFAULT_THRESHOLD = 10
@@ -14,6 +14,8 @@ const uid = () =>
 
 export default function SettingsWholesalePage() {
   const [threshold, setThreshold] = useState<number | ''>('')
+  const [sampleFee, setSampleFee] = useState<number | ''>('')
+  const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [options, setOptions] = useState<WholesaleOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,6 +29,8 @@ export default function SettingsWholesalePage() {
     const services = await getServices()
     const stored = await services.settings.getSettings()
     setThreshold(stored.wholesaleThresholdKgDefault ?? DEFAULT_THRESHOLD)
+    setSampleFee(stored.wholesaleSampleFeeJpy ?? 100)
+    setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
     setOptions(stored.wholesaleOptions ?? [])
     setLoading(false)
@@ -60,6 +64,12 @@ export default function SettingsWholesalePage() {
         .filter(o => o.name)
       const input: Partial<Settings> = {
         wholesaleThresholdKgDefault: Number(threshold),
+        wholesaleSampleFeeJpy: sampleFee === '' ? 0 : Math.max(0, Number(sampleFee)),
+        wholesaleRankDiscounts: {
+          standard: Math.min(100, Math.max(0, Number(rankDiscounts.standard) || 0)),
+          premium: Math.min(100, Math.max(0, Number(rankDiscounts.premium) || 0)),
+          exclusive: Math.min(100, Math.max(0, Number(rankDiscounts.exclusive) || 0)),
+        },
         shippingRatesJp: cleanTiers,
         wholesaleOptions: cleanOptions,
       }
@@ -123,18 +133,59 @@ export default function SettingsWholesalePage() {
           <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
         ) : (
           <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <div className="max-w-xs">
-              <label className="mb-1 block text-sm font-medium text-[#173c2a]">セルフ決済しきい値 (kg)</label>
-              <input
-                type="number"
-                min="0"
-                step="0.1"
-                value={threshold}
-                onChange={e => setThreshold(e.target.value ? Number(e.target.value) : '')}
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                placeholder={String(DEFAULT_THRESHOLD)}
-              />
-              <p className="mt-1 text-[11px] text-[#68756c]">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="max-w-xs">
+                <label className="mb-1 block text-sm font-medium text-[#173c2a]">セルフ決済しきい値 (kg)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={threshold}
+                  onChange={e => setThreshold(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  placeholder={String(DEFAULT_THRESHOLD)}
+                />
+                <p className="mt-1 text-[11px] text-[#68756c]">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
+              </div>
+              <div className="max-w-xs">
+                <label className="mb-1 block text-sm font-medium text-[#173c2a]">サンプル手数料 (円・税抜)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={sampleFee}
+                  onChange={e => setSampleFee(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  placeholder="100"
+                />
+                <p className="mt-1 text-[11px] text-[#68756c]">サンプル価格 ＝ 卸売単価 × 0.01（10g相当）＋ この手数料。全商品共通（初期値 100円）。</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && (
+          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-[#173c2a]">顧客ランク別 割引率（%）</h2>
+              <p className="mt-1 text-[11px] text-[#68756c]">会員の顧客ランクに応じて卸売商品価格に適用される割引率です（サンプル・小分け・送料は対象外）。ランクは各顧客ページで設定します。</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {(['standard', 'premium', 'exclusive'] as const).map(rk => (
+                <div key={rk}>
+                  <label className="mb-1 block text-sm font-medium capitalize text-[#173c2a]">{rk}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min="0" max="100" step="1"
+                      value={rankDiscounts[rk] || ''}
+                      onChange={e => setRankDiscounts(prev => ({ ...prev, [rk]: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }))}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      placeholder="0"
+                    />
+                    <span className="text-sm text-[#68756c]">%</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

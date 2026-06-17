@@ -879,22 +879,35 @@ export default function InventoryPage() {
 
         <div className="hidden overflow-hidden rounded-2xl border border-[#d9d1be] bg-white shadow-sm md:block">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-max min-w-full text-sm">
               <thead className="bg-[#f7f5ee]">
-                <tr>
-                  {user?.role === 'admin' && <th className="w-10 px-4 py-3 text-left font-medium text-[#68756c]" />}
+                <tr className="whitespace-nowrap">
+                  {user?.role === 'admin' && <th className="w-10 px-3 py-3 text-left font-medium text-[#68756c]" />}
                   <SortableTh label="SKU" sortKey="sku" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="茶種 / グレード / 品種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="産地 / 仕入先 / 認証" sortKey="origin" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="残在庫" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="単価 (kg)" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                  <SortableTh label="茶種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">グレード</th>
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">品種</th>
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">摘採</th>
+                  <SortableTh label="産地" sortKey="origin" current={sortKey} dir={sortDir} onSort={handleSort} />
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">仕入先</th>
+                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">認証</th>
+                  <SortableTh label="残在庫" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                  <SortableTh label="卸単価" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">仕入単価</th>
+                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利</th>
+                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利率</th>
                   <SortableTh label="状態" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  {user?.role === 'admin' && <th className="px-4 py-3 text-right font-medium text-[#68756c]">操作</th>}
+                  {user?.role === 'admin' && <th className="px-3 py-3 text-right font-medium text-[#68756c]">操作</th>}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(product => (
+                {filtered.map(product => {
+                  const wholesale = product.standardWholesalePrice
+                  const cost = product.purchaseUnitPrice
+                  const margin = wholesale != null && cost != null ? wholesale - cost : undefined
+                  const marginRate = wholesale != null && cost != null && wholesale > 0 ? ((wholesale - cost) / wholesale) * 100 : undefined
+                  return (
                   <tr
                     key={product.id}
                     draggable={isDraggable}
@@ -907,73 +920,35 @@ export default function InventoryPage() {
                     onDragLeave={() => setDragOverId(prev => (prev === product.id ? null : prev))}
                     onDrop={() => handleProductDrop(product.id)}
                     onClick={() => openDetail(product.id)}
-                    className={`cursor-pointer border-t border-[#ece5d7] hover:bg-[#faf8f2] ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
+                    className={`cursor-pointer whitespace-nowrap border-t border-[#ece5d7] hover:bg-[#faf8f2] ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
                   >
                     {user?.role === 'admin' && (
-                      <td className="px-4 py-4 align-top text-gray-400" onClick={e => e.stopPropagation()}>
+                      <td className="px-3 py-3 text-gray-400" onClick={e => e.stopPropagation()}>
                         <GripVertical size={16} />
                       </td>
                     )}
-                    <td className="px-4 py-4 font-mono text-gray-700">{product.sku}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-[#173c2a]">{product.name}</span>
-                        {product.inquireToOrder && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-[#68756c]">{compactText(product.purchaseProductName)}</div>
+                    <td className="px-3 py-3 font-mono text-gray-700">{product.sku}</td>
+                    <td className="px-3 py-3">
+                      <span className="font-medium text-[#173c2a]">{product.name}</span>
+                      {product.inquireToOrder && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                      )}
                     </td>
-                    <td className="px-4 py-4 text-gray-700">
-                      <div>
-                        {[
-                          translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType,
-                          translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade,
-                        ]
-                          .filter(Boolean)
-                          .join(' / ') || '-'}
-                      </div>
-                      <div className="text-xs text-[#68756c]">品種: {formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</div>
-                      <div className="text-xs text-[#68756c]">摘採: {formatOptionList(translateValues(masters, 'plucking', product.pluckingMethods))}</div>
-                    </td>
-                    <td className="px-4 py-4 text-gray-700">
-                      <div>{formatOptionList(translateValues(masters, 'origin', product.origins))}</div>
-                      <div className="text-xs text-[#68756c]">仕入先: {compactText(product.supplier)}</div>
-                      <div className="text-xs text-[#68756c]">認証: {formatOptionList(translateValues(masters, 'certification', product.certifications))}</div>
-                    </td>
-                    <td className="px-4 py-4 text-gray-700">
-                      <div className={`font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{product.currentStockKg.toFixed(1)} kg</div>
-                    </td>
-                    <td className="px-4 py-4 text-gray-700">
-                      {(() => {
-                        const wholesale = product.standardWholesalePrice
-                        const cost = product.purchaseUnitPrice
-                        const margin = wholesale != null && cost != null ? wholesale - cost : undefined
-                        const marginRate = wholesale != null && cost != null && wholesale > 0
-                          ? ((wholesale - cost) / wholesale) * 100
-                          : undefined
-                        return (
-                          <div className="text-right">
-                            <div>
-                              <span className="text-xs text-[#68756c]">卸 </span>
-                              <span className="font-semibold text-[#173c2a]">{formatCurrency(wholesale)}</span>
-                            </div>
-                            <div className="text-xs text-[#68756c]">
-                              仕入 <span className="text-[#173c2a]">{formatCurrency(cost)}</span>
-                            </div>
-                            <div className={`mt-0.5 text-xs ${margin == null ? 'text-[#68756c]' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                              粗利 {margin == null ? '-' : formatCurrency(margin)}
-                              {marginRate != null && (
-                                <span className="ml-1 text-[10px]">({marginRate.toFixed(1)}%)</span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-4 py-4"><StockStatusBadge status={product.stockStatus} /></td>
+                    <td className="px-3 py-3 text-gray-700">{translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType ?? '-'}</td>
+                    <td className="px-3 py-3 text-gray-700">{translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade ?? '-'}</td>
+                    <td className="px-3 py-3 text-gray-700">{formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</td>
+                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'plucking', product.pluckingMethods))}</td>
+                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'origin', product.origins))}</td>
+                    <td className="px-3 py-3 text-gray-700">{compactText(product.supplier)}</td>
+                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'certification', product.certifications))}</td>
+                    <td className={`px-3 py-3 text-right font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{product.currentStockKg.toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right font-semibold text-[#173c2a]">{formatCurrency(wholesale)}</td>
+                    <td className="px-3 py-3 text-right text-gray-700">{formatCurrency(cost)}</td>
+                    <td className={`px-3 py-3 text-right ${margin == null ? 'text-[#68756c]' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>
+                    <td className={`px-3 py-3 text-right text-xs ${marginRate == null ? 'text-[#68756c]' : marginRate < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{marginRate == null ? '-' : `${marginRate.toFixed(1)}%`}</td>
+                    <td className="px-3 py-3"><StockStatusBadge status={product.stockStatus} /></td>
                     {user?.role === 'admin' && (
-                      <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                      <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => handleDuplicateProduct(product)}
@@ -992,10 +967,11 @@ export default function InventoryPage() {
                       </td>
                     )}
                   </tr>
-                ))}
+                  )
+                })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={user?.role === 'admin' ? 9 : 8} className="px-4 py-12 text-center text-[#68756c]">
+                    <td colSpan={user?.role === 'admin' ? 17 : 15} className="px-4 py-12 text-center text-[#68756c]">
                       商品がありません
                     </td>
                   </tr>

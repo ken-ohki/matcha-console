@@ -22,9 +22,12 @@ interface Member {
   businessStage?: string
   annualVolumeEstimate?: string
   taxId?: string
+  rank?: string
   buyerId?: string
   createdAtMs?: number
 }
+
+const RANKS = ['standard', 'premium', 'exclusive'] as const
 
 interface OrderItem {
   productName?: string
@@ -114,6 +117,25 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
     }
   }
 
+  const setRank = async (rank: string) => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/wholesale/members/${uid}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ action: 'set_rank', rank }),
+      })
+      if (!res.ok) {
+        setError('ランクの更新に失敗しました')
+        return
+      }
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // Purchase summary — count & spend exclude cancelled orders; spend counts paid only.
   const live = orders.filter(o => o.status !== 'cancelled')
   const paidSpend = orders.filter(o => o.paymentStatus === 'paid').reduce((s, o) => s + (o.totalJpy ?? 0), 0)
@@ -156,6 +178,22 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                   <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-[#174c33] px-3 py-1.5 text-sm text-white hover:opacity-90"><Check size={14} /> 承認</button>
                 )}
               </div>
+            </div>
+
+            {/* Rank */}
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#d9d1be] bg-white p-4">
+              <span className="text-sm font-medium text-[#173c2a]">顧客ランク</span>
+              <select
+                value={member.rank ?? 'standard'}
+                onChange={e => setRank(e.target.value)}
+                disabled={busy}
+                className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-60"
+              >
+                {RANKS.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              <span className="text-[11px] text-[#68756c]">割引率は「設定 → 卸売設定」で定義します。</span>
             </div>
 
             {/* Summary stats */}

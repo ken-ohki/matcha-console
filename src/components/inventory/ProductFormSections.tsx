@@ -738,14 +738,17 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           <label className="mb-1 block text-sm font-medium text-gray-700">標準包装単位 (kg)</label>
           <input
             type="number"
-            min="0"
-            step="0.1"
+            min="1"
+            step="1"
             value={form.standardPackageKg ?? ''}
-            onChange={event => setForm(prev => ({ ...prev, standardPackageKg: event.target.value ? Number(event.target.value) : undefined }))}
+            onChange={event => {
+              const v = event.target.value ? Math.max(1, Math.floor(Number(event.target.value))) : undefined
+              setForm(prev => ({ ...prev, standardPackageKg: v }))
+            }}
             className={fieldCls}
             placeholder="未設定なら1kg"
           />
-          <p className="mt-1 text-[11px] text-[#68756c]">標準の包装形態 (kg)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
+          <p className="mt-1 text-[11px] text-[#68756c]">標準の包装形態 (kg・整数)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">サンプル価格（1個 / 10g）</label>

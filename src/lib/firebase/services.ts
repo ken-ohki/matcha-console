@@ -54,6 +54,7 @@ import type {
   Settings,
   ShippingTierJp,
   WholesaleOption,
+  WholesaleRankDiscounts,
   StockStatus,
   Supplier,
   SupplierDetailsInput,
@@ -241,6 +242,8 @@ function getDefaultSettings(): Settings {
     wholesaleThresholdKgDefault: 10,
     shippingRatesJp: [],
     wholesaleOptions: [],
+    wholesaleSampleFeeJpy: 100,
+    wholesaleRankDiscounts: { standard: 0, premium: 0, exclusive: 0 },
   }
 }
 
@@ -665,6 +668,15 @@ function mapWholesaleOptions(value: unknown): WholesaleOption[] {
     .filter(o => o.id && o.name)
 }
 
+function mapRankDiscounts(value: unknown): WholesaleRankDiscounts {
+  const v = (value ?? {}) as Record<string, unknown>
+  const pct = (x: unknown) => {
+    const n = Number(x)
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0
+  }
+  return { standard: pct(v.standard), premium: pct(v.premium), exclusive: pct(v.exclusive) }
+}
+
 function mapSettings(data?: DocumentData): Settings {
   const defaults = getDefaultSettings()
   if (!data) return defaults
@@ -678,6 +690,9 @@ function mapSettings(data?: DocumentData): Settings {
         : defaults.wholesaleThresholdKgDefault,
     shippingRatesJp: mapShippingRatesJp(data.shippingRatesJp),
     wholesaleOptions: mapWholesaleOptions(data.wholesaleOptions),
+    wholesaleSampleFeeJpy:
+      data.wholesaleSampleFeeJpy != null ? Number(data.wholesaleSampleFeeJpy) : defaults.wholesaleSampleFeeJpy,
+    wholesaleRankDiscounts: mapRankDiscounts(data.wholesaleRankDiscounts),
   }
 }
 
