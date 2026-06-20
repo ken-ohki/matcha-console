@@ -91,7 +91,7 @@ export default function SettingsIssuerPage() {
   if (!isAdmin) {
     return (
       <AppLayout>
-        <div className="rounded-2xl border border-dashed border-[#d9d1be] bg-white p-10 text-center text-sm text-[#68756c]">
+        <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-mist">
           このページは管理者のみアクセスできます。
         </div>
       </AppLayout>
@@ -102,49 +102,49 @@ export default function SettingsIssuerPage() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-graphite">
             <Settings size={15} />
             設定
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">請求書 自社情報</h1>
-          <p className="mt-2 text-sm text-[#68756c]">
+          <h1 className="mt-3 text-3xl font-bold text-ink">請求書 自社情報</h1>
+          <p className="mt-2 text-sm text-mist">
             請求書・納品書・見積書に印字される自社の住所・連絡先・登録番号を設定します。
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/settings/masters" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">マスター管理</Link>
-          <Link href="/settings/users" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">ユーザー管理</Link>
-          <Link href="/settings/terms" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
-          <Link href="/settings/bank-accounts" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">入金口座</Link>
-          <Link href="/settings/issuer" className="rounded-full bg-[#174c33] px-3 py-1.5 text-white">自社情報</Link>
-          <Link href="/settings/wholesale" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]">卸売設定</Link>
+          <Link href="/settings/masters" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">マスター管理</Link>
+          <Link href="/settings/users" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">ユーザー管理</Link>
+          <Link href="/settings/terms" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
+          <Link href="/settings/bank-accounts" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">入金口座</Link>
+          <Link href="/settings/issuer" className="rounded-full bg-ink px-3 py-1.5 text-paper">自社情報</Link>
+          <Link href="/settings/wholesale" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">卸売設定</Link>
         </div>
 
         {feedback && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             feedback.tone === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
+              ? 'border-matcha/40 bg-bone text-matcha'
+              : 'border-alert/40 bg-alert/5 text-alert'
           }`}>
             {feedback.message}
           </div>
         )}
 
         {loading ? (
-          <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
+          <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
         ) : (
-          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2">
               {FIELDS.map(field => (
                 <div key={field.key} className={field.full ? 'md:col-span-2' : ''}>
-                  <label className="mb-1 block text-sm font-medium text-[#173c2a]">{field.label}</label>
+                  <label className="mb-1 block text-sm font-medium text-ink">{field.label}</label>
                   <input
                     type="text"
                     value={form[field.key]}
                     onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
                     placeholder={field.placeholder}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                   />
                 </div>
               ))}
@@ -156,7 +156,7 @@ export default function SettingsIssuerPage() {
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-graphite hover:bg-bone"
           >
             デフォルトに戻す
           </button>
@@ -164,7 +164,7 @@ export default function SettingsIssuerPage() {
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
           >
             <Save size={14} />
             {saving ? '保存中…' : '変更を保存'}

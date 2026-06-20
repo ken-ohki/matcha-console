@@ -110,7 +110,7 @@ export default function PurchaseOrderDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="py-20 text-center text-sm text-[#68756c]">読み込み中…</div>
+        <div className="py-20 text-center text-sm text-mist">読み込み中…</div>
       </AppLayout>
     )
   }
@@ -119,8 +119,8 @@ export default function PurchaseOrderDetailPage() {
     return (
       <AppLayout>
         <div className="space-y-4 py-20 text-center">
-          <p className="text-sm text-[#68756c]">発注が見つかりませんでした。</p>
-          <Link href="/purchase-orders" className="inline-flex items-center gap-2 text-sm font-medium text-[#174c33] hover:underline">
+          <p className="text-sm text-mist">発注が見つかりませんでした。</p>
+          <Link href="/purchase-orders" className="inline-flex items-center gap-2 text-sm font-medium text-matchaDeep hover:underline">
             <ArrowLeft size={14} /> 発注一覧へ戻る
           </Link>
         </div>
@@ -137,19 +137,19 @@ export default function PurchaseOrderDetailPage() {
       <div className="space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-3">
-          <Link href="/purchase-orders" className="inline-flex w-fit items-center gap-1.5 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/purchase-orders" className="inline-flex w-fit items-center gap-1.5 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} /> 発注一覧
           </Link>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <StatusBadge status={order.status} />
-              <h1 className="text-2xl font-bold text-[#173c2a]">{order.supplierName}</h1>
-              <span className="text-sm text-[#68756c]">{formatDate(order.orderDate)}</span>
+              <h1 className="text-2xl font-bold text-ink">{order.supplierName}</h1>
+              <span className="text-sm text-mist">{formatDate(order.orderDate)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/purchase-orders/${order.id}/document`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#d9d1be] bg-white px-3 py-2 text-sm font-medium text-[#173c2a] transition hover:bg-[#f7f5ee]"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-ink transition hover:bg-bone"
               >
                 <FileText size={14} /> 発注書
               </Link>
@@ -158,7 +158,7 @@ export default function PurchaseOrderDetailPage() {
                   <button
                     type="button"
                     onClick={handleDelete}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-alert/40 bg-white px-3 py-2 text-sm font-medium text-alert transition hover:bg-alert/5"
                   >
                     <Trash2 size={14} /> 削除
                   </button>
@@ -166,7 +166,7 @@ export default function PurchaseOrderDetailPage() {
                     type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
                   >
                     {saving ? '保存中…' : '保存'}
                   </button>
@@ -177,10 +177,10 @@ export default function PurchaseOrderDetailPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">{message}</div>
         )}
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>
         )}
 
         {/* Tabs */}
@@ -192,8 +192,8 @@ export default function PurchaseOrderDetailPage() {
               onClick={() => setTab(t.key)}
               className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                 tab === t.key
-                  ? 'border-[#174c33] text-[#174c33]'
-                  : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                  ? 'border-[#174c33] text-matchaDeep'
+                  : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {t.label}
@@ -214,16 +214,16 @@ export default function PurchaseOrderDetailPage() {
             <OverviewCard label="支払済" value={formatCurrency(paid)} />
             <OverviewCard label="残額（税込）" value={formatCurrency(remaining)} strong={remaining > 0} />
             <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 sm:col-span-2 lg:col-span-3">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[#68756c]">商品</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wider text-mist">商品</p>
               <div className="space-y-1.5">
                 {order.items.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-sm">
-                    <span className="text-[#173c2a]">{item.productName}{item.productSku ? `（${item.productSku}）` : ''}</span>
-                    <span className="text-[#68756c]">{formatKg(item.quantityKg)} × {formatCurrency(item.unitPrice)}</span>
+                    <span className="text-ink">{item.productName}{item.productSku ? `（${item.productSku}）` : ''}</span>
+                    <span className="text-mist">{formatKg(item.quantityKg)} × {formatCurrency(item.unitPrice)}</span>
                   </div>
                 ))}
               </div>
-              {order.notes && <p className="mt-3 whitespace-pre-wrap border-t border-[#f0ebdf] pt-3 text-sm text-[#68756c]">{order.notes}</p>}
+              {order.notes && <p className="mt-3 whitespace-pre-wrap border-t border-[#f0ebdf] pt-3 text-sm text-mist">{order.notes}</p>}
             </div>
           </div>
         )}
@@ -242,21 +242,21 @@ export default function PurchaseOrderDetailPage() {
         {tab === 'payment' && (
           <fieldset disabled={!canEdit} className="space-y-5">
             <PoBillingSection form={form} setForm={setForm as React.Dispatch<React.SetStateAction<PurchaseOrderInput>>} poId={order.id} />
-            <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 sm:grid-cols-3">
+            <div className="grid gap-3 rounded-2xl border border-line bg-bone p-4 sm:grid-cols-3">
               <div>
-                <p className="text-xs text-[#68756c]">合計（税込）</p>
-                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(taxIncl)}</p>
+                <p className="text-xs text-mist">合計（税込）</p>
+                <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(taxIncl)}</p>
               </div>
               <div>
-                <p className="text-xs text-[#68756c]">支払済</p>
-                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(paid)}</p>
+                <p className="text-xs text-mist">支払済</p>
+                <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(paid)}</p>
               </div>
               <div>
-                <p className="text-xs text-[#68756c]">残額</p>
-                <p className={`mt-1 text-lg font-semibold ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatCurrency(remaining)}</p>
+                <p className="text-xs text-mist">残額</p>
+                <p className={`mt-1 text-lg font-semibold ${remaining > 0 ? 'text-[#a87b1e]' : 'text-matcha'}`}>{formatCurrency(remaining)}</p>
               </div>
             </div>
-            <p className="text-xs text-[#68756c]">※ 支払い内容を変更したら上部の「保存」を押してください。</p>
+            <p className="text-xs text-mist">※ 支払い内容を変更したら上部の「保存」を押してください。</p>
           </fieldset>
         )}
 
@@ -264,7 +264,7 @@ export default function PurchaseOrderDetailPage() {
           <div className="space-y-4">
             <div className="overflow-hidden rounded-2xl border border-[#e6dfcf] bg-white">
               <table className="min-w-full text-sm">
-                <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                   <tr>
                     <th className="px-4 py-2 font-medium">商品</th>
                     <th className="px-4 py-2 font-medium text-right">発注数量</th>
@@ -276,23 +276,23 @@ export default function PurchaseOrderDetailPage() {
                   {order.items.map((item, i) => {
                     const remainingKg = Math.max(0, item.quantityKg - (item.receivedKg ?? 0))
                     return (
-                      <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                      <tr key={i} className="border-t border-[#f0ebdf] text-ink">
                         <td className="px-4 py-2">
                           <div className="font-medium">{item.productName}</div>
-                          <div className="text-[11px] text-[#68756c]">{item.productSku}</div>
+                          <div className="text-[11px] text-mist">{item.productSku}</div>
                         </td>
                         <td className="px-4 py-2 text-right">{formatKg(item.quantityKg)}</td>
                         <td className="px-4 py-2 text-right">{formatKg(item.receivedKg ?? 0)}</td>
-                        <td className={`px-4 py-2 text-right ${remainingKg > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatKg(remainingKg)}</td>
+                        <td className={`px-4 py-2 text-right ${remainingKg > 0 ? 'text-[#a87b1e]' : 'text-matcha'}`}>{formatKg(remainingKg)}</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="text-sm text-[#68756c]">
+            <p className="text-sm text-mist">
               入荷の登録・反映は
-              <Link href="/receiving" className="mx-1 font-medium text-[#174c33] hover:underline">入荷管理</Link>
+              <Link href="/receiving" className="mx-1 font-medium text-matchaDeep hover:underline">入荷管理</Link>
               で行います。実際の入荷日は「商品・金額」タブで編集できます。
             </p>
           </div>
@@ -305,8 +305,8 @@ export default function PurchaseOrderDetailPage() {
 function OverviewCard({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-[#68756c]">{label}</p>
-      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-[#173c2a]' : 'text-sm text-[#173c2a]'}`}>{value}</div>
+      <p className="text-xs font-medium uppercase tracking-wider text-mist">{label}</p>
+      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-ink' : 'text-sm text-ink'}`}>{value}</div>
     </div>
   )
 }

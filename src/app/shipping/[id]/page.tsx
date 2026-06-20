@@ -18,10 +18,10 @@ const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   shipped: '発送完了',
 }
 const SHIPPING_COLORS: Record<ShippingStatus, string> = {
-  ordering: 'bg-slate-100 text-slate-700',
-  producing: 'bg-blue-100 text-blue-800',
-  ready_to_ship: 'bg-amber-100 text-amber-800',
-  shipped: 'bg-emerald-100 text-emerald-800',
+  ordering: 'bg-bone text-graphite',
+  producing: 'bg-bone text-graphite',
+  ready_to_ship: 'bg-bone text-[#a87b1e]',
+  shipped: 'bg-bone text-matcha',
 }
 const STATUS_OPTIONS: ShippingStatus[] = ['ordering', 'producing', 'ready_to_ship', 'shipped']
 
@@ -34,7 +34,7 @@ type ShipForm = {
   shippingAddress: string
 }
 
-const fieldCls = 'w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600'
+const fieldCls = 'w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha'
 
 export default function ShippingDetailPage() {
   const params = useParams<{ id: string }>()
@@ -151,14 +151,14 @@ export default function ShippingDetailPage() {
   }
 
   if (loading) {
-    return <AppLayout><div className="py-20 text-center text-sm text-[#68756c]">読み込み中…</div></AppLayout>
+    return <AppLayout><div className="py-20 text-center text-sm text-mist">読み込み中…</div></AppLayout>
   }
   if (!sale || !form) {
     return (
       <AppLayout>
         <div className="space-y-4 py-20 text-center">
-          <p className="text-sm text-[#68756c]">発送案件が見つかりませんでした。</p>
-          <Link href="/shipping" className="inline-flex items-center gap-2 text-sm font-medium text-[#174c33] hover:underline">
+          <p className="text-sm text-mist">発送案件が見つかりませんでした。</p>
+          <Link href="/shipping" className="inline-flex items-center gap-2 text-sm font-medium text-matchaDeep hover:underline">
             <ArrowLeft size={14} /> 発送管理へ戻る
           </Link>
         </div>
@@ -172,22 +172,22 @@ export default function ShippingDetailPage() {
     <AppLayout>
       <div className="space-y-5">
         <div className="flex flex-col gap-3">
-          <Link href="/shipping" className="inline-flex w-fit items-center gap-1.5 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/shipping" className="inline-flex w-fit items-center gap-1.5 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} /> 発送管理
           </Link>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${SHIPPING_COLORS[form.shippingStatus]}`}>{SHIPPING_LABELS[form.shippingStatus]}</span>
-              <h1 className="text-2xl font-bold text-[#173c2a]">{sale.buyerName}</h1>
-              <span className="text-sm text-[#68756c]">{sale.country || '-'}</span>
-              {overdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">期限超過</span>}
+              <h1 className="text-2xl font-bold text-ink">{sale.buyerName}</h1>
+              <span className="text-sm text-mist">{sale.country || '-'}</span>
+              {overdue && <span className="rounded-full bg-alert/10 px-2 py-0.5 text-[10px] font-medium text-alert">期限超過</span>}
             </div>
             {canEdit && form.shippingStatus !== 'shipped' && (
               <button
                 type="button"
                 onClick={() => persist({ shippingStatus: 'shipped', shippingDate: form.shippingDate || todayIso() })}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
               >
                 <PackageCheck size={15} /> 発送完了にする
               </button>
@@ -195,16 +195,16 @@ export default function ShippingDetailPage() {
           </div>
         </div>
 
-        {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+        {message && <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">{message}</div>}
+        {error && <div className="rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>}
 
         {/* 発送内容 */}
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送する商品</p>
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">発送する商品</p>
             <div className="overflow-hidden rounded-xl border border-[#ece8db]">
               <table className="min-w-full text-sm">
-                <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                   <tr>
                     <th className="px-3 py-2 font-medium">商品</th>
                     <th className="px-3 py-2 font-medium">SKU</th>
@@ -213,39 +213,39 @@ export default function ShippingDetailPage() {
                 </thead>
                 <tbody>
                   {sale.items.map((item, i) => (
-                    <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                    <tr key={i} className="border-t border-[#f0ebdf] text-ink">
                       <td className="px-3 py-2">{item.productName}</td>
-                      <td className="px-3 py-2 text-[#68756c]">{item.productSku}</td>
+                      <td className="px-3 py-2 text-mist">{item.productSku}</td>
                       <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 text-xs text-[#68756c]">合計数量 {formatKg(sale.quantityKg)} ／ 納期 {sale.dueDate || '-'}</div>
+            <div className="mt-3 text-xs text-mist">合計数量 {formatKg(sale.quantityKg)} ／ 納期 {sale.dueDate || '-'}</div>
             {sale.shippingNote ? (
               <div className="mt-3">
-                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#68756c]">発送担当者へのメモ</p>
-                <div className="whitespace-pre-wrap rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">{sale.shippingNote}</div>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-mist">発送担当者へのメモ</p>
+                <div className="whitespace-pre-wrap rounded-xl border border-[#a87b1e]/40 bg-bone px-3 py-2 text-sm text-[#a87b1e]">{sale.shippingNote}</div>
               </div>
             ) : null}
             <div className="mt-3 text-xs">
-              <Link href={`/sales/${sale.id}`} className="font-medium text-[#174c33] hover:underline">販売案件の詳細を開く →</Link>
+              <Link href={`/sales/${sale.id}`} className="font-medium text-matchaDeep hover:underline">販売案件の詳細を開く →</Link>
             </div>
           </div>
 
           {/* 発送情報（編集） */}
           <fieldset disabled={!canEdit || saving} className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送情報</p>
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">発送情報</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">発送ステータス</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">発送ステータス</label>
                 <select value={form.shippingStatus} onChange={e => setForm({ ...form, shippingStatus: e.target.value as ShippingStatus })} className={fieldCls}>
                   {STATUS_OPTIONS.map(s => <option key={s} value={s}>{SHIPPING_LABELS[s]}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">発送方法</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">発送方法</label>
                 <select value={form.shippingMethod} onChange={e => setForm({ ...form, shippingMethod: e.target.value })} className={fieldCls}>
                   <option value="">未設定</option>
                   {methodOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -254,23 +254,23 @@ export default function ShippingDetailPage() {
                   )}
                 </select>
                 {methodOptions.length === 0 && (
-                  <p className="mt-1 text-[11px] text-amber-700">設定 → マスター管理 → 発送方法 で登録できます</p>
+                  <p className="mt-1 text-[11px] text-[#a87b1e]">設定 → マスター管理 → 発送方法 で登録できます</p>
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">発送日</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">発送日</label>
                 <input type="date" value={form.shippingDate} onChange={e => setForm({ ...form, shippingDate: e.target.value })} className={fieldCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">追跡番号</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">追跡番号</label>
                 <input value={form.trackingNumber} onChange={e => setForm({ ...form, trackingNumber: e.target.value })} className={fieldCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">郵便番号</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">郵便番号</label>
                 <input value={form.shippingPostalCode} onChange={e => setForm({ ...form, shippingPostalCode: e.target.value })} placeholder={buyer?.shippingPostalCode || '〒'} className={fieldCls} />
               </div>
               <div className="sm:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-700">発送先住所</label>
+                <label className="mb-1 block text-xs font-medium text-graphite">発送先住所</label>
                 <textarea rows={2} value={form.shippingAddress} onChange={e => setForm({ ...form, shippingAddress: e.target.value })} placeholder={buyer?.shippingAddress || '住所'} className={fieldCls} />
               </div>
             </div>
@@ -280,7 +280,7 @@ export default function ShippingDetailPage() {
                   type="button"
                   onClick={() => persist({})}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
                 >
                   {saving ? '保存中…' : '保存'}
                 </button>
@@ -291,22 +291,22 @@ export default function ShippingDetailPage() {
 
         {/* 発送伝票 */}
         <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送伝票（送り状など）</p>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">発送伝票（送り状など）</p>
           {sale.shippingSlip ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f1] px-3 py-2 text-sm">
-              <FileText size={15} className="text-[#174c33]" />
-              <a href={sale.shippingSlip.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-[#173c2a] hover:underline">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6dfcf] bg-bone px-3 py-2 text-sm">
+              <FileText size={15} className="text-matchaDeep" />
+              <a href={sale.shippingSlip.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-ink hover:underline">
                 {sale.shippingSlip.name}
               </a>
-              {sale.shippingSlip.uploadedAt && <span className="text-[10px] text-[#a59f8c]">{sale.shippingSlip.uploadedAt}</span>}
+              {sale.shippingSlip.uploadedAt && <span className="text-[10px] text-mist">{sale.shippingSlip.uploadedAt}</span>}
               {canEdit && (
-                <button type="button" onClick={handleRemoveSlip} disabled={uploadingSlip} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" aria-label="削除">
+                <button type="button" onClick={handleRemoveSlip} disabled={uploadingSlip} className="rounded-lg p-1.5 text-alert hover:bg-alert/5" aria-label="削除">
                   <Trash2 size={14} />
                 </button>
               )}
             </div>
           ) : canEdit ? (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-4 py-3 text-sm font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-white px-4 py-3 text-sm font-medium text-matchaDeep transition hover:bg-[#eef3eb]">
               <FileText size={14} />
               {uploadingSlip ? 'アップロード中…' : '発送伝票をアップロード（PDF / 画像）'}
               <input
@@ -322,9 +322,9 @@ export default function ShippingDetailPage() {
               />
             </label>
           ) : (
-            <span className="text-sm text-[#a59f8c]">未添付</span>
+            <span className="text-sm text-mist">未添付</span>
           )}
-          {slipError && <p className="mt-2 text-xs text-red-600">{slipError}</p>}
+          {slipError && <p className="mt-2 text-xs text-alert">{slipError}</p>}
         </div>
       </div>
     </AppLayout>

@@ -163,7 +163,7 @@ export default function SaleDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="py-20 text-center text-sm text-[#68756c]">読み込み中…</div>
+        <div className="py-20 text-center text-sm text-mist">読み込み中…</div>
       </AppLayout>
     )
   }
@@ -172,8 +172,8 @@ export default function SaleDetailPage() {
     return (
       <AppLayout>
         <div className="space-y-4 py-20 text-center">
-          <p className="text-sm text-[#68756c]">販売案件が見つかりませんでした。</p>
-          <Link href="/sales" className="inline-flex items-center gap-2 text-sm font-medium text-[#174c33] hover:underline">
+          <p className="text-sm text-mist">販売案件が見つかりませんでした。</p>
+          <Link href="/sales" className="inline-flex items-center gap-2 text-sm font-medium text-matchaDeep hover:underline">
             <ArrowLeft size={14} /> 販売管理へ戻る
           </Link>
         </div>
@@ -191,7 +191,7 @@ export default function SaleDetailPage() {
       <div className="space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-3">
-          <Link href="/sales" className="inline-flex w-fit items-center gap-1.5 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/sales" className="inline-flex w-fit items-center gap-1.5 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} /> 販売管理
           </Link>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -199,14 +199,14 @@ export default function SaleDetailPage() {
               <SalesStatusBadge status={record.status} />
               <PaymentBadge status={record.paymentStatus} />
               <ShippingBadge status={record.shippingStatus} />
-              <h1 className="text-2xl font-bold text-[#173c2a]">{record.buyerName}</h1>
+              <h1 className="text-2xl font-bold text-ink">{record.buyerName}</h1>
             </div>
             {canEdit && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-alert/40 bg-white px-3 py-2 text-sm font-medium text-alert transition hover:bg-alert/5"
                 >
                   <Trash2 size={14} /> 削除
                 </button>
@@ -214,7 +214,7 @@ export default function SaleDetailPage() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
                 >
                   {saving ? '保存中…' : '保存'}
                 </button>
@@ -224,10 +224,10 @@ export default function SaleDetailPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">{message}</div>
         )}
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>
         )}
 
         {/* Tabs */}
@@ -238,7 +238,7 @@ export default function SaleDetailPage() {
               type="button"
               onClick={() => setTab(t.key)}
               className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-                tab === t.key ? 'border-[#174c33] text-[#174c33]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                tab === t.key ? 'border-[#174c33] text-matchaDeep' : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {t.label}
@@ -257,12 +257,12 @@ export default function SaleDetailPage() {
               <OverviewCard label="請求額（税込）" value={formatCurrency(taxIncl)} strong />
               <OverviewCard label="請求額（税抜）" value={formatCurrency(record.invoiceAmount || record.revenue)} />
               <OverviewCard label="原価" value={formatCurrency(record.costAmount)} />
-              <OverviewCard label="粗利" value={<span className={record.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}>{formatCurrency(record.grossProfit)}</span>} strong />
+              <OverviewCard label="粗利" value={<span className={record.grossProfit >= 0 ? 'text-matcha' : 'text-alert'}>{formatCurrency(record.grossProfit)}</span>} strong />
               <OverviewCard label="作成日" value={record.createdAt.toLocaleDateString('ja-JP')} />
             </div>
             <div className="overflow-x-auto rounded-2xl border border-[#e6dfcf] bg-white">
               <table className="min-w-full text-sm">
-                <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                   <tr>
                     <th className="px-4 py-2 font-medium">商品</th>
                     <th className="px-4 py-2 font-medium">SKU</th>
@@ -279,15 +279,15 @@ export default function SaleDetailPage() {
                     const profit = item.grossProfit ?? (item.revenue - item.costAmount)
                     const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : null
                     return (
-                      <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                      <tr key={i} className="border-t border-[#f0ebdf] text-ink">
                         <td className="px-4 py-2">{item.productName}</td>
-                        <td className="px-4 py-2 text-[#68756c]">{item.productSku}</td>
+                        <td className="px-4 py-2 text-mist">{item.productSku}</td>
                         <td className="whitespace-nowrap px-4 py-2 text-right">{formatKg(item.quantityKg)}</td>
                         <td className="whitespace-nowrap px-4 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
                         <td className="whitespace-nowrap px-4 py-2 text-right font-medium">{formatCurrency(item.revenue)}</td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-[#68756c]">{formatCurrency(item.costAmount)}</td>
-                        <td className={`whitespace-nowrap px-4 py-2 text-right font-medium ${profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(profit)}</td>
-                        <td className={`whitespace-nowrap px-4 py-2 text-right ${profit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{margin != null ? `${margin.toFixed(1)}%` : '-'}</td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-mist">{formatCurrency(item.costAmount)}</td>
+                        <td className={`whitespace-nowrap px-4 py-2 text-right font-medium ${profit >= 0 ? 'text-matcha' : 'text-alert'}`}>{formatCurrency(profit)}</td>
+                        <td className={`whitespace-nowrap px-4 py-2 text-right ${profit >= 0 ? 'text-matcha' : 'text-alert'}`}>{margin != null ? `${margin.toFixed(1)}%` : '-'}</td>
                       </tr>
                     )
                   })}
@@ -295,7 +295,7 @@ export default function SaleDetailPage() {
               </table>
             </div>
             {((record.shippingFee || 0) > 0 || (record.fees ?? []).length > 0) && (
-              <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 text-sm text-[#173c2a]">
+              <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 text-sm text-ink">
                 {(record.shippingFee || 0) > 0 && <span className="mr-3">送料 {formatCurrency(record.shippingFee)}</span>}
                 {(record.fees ?? []).map((f, i) => (
                   <span key={i} className="mr-3">{f.name || '諸費用'} {formatCurrency((Number(f.quantity) || 0) * (Number(f.unitPrice) || 0))}（{f.taxRate === 0 ? '免税' : `${f.taxRate}%`}）</span>
@@ -304,8 +304,8 @@ export default function SaleDetailPage() {
             )}
             {record.notes && (
               <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-                <p className="text-[11px] uppercase tracking-wider text-[#68756c]">メモ</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-[#173c2a]">{record.notes}</p>
+                <p className="text-[11px] uppercase tracking-wider text-mist">メモ</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{record.notes}</p>
               </div>
             )}
           </div>
@@ -325,17 +325,17 @@ export default function SaleDetailPage() {
         {tab === 'payment' && (
           <fieldset disabled={!canEdit} className="space-y-4">
             <SalePaymentSection form={form} setForm={setFormTyped} />
-            <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 sm:grid-cols-2">
+            <div className="grid gap-3 rounded-2xl border border-line bg-bone p-4 sm:grid-cols-2">
               <div>
-                <p className="text-xs text-[#68756c]">請求額（税抜）</p>
-                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(record.invoiceAmount || record.revenue)}</p>
+                <p className="text-xs text-mist">請求額（税抜）</p>
+                <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(record.invoiceAmount || record.revenue)}</p>
               </div>
               <div>
-                <p className="text-xs text-[#68756c]">請求額（税込）</p>
-                <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(taxIncl)}</p>
+                <p className="text-xs text-mist">請求額（税込）</p>
+                <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(taxIncl)}</p>
               </div>
             </div>
-            <p className="text-xs text-[#68756c]">※ 変更したら上部の「保存」を押してください。入金管理（/receivables）の一覧にも反映されます。</p>
+            <p className="text-xs text-mist">※ 変更したら上部の「保存」を押してください。入金管理（/receivables）の一覧にも反映されます。</p>
           </fieldset>
         )}
 
@@ -343,40 +343,40 @@ export default function SaleDetailPage() {
           <div className="space-y-4">
             <fieldset disabled={!canEdit} className="space-y-4">
               <SaleShippingSection form={form} setForm={setFormTyped} buyerShippingAddress={buyerShippingAddress} shippingMethods={optionsForType(masters, 'shipping_method')} />
-              <p className="text-xs text-[#68756c]">※ 変更したら上部の「保存」を押してください。発送管理（/shipping）の一覧にも反映されます。</p>
+              <p className="text-xs text-mist">※ 変更したら上部の「保存」を押してください。発送管理（/shipping）の一覧にも反映されます。</p>
             </fieldset>
 
             {/* 発送伝票 */}
             <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送伝票（送り状など）</p>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">発送伝票（送り状など）</p>
               {record.shippingSlip ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f1] px-3 py-2 text-sm">
-                  <FileText size={15} className="text-[#174c33]" />
-                  <a href={record.shippingSlip.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-[#173c2a] hover:underline">{record.shippingSlip.name}</a>
-                  {record.shippingSlip.uploadedAt && <span className="text-[10px] text-[#a59f8c]">{record.shippingSlip.uploadedAt}</span>}
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6dfcf] bg-bone px-3 py-2 text-sm">
+                  <FileText size={15} className="text-matchaDeep" />
+                  <a href={record.shippingSlip.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-ink hover:underline">{record.shippingSlip.name}</a>
+                  {record.shippingSlip.uploadedAt && <span className="text-[10px] text-mist">{record.shippingSlip.uploadedAt}</span>}
                   {canEdit && (
-                    <button type="button" onClick={handleRemoveSlip} disabled={uploadingSlip} className="rounded-lg p-1.5 text-red-500 hover:bg-red-50" aria-label="削除"><Trash2 size={14} /></button>
+                    <button type="button" onClick={handleRemoveSlip} disabled={uploadingSlip} className="rounded-lg p-1.5 text-alert hover:bg-alert/5" aria-label="削除"><Trash2 size={14} /></button>
                   )}
                 </div>
               ) : canEdit ? (
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-4 py-3 text-sm font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-white px-4 py-3 text-sm font-medium text-matchaDeep transition hover:bg-[#eef3eb]">
                   <FileText size={14} />
                   {uploadingSlip ? 'アップロード中…' : '発送伝票をアップロード（PDF / 画像）'}
                   <input type="file" accept="application/pdf,image/*" className="hidden" disabled={uploadingSlip}
                     onChange={async e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) await handleUploadSlip(f) }} />
                 </label>
               ) : (
-                <span className="text-sm text-[#a59f8c]">未添付</span>
+                <span className="text-sm text-mist">未添付</span>
               )}
-              {slipError && <p className="mt-2 text-xs text-red-600">{slipError}</p>}
+              {slipError && <p className="mt-2 text-xs text-alert">{slipError}</p>}
             </div>
           </div>
         )}
 
         {tab === 'documents' && (
-          <div className="space-y-4 rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-5">
+          <div className="space-y-4 rounded-2xl border border-line bg-bone p-5">
             <div>
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">日本語</p>
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-mist">日本語</p>
               <div className="flex flex-wrap gap-2">
                 <DocLink href={`/sales/${record.id}/document?type=invoice&lang=ja`} primary>請求書を発行</DocLink>
                 <DocLink href={`/sales/${record.id}/document?type=delivery&lang=ja`}>納品書を発行</DocLink>
@@ -384,23 +384,23 @@ export default function SaleDetailPage() {
               </div>
             </div>
             <div>
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">English</p>
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-mist">English</p>
               <div className="flex flex-wrap gap-2">
                 <DocLink href={`/sales/${record.id}/document?type=invoice&lang=en`} primary>Issue Invoice</DocLink>
                 <DocLink href={`/sales/${record.id}/document?type=delivery&lang=en`}>Issue Delivery Note</DocLink>
                 <DocLink href={`/sales/${record.id}/document?type=quotation&lang=en`}>Issue Quotation</DocLink>
               </div>
             </div>
-            <p className="text-xs text-[#68756c]">帳票は販売案件の内容から自動生成されます。各「発行」ボタンを押すと帳票画面が開き、「PDFを発行」で保存すると下の発行履歴に記録されます。</p>
+            <p className="text-xs text-mist">帳票は販売案件の内容から自動生成されます。各「発行」ボタンを押すと帳票画面が開き、「PDFを発行」で保存すると下の発行履歴に記録されます。</p>
 
-            <div className="border-t border-[#ece5d7] pt-4">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">発行履歴</p>
+            <div className="border-t border-line pt-4">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-mist">発行履歴</p>
               {(record.issuedDocuments ?? []).length === 0 ? (
                 <p className="text-xs text-[#9aa39a]">まだ発行されたPDFはありません。</p>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-[#ece8db] bg-white">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                    <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                       <tr>
                         <th className="px-3 py-2 font-medium">種類</th>
                         <th className="px-3 py-2 font-medium">言語</th>
@@ -411,16 +411,16 @@ export default function SaleDetailPage() {
                     </thead>
                     <tbody>
                       {[...(record.issuedDocuments ?? [])].sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)).map(d => (
-                        <tr key={d.id} className="border-t border-[#f0ebdf] text-[#173c2a]">
+                        <tr key={d.id} className="border-t border-[#f0ebdf] text-ink">
                           <td className="px-3 py-2">{DOC_TYPE_LABELS[d.type]}</td>
-                          <td className="px-3 py-2 text-[#68756c]">{d.language === 'en' ? 'English' : '日本語'}</td>
-                          <td className="px-3 py-2 text-[#68756c]">{d.issuedAt ? new Date(d.issuedAt).toLocaleString('ja-JP') : '-'}</td>
+                          <td className="px-3 py-2 text-mist">{d.language === 'en' ? 'English' : '日本語'}</td>
+                          <td className="px-3 py-2 text-mist">{d.issuedAt ? new Date(d.issuedAt).toLocaleString('ja-JP') : '-'}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(d.total)}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center justify-end gap-2">
-                              <a href={d.url} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-[#f7f5ee] px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">開く</a>
+                              <a href={d.url} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-bone px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">開く</a>
                               {canEdit && (
-                                <button type="button" onClick={() => handleDeleteDocument(d.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" aria-label="削除">
+                                <button type="button" onClick={() => handleDeleteDocument(d.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-alert/5 hover:text-alert" aria-label="削除">
                                   <Trash2 size={13} />
                                 </button>
                               )}
@@ -449,8 +449,8 @@ const DOC_TYPE_LABELS: Record<'invoice' | 'delivery' | 'quotation', string> = {
 function OverviewCard({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-[#68756c]">{label}</p>
-      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-[#173c2a]' : 'text-sm text-[#173c2a]'}`}>{value}</div>
+      <p className="text-xs font-medium uppercase tracking-wider text-mist">{label}</p>
+      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-ink' : 'text-sm text-ink'}`}>{value}</div>
     </div>
   )
 }
@@ -461,8 +461,8 @@ function DocLink({ href, primary, children }: { href: string; primary?: boolean;
       href={href}
       className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
         primary
-          ? 'bg-[#174c33] text-white shadow hover:bg-[#205f43]'
-          : 'border border-[#174c33] bg-white text-[#174c33] hover:bg-[#ece8db]'
+          ? 'bg-ink text-paper shadow hover:bg-[#205f43]'
+          : 'border border-[#174c33] bg-white text-matchaDeep hover:bg-[#ece8db]'
       }`}
     >
       <FileText size={14} /> {children}

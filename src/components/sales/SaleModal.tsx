@@ -68,16 +68,16 @@ export function SaleModal({
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '販売案件を編集' : '販売案件を登録'}</h2>
-            <p className="text-sm text-[#68756c] mt-1">登録済みの販売先は候補から再利用できます。</p>
+            <h2 className="text-xl font-semibold text-ink">{initial ? '販売案件を編集' : '販売案件を登録'}</h2>
+            <p className="text-sm text-mist mt-1">登録済みの販売先は候補から再利用できます。</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-bone hover:text-mist">
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mb-4 rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -92,14 +92,14 @@ export function SaleModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm text-graphite transition hover:bg-bone"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+              className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
             >
               {saving ? '保存中...' : '保存'}
             </button>

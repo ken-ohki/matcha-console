@@ -80,39 +80,40 @@ export default function WholesaleInquiriesPage() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-bl-6 flex items-end justify-between border-b border-ink pb-bl-3">
           <div>
-            <h1 className="text-2xl font-bold text-[#173c2a]">卸売の問い合わせ</h1>
-            <p className="mt-1 text-sm text-[#68756c]">規定量以上・在庫超過・受注生産などの問い合わせ。成約時は販売管理から売上(sales)を作成してください。</p>
+            <p className="kicker mb-bl">SABO WHOLESALE</p>
+            <h1 className="display-2 text-2xl text-ink">卸売の問い合わせ</h1>
+            <p className="mt-bl text-sm text-mist">規定量以上・在庫超過・受注生産などの問い合わせ。成約時は販売管理から売上(sales)を作成してください。</p>
           </div>
-          <button onClick={load} className="flex items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-2 text-sm text-[#173c2a] hover:bg-[#f4f2ea]">
-            <RefreshCw size={15} /> 更新
+          <button onClick={load} className="btn-ghost">
+            <RefreshCw size={14} /> 更新
           </button>
         </div>
 
         {loading ? (
-          <p className="text-sm text-[#68756c]">読み込み中…</p>
+          <p className="text-sm text-mist">読み込み中…</p>
         ) : inquiries.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-8 text-center text-sm text-[#a59f8c]">問い合わせはありません。</p>
+          <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">問い合わせはありません。</p>
         ) : (
           <div className="space-y-3">
             {inquiries.map(q => (
-              <div key={q.id} className={`rounded-2xl border border-[#d9d1be] bg-white p-4 ${busy === q.id ? 'opacity-50' : ''}`}>
+              <div key={q.id} className={`panel p-4 ${busy === q.id ? 'opacity-50' : ''}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-medium text-[#173c2a]">{q.memberCompanyName}</p>
-                    <p className="mt-0.5 text-xs text-[#a59f8c]">{REASON_LABEL[q.reason ?? ''] ?? q.reason} · {q.shippingCountry}</p>
-                    <ul className="mt-2 text-xs text-[#68756c]">
+                    <p className="font-medium text-ink">{q.memberCompanyName}</p>
+                    <p className="mt-0.5 text-xs text-mist">{REASON_LABEL[q.reason ?? ''] ?? q.reason} · {q.shippingCountry}</p>
+                    <ul className="mt-2 text-xs text-mist">
                       {(q.items ?? []).map((i, idx) => (
                         <li key={idx}>{i.productName ?? i.productSku ?? i.productSku} — {i.quantityKg}kg</li>
                       ))}
                     </ul>
-                    {q.message && <p className="mt-2 whitespace-pre-wrap text-sm text-[#173c2a]">{q.message}</p>}
+                    {q.message && <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{q.message}</p>}
                   </div>
                   <select
                     value={q.status ?? 'open'}
                     onChange={e => setStatus(q.id, e.target.value)}
-                    className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-sm text-[#173c2a]"
+                    className="rounded-lg border border-line bg-paper px-2 py-1 text-sm text-ink"
                   >
                     {STATUSES.map(s => (
                       <option key={s} value={s}>{STATUS_LABEL[s]}</option>

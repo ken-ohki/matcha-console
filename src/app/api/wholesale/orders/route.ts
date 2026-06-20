@@ -78,13 +78,42 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'quote'
+  action?: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'notify_shipped'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
+  trackingNumber?: string
+  shippingCarrierLabel?: string
 }
 
 // Base URL of the wholesale storefront app (owns Stripe + order/stock logic).
 const WHOLESALE_BASE_URL = process.env.WHOLESALE_BASE_URL || 'https://wholesale.sabo-matcha.jp'
+
+// Direct order entry — delegate to the wholesale app (it owns placeOrder + stock).
+export async function POST(request: Request) {
+  try {
+    await requireAdmin(request)
+  } catch (err) {
+    return handleAuthError(err)
+  }
+  const auth = request.headers.get('authorization') ?? ''
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
+  }
+  try {
+    const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/orders`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: auth },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    return NextResponse.json(data, { status: res.status })
+  } catch (err) {
+    return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+  }
+}
 
 export async function PATCH(request: Request) {
   try {
@@ -132,8 +161,33 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true, status: 'paid' })
   }
   if (body.action === 'mark_shipped') {
-    await ref.set({ status: 'shipped', updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    const now = new Date().toISOString()
+    await ref.set(
+      {
+        status: 'shipped',
+        shippedAt: now,
+        ...(body.trackingNumber?.trim() ? { trackingNumber: body.trackingNumber.trim() } : {}),
+        ...(body.shippingCarrierLabel?.trim() ? { shippingCarrierLabel: body.shippingCarrierLabel.trim() } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
     return NextResponse.json({ ok: true, status: 'shipped' })
+  }
+  // Send the shipment notification email — delegate to the wholesale app (Resend).
+  if (body.action === 'notify_shipped') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/orders/notify-shipped`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify({ orderId: body.orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+    }
   }
   if (body.action === 'cancel') {
     await cancelOrder(database, body.orderId)

@@ -28,18 +28,18 @@ export const STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
 }
 
 export const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
-  placed: 'bg-slate-100 text-slate-700',
-  shipped: 'bg-blue-100 text-blue-800',
-  received: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-gray-100 text-gray-500',
+  placed: 'bg-bone text-graphite',
+  shipped: 'bg-bone text-graphite',
+  received: 'bg-bone text-matcha',
+  cancelled: 'bg-bone text-mist',
 }
 
 export function PaymentStatusBadge({ status, hasInvoice }: { status: PurchaseOrderPaymentStatus; hasInvoice: boolean }) {
   const map = {
-    uninvoiced: { label: '未請求', cls: 'bg-slate-100 text-slate-700' },
-    unpaid: { label: '未払', cls: 'bg-amber-100 text-amber-800' },
+    uninvoiced: { label: '未請求', cls: 'bg-bone text-graphite' },
+    unpaid: { label: '未払', cls: 'bg-bone text-[#a87b1e]' },
     partial: { label: '一部支払', cls: 'bg-sky-100 text-sky-800' },
-    paid: { label: '支払済', cls: 'bg-emerald-100 text-emerald-800' },
+    paid: { label: '支払済', cls: 'bg-bone text-matcha' },
   } as const
   const m = map[status]
   return (
@@ -146,10 +146,10 @@ export function ProductCombobox({
         }}
         onBlur={() => setTimeout(() => setFocused(false), 150)}
         placeholder="商品名・SKUで検索、または新規商品名を入力"
-        className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+        className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
       />
       {focused && (
-        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-line bg-white shadow-lg">
           {suggestions.map(p => (
             <button
               key={p.id}
@@ -159,14 +159,14 @@ export function ProductCombobox({
                 setQuery('')
                 setFocused(false)
               }}
-              className="block w-full border-b border-[#f0ebe0] px-3 py-2 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+              className="block w-full border-b border-[#f0ebe0] px-3 py-2 text-left last:border-b-0 hover:bg-bone"
             >
-              <div className="text-sm font-medium text-[#173c2a]">
+              <div className="text-sm font-medium text-ink">
                 {p.purchaseProductName || p.name}
                 <span className="ml-1 text-xs font-normal text-[#9a8f76]">{p.sku}</span>
               </div>
               {productSubLabel(p) && (
-                <div className="text-[11px] text-[#68756c]">{productSubLabel(p)}</div>
+                <div className="text-[11px] text-mist">{productSubLabel(p)}</div>
               )}
             </button>
           ))}
@@ -178,7 +178,7 @@ export function ProductCombobox({
                 setQuery('')
                 setFocused(false)
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-[#174c33] hover:bg-[#eef3eb]"
+              className="block w-full px-3 py-2 text-left text-sm text-matchaDeep hover:bg-[#eef3eb]"
             >
               ＋ 新規商品として「{trimmed}」を登録
             </button>
@@ -200,7 +200,7 @@ type FormProps = {
 }
 
 const fieldCls =
-  'w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  'w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha'
 
 export function PoBasicSection({ form, setForm, suppliers }: FormProps & { suppliers: Supplier[] }) {
   const [supplierFocused, setSupplierFocused] = useState(false)
@@ -213,7 +213,7 @@ export function PoBasicSection({ form, setForm, suppliers }: FormProps & { suppl
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">ステータス</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">ステータス</label>
         <select
           value={form.status}
           onChange={e => setForm(prev => ({ ...prev, status: e.target.value as PurchaseOrderStatus }))}
@@ -226,7 +226,7 @@ export function PoBasicSection({ form, setForm, suppliers }: FormProps & { suppl
         </select>
       </div>
       <div className="relative">
-        <label className="mb-1 block text-sm font-medium text-gray-700">発注先</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">発注先</label>
         <input
           required
           value={form.supplierName}
@@ -237,7 +237,7 @@ export function PoBasicSection({ form, setForm, suppliers }: FormProps & { suppl
           placeholder="例: 山政小山園"
         />
         {supplierFocused && supplierSuggestions.length > 0 && (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-line bg-white shadow-lg">
             {supplierSuggestions.map(s => (
               <button
                 key={s.id}
@@ -247,10 +247,10 @@ export function PoBasicSection({ form, setForm, suppliers }: FormProps & { suppl
                   setForm(prev => ({ ...prev, supplierName: s.name }))
                   setSupplierFocused(false)
                 }}
-                className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+                className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-bone"
               >
-                <span className="block text-sm font-medium text-[#173c2a]">{s.name}</span>
-                <span className="shrink-0 text-xs text-[#68756c]">{s.orderCount}件</span>
+                <span className="block text-sm font-medium text-ink">{s.name}</span>
+                <span className="shrink-0 text-xs text-mist">{s.orderCount}件</span>
               </button>
             ))}
           </div>
@@ -292,14 +292,14 @@ export function PoItemsSection({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">商品</label>
-        <span className="text-xs text-[#68756c]">合計 {formatCurrency(totals.totalAmount)}</span>
+        <label className="block text-sm font-medium text-graphite">商品</label>
+        <span className="text-xs text-mist">合計 {formatCurrency(totals.totalAmount)}</span>
       </div>
       <div className="space-y-2">
         {form.items.map((line, index) => {
           const lineTotal = (Number(line.quantityKg) || 0) * (Number(line.unitPrice) || 0)
           return (
-            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
+            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-bone p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
               <div className="space-y-1.5">
                 <ProductCombobox
                   products={products}
@@ -313,19 +313,19 @@ export function PoItemsSection({
                   onFreeText={name => updateItem(index, { productId: '', productName: name })}
                 />
                 {!line.productId && (line.productName ?? '').trim() && (
-                  <div className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-2">
-                    <p className="text-[11px] font-medium text-amber-800">新規商品。SKUと在庫グループを入力すると在庫管理に登録されます（入荷前は0kg）。</p>
+                  <div className="space-y-1 rounded-lg border border-[#a87b1e]/40 bg-bone p-2">
+                    <p className="text-[11px] font-medium text-[#a87b1e]">新規商品。SKUと在庫グループを入力すると在庫管理に登録されます（入荷前は0kg）。</p>
                     <div className="flex gap-1.5">
                       <input
                         value={line.newProductSku ?? ''}
                         onChange={e => updateItem(index, { newProductSku: e.target.value })}
                         placeholder="SKU"
-                        className="w-1/2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-1/2 rounded-lg border border-line px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-matcha"
                       />
                       <select
                         value={line.newProductGroupId ?? ''}
                         onChange={e => updateItem(index, { newProductGroupId: e.target.value })}
-                        className="w-1/2 rounded-lg border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-1/2 rounded-lg border border-line px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-matcha"
                       >
                         <option value="">グループ選択</option>
                         {inventoryGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -342,7 +342,7 @@ export function PoItemsSection({
                 value={line.quantityKg}
                 placeholder="数量 (kg)"
                 onChange={e => updateItem(index, { quantityKg: Number(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
               <input
                 required
@@ -352,7 +352,7 @@ export function PoItemsSection({
                 value={line.unitPrice}
                 placeholder="税抜単価"
                 onChange={e => updateItem(index, { unitPrice: Number(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
               <select
                 value={line.taxRate ?? 8}
@@ -361,13 +361,13 @@ export function PoItemsSection({
                   updateItem(index, { taxRate: v === 0 ? 0 : v === 10 ? 10 : 8 })
                 }}
                 title="消費税区分"
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value={0}>免税</option>
                 <option value={8}>8%軽減</option>
                 <option value={10}>10%</option>
               </select>
-              <div className="flex items-center justify-end text-xs text-[#68756c] md:px-2">
+              <div className="flex items-center justify-end text-xs text-mist md:px-2">
                 {formatCurrency(lineTotal)}
               </div>
               <button
@@ -375,7 +375,7 @@ export function PoItemsSection({
                 onClick={() => removeItem(index)}
                 disabled={form.items.length <= 1}
                 aria-label="削除"
-                className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-red-600 disabled:opacity-30"
+                className="self-center rounded-lg p-2 text-mist transition hover:bg-bone hover:text-alert disabled:opacity-30"
               >
                 <X size={16} />
               </button>
@@ -386,7 +386,7 @@ export function PoItemsSection({
       <button
         type="button"
         onClick={addItem}
-        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]"
+        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-matchaDeep transition hover:bg-[#ece8db]"
       >
         <Plus size={14} />
         商品を追加
@@ -399,7 +399,7 @@ export function PoDatesSection({ form, setForm }: FormProps) {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">発注日</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">発注日</label>
         <input
           required
           type="date"
@@ -409,7 +409,7 @@ export function PoDatesSection({ form, setForm }: FormProps) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">入荷予定日</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">入荷予定日</label>
         <input
           type="date"
           value={form.expectedDeliveryDate ?? ''}
@@ -418,7 +418,7 @@ export function PoDatesSection({ form, setForm }: FormProps) {
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">実際の入荷日</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">実際の入荷日</label>
         <input
           type="date"
           value={form.actualDeliveryDate ?? ''}
@@ -437,15 +437,15 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
   const hasPayments = (form.payments ?? []).length > 0
 
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・支払い</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">請求・支払い</p>
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wider text-[#68756c]">支払いステータス</label>
+          <label className="mb-1 block text-[11px] uppercase tracking-wider text-mist">支払いステータス</label>
           {hasPayments ? (
             <div className="py-1.5">
               <PaymentStatusBadge status={form.paymentStatus ?? 'uninvoiced'} hasInvoice={!!form.invoice} />
-              <p className="mt-0.5 text-[10px] text-[#68756c]">分割支払いから自動判定</p>
+              <p className="mt-0.5 text-[10px] text-mist">分割支払いから自動判定</p>
             </div>
           ) : (
             <select
@@ -460,7 +460,7 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
           )}
         </div>
         <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wider text-[#68756c]">支払い期日</label>
+          <label className="mb-1 block text-[11px] uppercase tracking-wider text-mist">支払い期日</label>
           <input
             type="date"
             value={form.paymentDueDate ?? ''}
@@ -469,7 +469,7 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wider text-[#68756c]">支払日</label>
+          <label className="mb-1 block text-[11px] uppercase tracking-wider text-mist">支払日</label>
           <input
             type="date"
             value={form.paidDate ?? ''}
@@ -478,13 +478,13 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
           />
         </div>
         <div className="md:col-span-3">
-          <label className="mb-1 block text-xs font-medium text-gray-700">請求書（PDF）</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">請求書（PDF）</label>
           {form.invoice ? (
-            <div className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f1] px-3 py-2 text-sm">
-              <a href={form.invoice.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-[#173c2a] hover:underline">
+            <div className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-bone px-3 py-2 text-sm">
+              <a href={form.invoice.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-ink hover:underline">
                 {form.invoice.name}
               </a>
-              {form.invoice.uploadedAt && <span className="text-[10px] text-[#a59f8c]">{form.invoice.uploadedAt}</span>}
+              {form.invoice.uploadedAt && <span className="text-[10px] text-mist">{form.invoice.uploadedAt}</span>}
               <button
                 type="button"
                 onClick={async () => {
@@ -492,13 +492,13 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
                   if (form.invoice?.url) await deleteStorageObjectByUrl(form.invoice.url)
                   setForm(prev => ({ ...prev, invoice: null }))
                 }}
-                className="rounded-lg p-1 text-red-500 hover:bg-red-50"
+                className="rounded-lg p-1 text-alert hover:bg-alert/5"
               >
                 <Trash2 size={14} />
               </button>
             </div>
           ) : (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-3 py-2 text-xs font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-white px-3 py-2 text-xs font-medium text-matchaDeep transition hover:bg-[#eef3eb]">
               <FileText size={12} />
               {uploadingInvoice ? 'アップロード中…' : '請求書PDFを添付'}
               <input
@@ -538,10 +538,10 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
               />
             </label>
           )}
-          {invoiceError && <p className="mt-1 text-xs text-red-600">{invoiceError}</p>}
+          {invoiceError && <p className="mt-1 text-xs text-alert">{invoiceError}</p>}
         </div>
         <div className="md:col-span-3">
-          <p className="mb-2 text-xs font-medium text-gray-700">支払い（分割対応）</p>
+          <p className="mb-2 text-xs font-medium text-graphite">支払い（分割対応）</p>
           <PaymentsEditor
             payments={form.payments ?? []}
             totalIncl={totals.totalIncl}
@@ -557,35 +557,35 @@ export function PoFeesSection({ form, setForm }: FormProps) {
   return (
     <div className="grid gap-3 md:grid-cols-3">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">送料（税抜）</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">送料（税抜）</label>
         <input
           type="number"
           min="0"
           step="1"
           value={form.shippingFee ?? 0}
           onChange={e => setForm(prev => ({ ...prev, shippingFee: Number(e.target.value) || 0 }))}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">諸経費（税抜）</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">諸経費（税抜）</label>
         <input
           type="number"
           min="0"
           step="1"
           value={form.otherFees ?? 0}
           onChange={e => setForm(prev => ({ ...prev, otherFees: Number(e.target.value) || 0 }))}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">諸経費メモ</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">諸経費メモ</label>
         <input
           type="text"
           value={form.otherFeesNote ?? ''}
           onChange={e => setForm(prev => ({ ...prev, otherFeesNote: e.target.value }))}
           placeholder="例: 通関手数料"
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
         />
       </div>
     </div>
@@ -595,12 +595,12 @@ export function PoFeesSection({ form, setForm }: FormProps) {
 export function PoNotesSection({ form, setForm }: FormProps) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">メモ</label>
+      <label className="mb-1 block text-sm font-medium text-graphite">メモ</label>
       <textarea
         value={form.notes}
         onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
         rows={3}
-        className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+        className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
         placeholder="発注内容のメモ"
       />
     </div>
@@ -610,21 +610,21 @@ export function PoNotesSection({ form, setForm }: FormProps) {
 export function PoSummarySection({ form }: { form: PurchaseOrderInput }) {
   const t = computePoFormTotals(form)
   return (
-    <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-2">
+    <div className="grid gap-3 rounded-2xl border border-line bg-bone p-4 md:grid-cols-2">
       <div>
-        <p className="text-xs text-[#68756c]">合計数量</p>
-        <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatKg(t.totalQuantity)}</p>
+        <p className="text-xs text-mist">合計数量</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{formatKg(t.totalQuantity)}</p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">合計金額（税抜）</p>
-        <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(t.totalAmount)}</p>
-        <p className="mt-1 text-[10px] text-[#68756c]">
+        <p className="text-xs text-mist">合計金額（税抜）</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(t.totalAmount)}</p>
+        <p className="mt-1 text-[10px] text-mist">
           内訳: 商品 {formatCurrency(t.itemsSubtotal)} / 送料 {formatCurrency(t.shippingFee)} / 諸経費 {formatCurrency(t.otherFees)}
         </p>
-        <p className="mt-1 text-[10px] text-[#68756c]">
+        <p className="mt-1 text-[10px] text-mist">
           消費税: 10%対象 {formatCurrency(t.tax10)} / 8%対象 {formatCurrency(t.tax8)} / 合計 {formatCurrency(t.taxTotal)}
         </p>
-        <p className="mt-0.5 text-[10px] text-[#68756c]">
+        <p className="mt-0.5 text-[10px] text-mist">
           税込目安 {formatCurrency(t.totalIncl)}
         </p>
       </div>

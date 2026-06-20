@@ -167,18 +167,18 @@ export default function PayablesPage() {
             type="date"
             value={o.paymentDueDate ?? ''}
             onChange={e => updateInline(o.id, { paymentDueDate: e.target.value })}
-            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
+            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-alert/40 text-alert' : 'border-line'}`}
           />
         </td>
-        <td className="px-3 py-2 text-[#173c2a]">
+        <td className="px-3 py-2 text-ink">
           <button type="button" onClick={() => setDetailOrder(o)} className="text-left hover:underline">{o.supplierName}</button>
         </td>
-        <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
+        <td className="px-3 py-2 text-mist">{productLabel}</td>
         <td className="px-3 py-2 text-right">
           <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
-          <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
+          <div className="text-[10px] text-mist">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
           {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
-            <div className="text-[10px] text-[#9d3d28]">残額 {formatCurrency(poRemaining(o))}</div>
+            <div className="text-[10px] text-alert">残額 {formatCurrency(poRemaining(o))}</div>
           )}
         </td>
         <td className="px-3 py-2">
@@ -188,7 +188,7 @@ export default function PayablesPage() {
             <select
               value={o.paymentStatus === 'partial' ? 'unpaid' : o.paymentStatus}
               onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
-              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+              className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
             >
               <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
               <option value="unpaid">{PAY_LABELS.unpaid}</option>
@@ -201,16 +201,16 @@ export default function PayablesPage() {
             type="date"
             value={o.paidDate ?? ''}
             onChange={e => updateInline(o.id, { paidDate: e.target.value })}
-            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
           />
         </td>
         <td className="px-3 py-2">
           {o.invoice ? (
-            <a href={o.invoice.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#174c33] hover:underline">
+            <a href={o.invoice.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-matchaDeep hover:underline">
               <FileText size={12} /> PDF
             </a>
           ) : (
-            <span className="text-[#a59f8c] text-xs">未添付</span>
+            <span className="text-mist text-xs">未添付</span>
           )}
         </td>
         <td className="px-3 py-2 text-right">
@@ -219,7 +219,7 @@ export default function PayablesPage() {
               type="button"
               onClick={() => markPaid(o.id)}
               disabled={savingId === o.id}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
             >
               <CheckCircle2 size={12} /> 支払確認
             </button>
@@ -232,14 +232,14 @@ export default function PayablesPage() {
   const renderPoCard = (label: string, colorClass: string, list: PurchaseOrder[]) => (
     <div className={`rounded-2xl border-2 ${colorClass}`}>
       <div className="flex items-center gap-2 px-4 py-3">
-        <h2 className="text-sm font-semibold text-[#173c2a]">{label}</h2>
-        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
+        <h2 className="text-sm font-semibold text-ink">{label}</h2>
+        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
           {list.length}件 / {formatCurrency(list.reduce((s, o) => s + computePoTaxIncluded(o), 0))}
         </span>
       </div>
       <div className="overflow-x-auto border-t border-white/60">
         <table className="min-w-[920px] text-sm">
-          <thead className="bg-white/60 text-[#173c2a]">
+          <thead className="bg-white/60 text-ink">
             <tr>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">期日</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">仕入先</th>
@@ -262,10 +262,10 @@ export default function PayablesPage() {
       <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-[#173c2a]">支払管理</h1>
-            <p className="text-sm text-[#68756c]">期日が近い／超過した買掛を一目で確認し、支払を記録できます。</p>
+            <h1 className="text-2xl font-semibold text-ink">支払管理</h1>
+            <p className="text-sm text-mist">期日が近い／超過した買掛を一目で確認し、支払を記録できます。</p>
           </div>
-          <Link href="/financials" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">
+          <Link href="/financials" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">
             収支ダッシュボード →
           </Link>
         </div>
@@ -276,18 +276,18 @@ export default function PayablesPage() {
           <KPICard title="今月支払 (確認済)" value={formatCurrency(kpis.paidThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#d9d1be] bg-white p-3">
-          <Filter size={14} className="text-[#68756c]" />
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3">
+          <Filter size={14} className="text-mist" />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="仕入先または商品名で検索"
-            className="flex-1 min-w-[200px] rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="flex-1 min-w-[200px] rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
           />
-          {feedback && <span className="text-xs text-[#174c33]">{feedback}</span>}
+          {feedback && <span className="text-xs text-matchaDeep">{feedback}</span>}
         </div>
 
-        {loading && <p className="text-sm text-[#68756c]">読み込み中…</p>}
+        {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
         {!loading && (() => {
           const tabs = bucketsToRender
@@ -310,12 +310,12 @@ export default function PayablesPage() {
                       onClick={() => setActiveBucket(b)}
                       className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
                         active === b
-                          ? 'border-[#174c33] text-[#173c2a]'
-                          : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                          ? 'border-[#174c33] text-ink'
+                          : 'border-transparent text-mist hover:text-ink'
                       }`}
                     >
                       {BUCKET_LABELS[b]}
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c]'}`}>{count}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-ink text-paper' : 'bg-bone text-mist'}`}>{count}</span>
                     </button>
                   )
                 })}
@@ -323,15 +323,15 @@ export default function PayablesPage() {
 
               {active === 'actionNeeded' ? (
                 overGroup.length === 0 && dueGroup.length === 0 ? (
-                  <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">要確認の買掛はありません。</p>
+                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の買掛はありません。</p>
                 ) : (
                   <div className="space-y-4">
-                    {overGroup.length > 0 && renderPoCard('期限超過', 'border-red-300 bg-red-50', overGroup)}
-                    {dueGroup.length > 0 && renderPoCard('今月期限', 'border-amber-300 bg-amber-50', dueGroup)}
+                    {overGroup.length > 0 && renderPoCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
+                    {dueGroup.length > 0 && renderPoCard('今月期限', 'border-[#a87b1e]/40 bg-bone', dueGroup)}
                   </div>
                 )
               ) : rows.length === 0 ? (
-                <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active]}の買掛はありません。</p>
+                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{BUCKET_LABELS[active]}の買掛はありません。</p>
               ) : (
                 renderPoCard(BUCKET_LABELS[active], BUCKET_COLORS[active], rows)
               )}
@@ -353,8 +353,8 @@ export default function PayablesPage() {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-3 py-1 text-sm">
-      <span className="text-[#68756c]">{label}</span>
-      <span className="text-right font-medium text-[#173c2a]">{value}</span>
+      <span className="text-mist">{label}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
     </div>
   )
 }
@@ -375,17 +375,17 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6" onClick={e => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{order.supplierName}</h2>
-            <p className="mt-1 text-xs text-[#68756c]">発注の詳細（読み取り専用）</p>
+            <h2 className="text-xl font-semibold text-ink">{order.supplierName}</h2>
+            <p className="mt-1 text-xs text-mist">発注の詳細（読み取り専用）</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">発注書 →</Link>
-            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X size={18} /></button>
+            <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">発注書 →</Link>
+            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-bone hover:text-mist"><X size={18} /></button>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
             <DetailRow label="発注ステータス" value={PO_STATUS_LABELS[order.status]} />
             <DetailRow label="支払ステータス" value={PAY_LABELS[order.paymentStatus]} />
             <DetailRow label="発注日" value={order.orderDate || '-'} />
@@ -394,7 +394,7 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
             <DetailRow label="支払期日" value={order.paymentDueDate || '-'} />
             <DetailRow label="支払日" value={order.paidDate || '-'} />
           </div>
-          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
             <DetailRow label="商品代金（税抜）" value={formatCurrency(order.totalAmount)} />
             <DetailRow label="送料" value={formatCurrency(order.shippingFee ?? 0)} />
             <DetailRow label="諸経費" value={formatCurrency(order.otherFees ?? 0)} />
@@ -402,19 +402,19 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
             <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
             <DetailRow label="合計（税抜）" value={formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))} />
             <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
-            <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-[#174c33] hover:underline">PDF</a> : '未添付'} />
+            <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-matchaDeep hover:underline">PDF</a> : '未添付'} />
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
-          <p className="mb-1 text-xs font-medium text-[#68756c]">振込先（支払口座）</p>
+        <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
+          <p className="mb-1 text-xs font-medium text-mist">振込先（支払口座）</p>
           {bankInfo
-            ? <p className="whitespace-pre-wrap text-[#173c2a]">{bankInfo}</p>
-            : <p className="text-[#a59f8c]">仕入先マスタに未登録です。<Link href="/suppliers" className="text-[#174c33] hover:underline">仕入先管理</Link>で登録してください。</p>}
+            ? <p className="whitespace-pre-wrap text-ink">{bankInfo}</p>
+            : <p className="text-mist">仕入先マスタに未登録です。<Link href="/suppliers" className="text-matchaDeep hover:underline">仕入先管理</Link>で登録してください。</p>}
         </div>
 
         <div className="mt-4 rounded-2xl border border-[#e6dfcf] p-3">
-          <p className="mb-2 text-xs font-medium text-[#68756c]">支払い（分割対応）</p>
+          <p className="mb-2 text-xs font-medium text-mist">支払い（分割対応）</p>
           <PaymentsEditor
             payments={order.payments ?? []}
             totalIncl={computePoTaxIncluded(order)}
@@ -424,7 +424,7 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#f7f5ee] text-left text-[#173c2a]">
+            <thead className="bg-bone text-left text-ink">
               <tr>
                 <th className="px-3 py-2 font-medium">商品</th>
                 <th className="px-3 py-2 font-medium text-right">数量</th>
@@ -435,8 +435,8 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
             </thead>
             <tbody>
               {(order.items ?? []).map((item, i) => (
-                <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
-                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-[#68756c]">({item.productSku})</span>}</td>
+                <tr key={i} className="border-t border-[#f0ebdf] text-ink">
+                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-mist">({item.productSku})</span>}</td>
                   <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
                   <td className="px-3 py-2 text-center">{(item.taxRate ?? 8) === 0 ? '免税' : `${item.taxRate ?? 8}%`}</td>
@@ -448,9 +448,9 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
         </div>
 
         {(order.otherFeesNote || order.notes) && (
-          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
-            {order.otherFeesNote && <p className="text-[#173c2a]"><span className="text-[#68756c]">諸経費メモ：</span>{order.otherFeesNote}</p>}
-            {order.notes && <p className="mt-1 whitespace-pre-wrap text-[#173c2a]"><span className="text-[#68756c]">メモ：</span>{order.notes}</p>}
+          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
+            {order.otherFeesNote && <p className="text-ink"><span className="text-mist">諸経費メモ：</span>{order.otherFeesNote}</p>}
+            {order.notes && <p className="mt-1 whitespace-pre-wrap text-ink"><span className="text-mist">メモ：</span>{order.notes}</p>}
           </div>
         )}
       </div>

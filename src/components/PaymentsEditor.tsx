@@ -52,20 +52,20 @@ export function PaymentsEditor({
 
   const removePayment = (id: string) => onChange(payments.filter(p => p.id !== id))
 
-  const fieldCls = 'rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  const fieldCls = 'rounded-lg border border-line bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-matcha'
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-        <span className="text-[#68756c]">合計（税込） <span className="font-semibold text-[#173c2a]">{formatCurrency(totalIncl)}</span></span>
-        <span className="text-[#68756c]">支払済 <span className="font-semibold text-emerald-700">{formatCurrency(paid)}</span></span>
-        <span className="text-[#68756c]">残額 <span className={`font-semibold ${remaining > 0 ? 'text-[#9d3d28]' : 'text-emerald-700'}`}>{formatCurrency(remaining)}</span></span>
+        <span className="text-mist">合計（税込） <span className="font-semibold text-ink">{formatCurrency(totalIncl)}</span></span>
+        <span className="text-mist">支払済 <span className="font-semibold text-matcha">{formatCurrency(paid)}</span></span>
+        <span className="text-mist">残額 <span className={`font-semibold ${remaining > 0 ? 'text-alert' : 'text-matcha'}`}>{formatCurrency(remaining)}</span></span>
       </div>
 
       {payments.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-[#ece8db]">
           <table className="min-w-full text-xs">
-            <thead className="bg-[#faf8f1] text-left text-[#68756c]">
+            <thead className="bg-bone text-left text-mist">
               <tr>
                 <th className="px-2 py-1.5 font-medium">支払日</th>
                 <th className="px-2 py-1.5 font-medium text-right">金額</th>
@@ -76,14 +76,14 @@ export function PaymentsEditor({
             </thead>
             <tbody>
               {payments.map(p => (
-                <tr key={p.id} className="border-t border-[#ece8db] text-[#173c2a]">
+                <tr key={p.id} className="border-t border-[#ece8db] text-ink">
                   <td className="px-2 py-1.5">{p.paidDate || '-'}</td>
                   <td className="px-2 py-1.5 text-right font-medium">{formatCurrency(p.amount)}</td>
                   <td className="px-2 py-1.5">{p.method || '-'}</td>
-                  <td className="px-2 py-1.5 text-[#68756c]">{p.note || '-'}</td>
+                  <td className="px-2 py-1.5 text-mist">{p.note || '-'}</td>
                   {!disabled && (
                     <td className="px-2 py-1.5 text-right">
-                      <button type="button" onClick={() => removePayment(p.id)} aria-label="削除" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                      <button type="button" onClick={() => removePayment(p.id)} aria-label="削除" className="rounded p-1 text-gray-400 hover:bg-alert/5 hover:text-alert">
                         <Trash2 size={12} />
                       </button>
                     </td>
@@ -96,8 +96,8 @@ export function PaymentsEditor({
       )}
 
       {!disabled && (
-        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-[#faf8f2] p-2.5">
-          <label className="text-[10px] text-[#68756c]">
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-line bg-bone p-2.5">
+          <label className="text-[10px] text-mist">
             <span className="mb-0.5 block">金額（税込）</span>
             <input
               type="number" min="0" step="1"
@@ -107,25 +107,25 @@ export function PaymentsEditor({
               className={`${fieldCls} w-28`}
             />
           </label>
-          <label className="text-[10px] text-[#68756c]">
+          <label className="text-[10px] text-mist">
             <span className="mb-0.5 block">支払日</span>
             <input type="date" value={draftDate} onChange={e => setDraftDate(e.target.value)} className={fieldCls} />
           </label>
-          <label className="text-[10px] text-[#68756c]">
+          <label className="text-[10px] text-mist">
             <span className="mb-0.5 block">方法</span>
             <select value={draftMethod} onChange={e => setDraftMethod(e.target.value)} className={fieldCls}>
               <option value="">未設定</option>
               {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </label>
-          <label className="flex-1 text-[10px] text-[#68756c]">
+          <label className="flex-1 text-[10px] text-mist">
             <span className="mb-0.5 block">メモ</span>
             <input value={draftNote} onChange={e => setDraftNote(e.target.value)} placeholder="例: 内金 / 残金" className={`${fieldCls} w-full`} />
           </label>
           <button
             type="button"
             onClick={addPayment}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#205f43]"
+            className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-[#205f43]"
           >
             <Plus size={14} /> 追加
           </button>
@@ -133,7 +133,7 @@ export function PaymentsEditor({
             <button
               type="button"
               onClick={() => setDraftAmount(remaining)}
-              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
             >
               残額を入力
             </button>

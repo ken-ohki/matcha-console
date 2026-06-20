@@ -49,24 +49,24 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#173c2a] via-[#27533b] to-[#d6c6a5] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#174c33] rounded-2xl mb-4 shadow-lg">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-ink rounded-2xl mb-4 shadow-lg">
             <Lock size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Matcha Console</h1>
+          <h1 className="text-3xl font-bold text-paper">Matcha Console</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">ログイン</h2>
+          <h2 className="text-xl font-semibold text-ink mb-2">ログイン</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-alert/5 border border-alert/40 rounded-lg text-alert text-sm">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-graphite mb-1">
                 メールアドレス
               </label>
               <input
@@ -74,13 +74,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full px-3 py-2.5 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-matcha focus:border-transparent"
                 placeholder="name@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-graphite mb-1">
                 パスワード
               </label>
               <input
@@ -88,7 +88,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full px-3 py-2.5 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-matcha focus:border-transparent"
                 placeholder="Password"
               />
             </div>
@@ -96,7 +96,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-[#174c33] hover:bg-[#123723] disabled:bg-[#4f7c65] text-white font-medium rounded-lg transition-colors text-sm"
+              className="w-full py-2.5 px-4 bg-ink hover:bg-matchaDeep disabled:bg-[#4f7c65] text-paper font-medium rounded-lg transition-colors text-sm"
             >
               {loading ? 'ログイン中...' : 'ログイン'}
             </button>
@@ -104,7 +104,7 @@ export default function LoginPage() {
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-500">または</span>
+            <span className="text-xs text-mist">または</span>
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
@@ -112,7 +112,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-gray-700 font-medium rounded-lg transition-colors text-sm"
+            className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 border border-line hover:bg-bone disabled:opacity-60 text-graphite font-medium rounded-lg transition-colors text-sm"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

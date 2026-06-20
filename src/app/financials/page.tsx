@@ -92,7 +92,7 @@ interface PartnerRow {
 }
 
 const editInputCls =
-  'w-full rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  'w-full rounded-lg border border-line bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-matcha'
 
 export default function FinancialsPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
@@ -430,10 +430,10 @@ export default function FinancialsPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Calculator size={20} className="text-[#174c33]" />
-              <h1 className="text-2xl font-bold text-[#173c2a]">収支管理</h1>
+              <Calculator size={20} className="text-matchaDeep" />
+              <h1 className="text-2xl font-bold text-ink">収支管理</h1>
             </div>
-            <p className="mt-1 text-sm text-[#68756c]">売上の入金状況と仕入の支払い状況を一元管理します。</p>
+            <p className="mt-1 text-sm text-mist">売上の入金状況と仕入の支払い状況を一元管理します。</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">
@@ -441,30 +441,30 @@ export default function FinancialsPage() {
                 type="date"
                 value={dateFrom}
                 onChange={e => setDateFrom(e.target.value)}
-                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-xs"
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs"
               />
-              <span className="text-xs text-[#68756c]">〜</span>
+              <span className="text-xs text-mist">〜</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={e => setDateTo(e.target.value)}
-                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-xs"
+                className="rounded-lg border border-line bg-white px-2 py-1.5 text-xs"
               />
             </div>
             <div className="flex flex-wrap gap-1">
-              <button onClick={() => applyPreset('thisMonth')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">今月</button>
-              <button onClick={() => applyPreset('lastMonth')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">先月</button>
-              <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">今年度</button>
-              <button onClick={() => applyPreset('all')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">全期間</button>
+              <button onClick={() => applyPreset('thisMonth')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">今月</button>
+              <button onClick={() => applyPreset('lastMonth')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">先月</button>
+              <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">今年度</button>
+              <button onClick={() => applyPreset('all')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">全期間</button>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[11px] text-[#68756c]">集計基準</span>
-              <div className="flex overflow-hidden rounded-full border border-[#d9d1be]">
+              <span className="text-[11px] text-mist">集計基準</span>
+              <div className="flex overflow-hidden rounded-full border border-line">
                 {([['order', '発注日'], ['delivery', '納品日']] as const).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => setSaleBasis(key)}
-                    className={`px-2.5 py-1 text-[11px] transition ${saleBasis === key ? 'bg-[#174c33] text-white' : 'bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+                    className={`px-2.5 py-1 text-[11px] transition ${saleBasis === key ? 'bg-ink text-paper' : 'bg-white text-matchaDeep hover:bg-[#eef3eb]'}`}
                   >
                     {label}
                   </button>
@@ -488,7 +488,7 @@ export default function FinancialsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap gap-1 border-b border-[#d9d1be]">
+        <div className="flex flex-wrap gap-1 border-b border-line">
           {([
             ['overview', '概要'],
             ['monthly', '月別'],
@@ -501,7 +501,7 @@ export default function FinancialsPage() {
               key={k}
               onClick={() => setActiveTab(k)}
               className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
-                activeTab === k ? 'border-[#174c33] text-[#173c2a]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                activeTab === k ? 'border-[#174c33] text-ink' : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {label}
@@ -511,23 +511,23 @@ export default function FinancialsPage() {
 
         {activeTab === 'overview' && (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+            <div className="rounded-2xl border border-line bg-white p-4">
               <div className="mb-3 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-[#9d3d28]" />
-                <h2 className="text-sm font-semibold text-[#173c2a]">アラート（期限超過）</h2>
+                <AlertTriangle size={16} className="text-alert" />
+                <h2 className="text-sm font-semibold text-ink">アラート（期限超過）</h2>
               </div>
               {overdueSales.length === 0 && overdueOrders.length === 0 ? (
-                <p className="text-xs text-[#68756c]">期限超過の請求・支払いはありません。</p>
+                <p className="text-xs text-mist">期限超過の請求・支払いはありません。</p>
               ) : (
                 <div className="space-y-3">
                   {overdueSales.length > 0 && (
                     <div>
-                      <p className="mb-1 text-[11px] uppercase tracking-wider text-[#9d3d28]">売上（未収・期限超過）</p>
-                      <ul className="space-y-1 text-xs text-[#173c2a]">
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-alert">売上（未収・期限超過）</p>
+                      <ul className="space-y-1 text-xs text-ink">
                         {overdueSales.map(r => (
-                          <li key={r.id} className="flex items-center justify-between rounded-lg bg-[#fff0ec] px-2 py-1.5">
+                          <li key={r.id} className="flex items-center justify-between rounded-lg bg-bone px-2 py-1.5">
                             <span>{r.buyerName} - {r.items[0]?.productName ?? ''}</span>
-                            <span className="text-[#9d3d28]">{formatCurrency(saleIncome(r))} / 期日 {r.dueDate}</span>
+                            <span className="text-alert">{formatCurrency(saleIncome(r))} / 期日 {r.dueDate}</span>
                           </li>
                         ))}
                       </ul>
@@ -535,12 +535,12 @@ export default function FinancialsPage() {
                   )}
                   {overdueOrders.length > 0 && (
                     <div>
-                      <p className="mb-1 text-[11px] uppercase tracking-wider text-[#9d3d28]">仕入（未払・期限超過）</p>
-                      <ul className="space-y-1 text-xs text-[#173c2a]">
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-alert">仕入（未払・期限超過）</p>
+                      <ul className="space-y-1 text-xs text-ink">
                         {overdueOrders.map(o => (
-                          <li key={o.id} className="flex items-center justify-between rounded-lg bg-[#fff0ec] px-2 py-1.5">
+                          <li key={o.id} className="flex items-center justify-between rounded-lg bg-bone px-2 py-1.5">
                             <span>{o.supplierName} - {o.items[0]?.productName ?? ''}</span>
-                            <span className="text-[#9d3d28]">{formatCurrency(poExpense(o))} / 期日 {o.paymentDueDate}</span>
+                            <span className="text-alert">{formatCurrency(poExpense(o))} / 期日 {o.paymentDueDate}</span>
                           </li>
                         ))}
                       </ul>
@@ -577,7 +577,7 @@ export default function FinancialsPage() {
           <CashFlowTab sales={sales} ecSales={ecSales} purchaseOrders={orders} />
         )}
 
-        {loading && <p className="text-xs text-[#68756c]">読み込み中…</p>}
+        {loading && <p className="text-xs text-mist">読み込み中…</p>}
       </div>
     </AppLayout>
   )
@@ -606,13 +606,13 @@ function PeriodTable({ rows, title, yoy }: {
   yoy?: Map<string, { revenue: number; expense: number; profit: number }>
 }) {
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white">
+    <div className="rounded-2xl border border-line bg-white">
       <div className="border-b border-[#ece8db] px-4 py-3">
-        <h2 className="text-sm font-semibold text-[#173c2a]">{title}</h2>
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs">
-          <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
+          <thead className="bg-bone text-left uppercase tracking-wider text-mist">
             <tr>
               <th className="px-3 py-2 font-medium">期間</th>
               <th className="px-3 py-2 font-medium text-right">売上計</th>
@@ -627,21 +627,21 @@ function PeriodTable({ rows, title, yoy }: {
             {rows.map(r => {
               const prev = yoy?.get(prevYearKey(r.key))
               const yoyText = prev ? formatPct(r.revenue, prev.revenue) : '—'
-              const yoyColor = !prev ? 'text-[#68756c]' : r.revenue >= prev.revenue ? 'text-[#174c33]' : 'text-[#9d3d28]'
+              const yoyColor = !prev ? 'text-mist' : r.revenue >= prev.revenue ? 'text-matchaDeep' : 'text-alert'
               return (
-                <tr key={r.key} className="border-t border-[#ece8db] text-[#173c2a]">
+                <tr key={r.key} className="border-t border-[#ece8db] text-ink">
                   <td className="px-3 py-2 font-medium">{r.label}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(r.revenue)}</td>
                   {yoy && <td className={`px-3 py-2 text-right text-[11px] ${yoyColor}`}>{yoyText}</td>}
-                  <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.collected)}</td>
+                  <td className="px-3 py-2 text-right text-matchaDeep">{formatCurrency(r.collected)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(r.expense)}</td>
-                  <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.paid)}</td>
-                  <td className={`px-3 py-2 text-right font-semibold ${r.net >= 0 ? 'text-[#174c33]' : 'text-[#9d3d28]'}`}>{formatCurrency(r.net)}</td>
+                  <td className="px-3 py-2 text-right text-alert">{formatCurrency(r.paid)}</td>
+                  <td className={`px-3 py-2 text-right font-semibold ${r.net >= 0 ? 'text-matchaDeep' : 'text-alert'}`}>{formatCurrency(r.net)}</td>
                 </tr>
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={yoy ? 7 : 6} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
+              <tr><td colSpan={yoy ? 7 : 6} className="px-3 py-6 text-center text-mist">データがありません。</td></tr>
             )}
           </tbody>
         </table>
@@ -657,7 +657,7 @@ function MonthlyTrendChart({ rows, yoy }: {
   const series = [...rows].sort((a, b) => a.key.localeCompare(b.key))
   if (series.length === 0) {
     return (
-      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4 text-center text-xs text-[#68756c]">表示できる月次データがありません。</div>
+      <div className="rounded-2xl border border-line bg-white p-4 text-center text-xs text-mist">表示できる月次データがありません。</div>
     )
   }
   const W = 720, H = 220
@@ -675,13 +675,13 @@ function MonthlyTrendChart({ rows, yoy }: {
   const yVal = (v: number) => yZero - (v / maxAbs) * (innerH / 2 - 4)
 
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <div className="mb-2 flex items-center justify-between text-xs text-[#68756c]">
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <div className="mb-2 flex items-center justify-between text-xs text-mist">
         <span>月次トレンド（売上＝緑棒 / 仕入＝赤棒 / 収支ライン＝紺）</span>
         <div className="flex gap-3">
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-600" />売上</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />仕入</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#173c2a]" />純収支</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-matcha" />売上</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-alert/50" />仕入</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-ink" />純収支</span>
           <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#9b9382]" style={{ borderTop: '1.5px dashed #9b9382' }} />前年売上</span>
         </div>
       </div>
@@ -728,40 +728,40 @@ function MonthlyTrendChart({ rows, yoy }: {
 
 function ProductsTab({ rows }: { rows: ProductRow[] }) {
   if (rows.length === 0) {
-    return <div className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">商品データがありません。</div>
+    return <div className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">商品データがありません。</div>
   }
   const total = rows.reduce((s, r) => s + r.revenue, 0) || 1
   const maxRev = rows[0]?.revenue || 1
   const top = rows.slice(0, 20)
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-        <h2 className="mb-3 text-sm font-semibold text-[#173c2a]">商品別 売上ランキング（期間内）</h2>
+      <div className="rounded-2xl border border-line bg-white p-4">
+        <h2 className="mb-3 text-sm font-semibold text-ink">商品別 売上ランキング（期間内）</h2>
         <div className="space-y-1.5">
           {top.map((r, i) => {
             const sharePct = (r.revenue / total) * 100
             const width = (r.revenue / maxRev) * 100
             return (
               <div key={`${r.productId}-${i}`} className="grid grid-cols-[24px_minmax(180px,1fr)_2fr_120px_60px] items-center gap-2 text-xs">
-                <span className="text-right font-mono text-[#68756c]">{i + 1}</span>
+                <span className="text-right font-mono text-mist">{i + 1}</span>
                 <div className="truncate">
-                  <span className="font-medium text-[#173c2a]">{r.name}</span>
-                  {r.sku && <span className="ml-1 text-[10px] text-[#68756c]">({r.sku})</span>}
+                  <span className="font-medium text-ink">{r.name}</span>
+                  {r.sku && <span className="ml-1 text-[10px] text-mist">({r.sku})</span>}
                 </div>
-                <div className="relative h-4 rounded bg-[#f4f2ea]">
-                  <div className="absolute inset-y-0 left-0 rounded bg-emerald-500/70" style={{ width: `${width}%` }} />
+                <div className="relative h-4 rounded bg-bone">
+                  <div className="absolute inset-y-0 left-0 rounded bg-matcha/70" style={{ width: `${width}%` }} />
                 </div>
-                <span className="text-right font-medium text-[#173c2a]">{formatCurrency(r.revenue)}</span>
-                <span className="text-right text-[#68756c]">{sharePct.toFixed(1)}%</span>
+                <span className="text-right font-medium text-ink">{formatCurrency(r.revenue)}</span>
+                <span className="text-right text-mist">{sharePct.toFixed(1)}%</span>
               </div>
             )
           })}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white">
+      <div className="overflow-hidden rounded-2xl border border-line bg-white">
         <table className="min-w-full text-xs">
-          <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
+          <thead className="bg-bone text-left uppercase tracking-wider text-mist">
             <tr>
               <th className="px-3 py-2 font-medium">商品</th>
               <th className="px-3 py-2 font-medium text-right">数量(kg)</th>
@@ -777,14 +777,14 @@ function ProductsTab({ rows }: { rows: ProductRow[] }) {
               const margin = r.revenue ? (r.profit / r.revenue) * 100 : 0
               const share = (r.revenue / total) * 100
               return (
-                <tr key={r.productId || r.name} className="border-t border-[#ece8db] text-[#173c2a]">
+                <tr key={r.productId || r.name} className="border-t border-[#ece8db] text-ink">
                   <td className="px-3 py-2">
                     <span className="font-medium">{r.name}</span>
-                    {r.sku && <span className="ml-1 text-[10px] text-[#68756c]">({r.sku})</span>}
+                    {r.sku && <span className="ml-1 text-[10px] text-mist">({r.sku})</span>}
                   </td>
                   <td className="px-3 py-2 text-right">{r.quantity.toFixed(2)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(r.revenue)}</td>
-                  <td className={`px-3 py-2 text-right ${r.profit >= 0 ? 'text-[#174c33]' : 'text-[#9d3d28]'}`}>{formatCurrency(r.profit)}</td>
+                  <td className={`px-3 py-2 text-right ${r.profit >= 0 ? 'text-matchaDeep' : 'text-alert'}`}>{formatCurrency(r.profit)}</td>
                   <td className="px-3 py-2 text-right">{margin.toFixed(1)}%</td>
                   <td className="px-3 py-2 text-right">{r.count}</td>
                   <td className="px-3 py-2 text-right">{share.toFixed(1)}%</td>
@@ -802,13 +802,13 @@ function PartnerTable({ title, rows, headers }: { title: string; rows: PartnerRo
   const total = rows.reduce((s, r) => s + r.total, 0) || 1
   const maxTotal = rows[0]?.total || 1
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white">
+    <div className="rounded-2xl border border-line bg-white">
       <div className="border-b border-[#ece8db] px-4 py-3">
-        <h2 className="text-sm font-semibold text-[#173c2a]">{title}</h2>
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs">
-          <thead className="bg-[#faf8f1] text-left uppercase tracking-wider text-[#68756c]">
+          <thead className="bg-bone text-left uppercase tracking-wider text-mist">
             <tr>
               <th className="px-3 py-2 font-medium">取引先</th>
               <th className="px-3 py-2 font-medium text-right">{headers[0]}</th>
@@ -823,25 +823,25 @@ function PartnerTable({ title, rows, headers }: { title: string; rows: PartnerRo
               const share = (r.total / total) * 100
               const width = (r.total / maxTotal) * 100
               return (
-                <tr key={r.name} className="border-t border-[#ece8db] text-[#173c2a]">
+                <tr key={r.name} className="border-t border-[#ece8db] text-ink">
                   <td className="px-3 py-2 font-medium">{r.name}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(r.total)}</td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <div className="relative h-3 flex-1 rounded bg-[#f4f2ea]">
-                        <div className="absolute inset-y-0 left-0 rounded bg-emerald-500/70" style={{ width: `${width}%` }} />
+                      <div className="relative h-3 flex-1 rounded bg-bone">
+                        <div className="absolute inset-y-0 left-0 rounded bg-matcha/70" style={{ width: `${width}%` }} />
                       </div>
-                      <span className="w-10 text-right text-[10px] text-[#68756c]">{share.toFixed(1)}%</span>
+                      <span className="w-10 text-right text-[10px] text-mist">{share.toFixed(1)}%</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-right text-[#174c33]">{formatCurrency(r.settled)}</td>
-                  <td className="px-3 py-2 text-right text-[#9d3d28]">{formatCurrency(r.outstanding)}</td>
+                  <td className="px-3 py-2 text-right text-matchaDeep">{formatCurrency(r.settled)}</td>
+                  <td className="px-3 py-2 text-right text-alert">{formatCurrency(r.outstanding)}</td>
                   <td className="px-3 py-2 text-right">{r.count}</td>
                 </tr>
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-[#68756c]">データがありません。</td></tr>
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-mist">データがありません。</td></tr>
             )}
           </tbody>
         </table>
@@ -938,48 +938,48 @@ function CashFlowTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
+      <div className="rounded-2xl border border-line bg-white p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs text-[#68756c]">
+          <label className="text-xs text-mist">
             <span className="mb-1 block">期首残高 (¥)</span>
             <input
               type="number"
               value={openingBalance}
               onChange={e => handleOpeningChange(Number(e.target.value) || 0)}
-              className="w-36 rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-36 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </label>
-          <label className="text-xs text-[#68756c]">
+          <label className="text-xs text-mist">
             <span className="mb-1 block">開始月</span>
             <input
               type="month"
               value={startMonth}
               onChange={e => setStartMonth(e.target.value)}
-              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </label>
-          <label className="text-xs text-[#68756c]">
+          <label className="text-xs text-mist">
             <span className="mb-1 block">終了月</span>
             <input
               type="month"
               value={endMonth}
               onChange={e => setEndMonth(e.target.value)}
-              className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </label>
           <div className="flex flex-wrap gap-1">
-            <button onClick={() => applyPreset('last12')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">過去12ヶ月</button>
-            <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">今年度</button>
-            <button onClick={() => applyPreset('next12')} className="rounded-full border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]">前後12ヶ月</button>
+            <button onClick={() => applyPreset('last12')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">過去12ヶ月</button>
+            <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">今年度</button>
+            <button onClick={() => applyPreset('next12')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">前後12ヶ月</button>
           </div>
           <div className="ml-auto flex gap-1">
             <button
               onClick={() => setMode('actual')}
-              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'actual' ? 'border-[#174c33] bg-[#174c33] text-white' : 'border-[#d9d1be] bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'actual' ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-matchaDeep hover:bg-[#eef3eb]'}`}
             >実績のみ</button>
             <button
               onClick={() => setMode('plan')}
-              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'plan' ? 'border-[#174c33] bg-[#174c33] text-white' : 'border-[#d9d1be] bg-white text-[#174c33] hover:bg-[#eef3eb]'}`}
+              className={`rounded-full border px-3 py-1 text-[11px] ${mode === 'plan' ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-matchaDeep hover:bg-[#eef3eb]'}`}
             >実績＋予定</button>
           </div>
         </div>
@@ -991,13 +991,13 @@ function CashFlowTab({
         <KPICard title="期間内のショート月数" value={`${shortMonths} ヶ月`} color={shortMonths > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
       </div>
 
-      <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-        <div className="mb-2 flex items-center justify-between text-xs text-[#68756c]">
+      <div className="rounded-2xl border border-line bg-white p-4">
+        <div className="mb-2 flex items-center justify-between text-xs text-mist">
           <span>月別 入金/支払（縦棒）と現金残高（ライン）</span>
           <div className="flex gap-3">
-            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-600" />入金</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />支払</span>
-            <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-[#173c2a]" />残高</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-matcha" />入金</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-alert/50" />支払</span>
+            <span className="inline-flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-ink" />残高</span>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -1038,9 +1038,9 @@ function CashFlowTab({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white">
+      <div className="overflow-hidden rounded-2xl border border-line bg-white">
         <table className="min-w-full text-sm">
-          <thead className="bg-[#f7f5ee] text-[#173c2a]">
+          <thead className="bg-bone text-ink">
             <tr>
               <th className="px-3 py-2 text-left font-medium">月</th>
               <th className="px-3 py-2 text-right font-medium">入金 (実績)</th>
@@ -1056,14 +1056,14 @@ function CashFlowTab({
               const isCurrent = r.key === todayKey
               const negative = r.endBalance < 0
               return (
-                <tr key={r.key} className={`${negative ? 'bg-red-50' : ''} ${isCurrent ? 'border-l-4 border-[#174c33]' : ''}`}>
-                  <td className="border-b border-gray-100 px-3 py-2 font-medium text-[#173c2a]">{r.key}</td>
-                  <td className="border-b border-gray-100 px-3 py-2 text-right text-emerald-700">{r.inActual > 0 ? formatCurrency(r.inActual) : '-'}</td>
-                  <td className="border-b border-gray-100 px-3 py-2 text-right text-[#68756c]">{r.inExpected > 0 ? formatCurrency(r.inExpected) : '-'}</td>
-                  <td className="border-b border-gray-100 px-3 py-2 text-right text-red-700">{r.outActual > 0 ? formatCurrency(r.outActual) : '-'}</td>
-                  <td className="border-b border-gray-100 px-3 py-2 text-right text-[#68756c]">{r.outExpected > 0 ? formatCurrency(r.outExpected) : '-'}</td>
-                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-medium ${r.net >= 0 ? 'text-[#173c2a]' : 'text-red-700'}`}>{formatCurrency(r.net)}</td>
-                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-semibold ${negative ? 'text-red-700' : 'text-[#173c2a]'}`}>{formatCurrency(r.endBalance)}</td>
+                <tr key={r.key} className={`${negative ? 'bg-alert/5' : ''} ${isCurrent ? 'border-l-4 border-[#174c33]' : ''}`}>
+                  <td className="border-b border-gray-100 px-3 py-2 font-medium text-ink">{r.key}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-matcha">{r.inActual > 0 ? formatCurrency(r.inActual) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-mist">{r.inExpected > 0 ? formatCurrency(r.inExpected) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-alert">{r.outActual > 0 ? formatCurrency(r.outActual) : '-'}</td>
+                  <td className="border-b border-gray-100 px-3 py-2 text-right text-mist">{r.outExpected > 0 ? formatCurrency(r.outExpected) : '-'}</td>
+                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-medium ${r.net >= 0 ? 'text-ink' : 'text-alert'}`}>{formatCurrency(r.net)}</td>
+                  <td className={`border-b border-gray-100 px-3 py-2 text-right font-semibold ${negative ? 'text-alert' : 'text-ink'}`}>{formatCurrency(r.endBalance)}</td>
                 </tr>
               )
             })}
@@ -1071,7 +1071,7 @@ function CashFlowTab({
         </table>
       </div>
 
-      <p className="text-[11px] text-[#68756c]">
+      <p className="text-[11px] text-mist">
         ※ 金額は税込換算（海外向け販売は税抜のまま）。EC 販売は売上日に入金とみなしています。期首残高はブラウザに保存されます。
       </p>
     </div>

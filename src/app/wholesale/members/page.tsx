@@ -28,10 +28,10 @@ interface Member {
 
 const STATUS_LABEL: Record<string, string> = { pending: '承認待ち', approved: '承認済み', rejected: '却下', suspended: '停止' }
 const STATUS_STYLE: Record<string, string> = {
-  pending: 'bg-amber-100 text-amber-800',
-  approved: 'bg-emerald-100 text-emerald-800',
-  rejected: 'bg-red-100 text-red-700',
-  suspended: 'bg-gray-200 text-gray-700',
+  pending: 'border-[#a87b1e] text-[#a87b1e]',
+  approved: 'border-matcha text-matcha',
+  rejected: 'border-alert text-alert',
+  suspended: 'border-line text-mist',
 }
 const VOLUME_LABEL: Record<string, string> = {
   undecided: '未定', under_10kg: '10kg未満', '10_50kg': '10〜50kg', '50_100kg': '50〜100kg', over_100kg: '100kg以上',
@@ -118,17 +118,18 @@ export default function WholesaleMembersPage() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-6xl">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-bl-6 flex items-end justify-between border-b border-ink pb-bl-3">
           <div>
-            <h1 className="text-2xl font-bold text-[#173c2a]">卸売会員管理</h1>
-            <p className="mt-1 text-sm text-[#68756c]">登録会員を審査・承認・管理します。社名をクリックで顧客情報と購入履歴を表示。{pendingCount > 0 && <span className="ml-1 text-amber-700">承認待ち {pendingCount} 件</span>}</p>
+            <p className="kicker mb-bl">SABO WHOLESALE</p>
+            <h1 className="display-2 text-2xl text-ink">卸売会員管理</h1>
+            <p className="mt-bl text-sm text-mist">登録会員を審査・承認・管理します。社名をクリックで顧客情報と購入履歴を表示。{pendingCount > 0 && <span className="ml-1 text-[#a87b1e]">承認待ち {pendingCount} 件</span>}</p>
           </div>
-          <button onClick={load} className="flex items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-2 text-sm text-[#173c2a] hover:bg-[#f4f2ea]">
-            <RefreshCw size={15} /> 更新
+          <button onClick={load} className="btn-ghost">
+            <RefreshCw size={14} /> 更新
           </button>
         </div>
 
-        {error && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
+        {error && <p className="mb-bl-2 rounded-lg border border-alert/40 bg-alert/5 px-4 py-2 text-sm text-alert">{error}</p>}
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="flex flex-wrap gap-1.5">
@@ -136,7 +137,7 @@ export default function WholesaleMembersPage() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
-                className={`rounded-full px-3 py-1.5 text-sm transition ${filter === f.key ? 'bg-[#174c33] text-white' : 'border border-[#d9d1be] text-[#173c2a] hover:bg-[#f4f2ea]'}`}
+                className={`rounded-full px-3 py-1.5 text-sm transition ${filter === f.key ? 'bg-ink text-paper' : 'border border-line text-ink hover:bg-bone'}`}
               >
                 {f.label}
                 {f.key === 'pending' && pendingCount > 0 && <span className="ml-1 text-xs">({pendingCount})</span>}
@@ -144,24 +145,24 @@ export default function WholesaleMembersPage() {
             ))}
           </div>
           <div className="relative ml-auto min-w-[220px] flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#a59f8c]" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="社名・担当者・メールで検索"
-              className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-lg border border-line bg-paper py-2 pl-9 pr-3 text-sm text-ink outline-none focus:border-ink"
             />
           </div>
         </div>
 
         {loading ? (
-          <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
+          <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-[#d9d1be] bg-white shadow-sm">
+          <div className="panel overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-max min-w-full text-sm">
-                <thead className="bg-[#f7f5ee]">
-                  <tr className="whitespace-nowrap text-left text-[#68756c]">
+                <thead className="bg-bone">
+                  <tr className="whitespace-nowrap text-left text-mist">
                     <th className="px-4 py-3 font-medium">会社名 / 屋号</th>
                     <th className="px-4 py-3 font-medium">ご担当者</th>
                     <th className="px-4 py-3 font-medium">メール</th>
@@ -176,21 +177,21 @@ export default function WholesaleMembersPage() {
                 </thead>
                 <tbody>
                   {filtered.map(m => (
-                    <tr key={m.uid} className={`whitespace-nowrap border-t border-[#ece5d7] hover:bg-[#faf8f2] ${busy === m.uid ? 'pointer-events-none opacity-50' : ''}`}>
+                    <tr key={m.uid} className={`whitespace-nowrap border-t border-line hover:bg-bone ${busy === m.uid ? 'pointer-events-none opacity-50' : ''}`}>
                       <td className="px-4 py-3">
-                        <Link href={`/wholesale/members/${m.uid}`} className="font-medium text-[#173c2a] hover:text-[#174c33] hover:underline">
+                        <Link href={`/wholesale/members/${m.uid}`} className="font-medium text-ink hover:text-matchaDeep hover:underline">
                           {m.companyName ?? '(社名未設定)'}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{m.contactName ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-700">{m.email ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-700">{m.country ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-700">{businessTypeText(m.businessTypes, m.businessType)}</td>
-                      <td className="px-4 py-3 text-gray-700">{m.annualVolumeEstimate ? VOLUME_LABEL[m.annualVolumeEstimate] ?? m.annualVolumeEstimate : '—'}</td>
-                      <td className="px-4 py-3 capitalize text-gray-700">{m.rank ?? 'standard'}</td>
-                      <td className="px-4 py-3 text-gray-700">{fmtDate(m.createdAtMs)}</td>
+                      <td className="px-4 py-3 text-graphite">{m.contactName ?? '—'}</td>
+                      <td className="px-4 py-3 text-graphite">{m.email ?? '—'}</td>
+                      <td className="px-4 py-3 text-graphite">{m.country ?? '—'}</td>
+                      <td className="px-4 py-3 text-graphite">{businessTypeText(m.businessTypes, m.businessType)}</td>
+                      <td className="px-4 py-3 text-graphite">{m.annualVolumeEstimate ? VOLUME_LABEL[m.annualVolumeEstimate] ?? m.annualVolumeEstimate : '—'}</td>
+                      <td className="px-4 py-3 capitalize text-graphite">{m.rank ?? 'standard'}</td>
+                      <td className="px-4 py-3 text-graphite">{fmtDate(m.createdAtMs)}</td>
                       <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-0.5 text-xs ${STATUS_STYLE[m.status ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
+                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${STATUS_STYLE[m.status ?? ''] ?? 'border-line text-mist'}`}>
                           {STATUS_LABEL[m.status ?? ''] ?? m.status}
                         </span>
                       </td>
@@ -198,21 +199,21 @@ export default function WholesaleMembersPage() {
                         <div className="flex justify-end gap-2">
                           {m.status === 'pending' && (
                             <>
-                              <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1.5 text-xs text-white hover:opacity-90">
+                              <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1.5 text-xs text-paper hover:opacity-90">
                                 <Check size={13} /> 承認
                               </button>
-                              <button onClick={() => act(m.uid, 'reject')} className="flex items-center gap-1 rounded-lg border border-[#d9d1be] px-2.5 py-1.5 text-xs text-[#9d3d28] hover:bg-[#fff0ec]">
+                              <button onClick={() => act(m.uid, 'reject')} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-alert hover:bg-bone">
                                 <X size={13} /> 却下
                               </button>
                             </>
                           )}
                           {m.status === 'approved' && (
-                            <button onClick={() => act(m.uid, 'suspend')} className="flex items-center gap-1 rounded-lg border border-[#d9d1be] px-2.5 py-1.5 text-xs text-[#8d5b08] hover:bg-[#fff6e5]">
+                            <button onClick={() => act(m.uid, 'suspend')} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-[#a87b1e] hover:bg-bone">
                               <Ban size={13} /> 停止
                             </button>
                           )}
                           {(m.status === 'rejected' || m.status === 'suspended') && (
-                            <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1.5 text-xs text-white hover:opacity-90">
+                            <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1.5 text-xs text-paper hover:opacity-90">
                               <Check size={13} /> 承認
                             </button>
                           )}
@@ -222,7 +223,7 @@ export default function WholesaleMembersPage() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-[#68756c]">該当する会員がいません。</td>
+                      <td colSpan={10} className="px-4 py-12 text-center text-mist">該当する会員がいません。</td>
                     </tr>
                   )}
                 </tbody>

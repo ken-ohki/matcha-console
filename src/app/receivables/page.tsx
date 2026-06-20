@@ -199,18 +199,18 @@ export default function ReceivablesPage() {
             type="date"
             value={s.dueDate ?? ''}
             onChange={e => updateInline(s.id, { dueDate: e.target.value })}
-            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-red-400 text-red-700' : 'border-[#d9d1be]'}`}
+            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-alert/40 text-alert' : 'border-line'}`}
           />
         </td>
-        <td className="px-3 py-2 text-[#173c2a]">
+        <td className="px-3 py-2 text-ink">
           <button type="button" onClick={() => setDetailSale(s)} className="text-left hover:underline">{s.buyerName}</button>
         </td>
-        <td className="px-3 py-2 text-[#68756c]">{productLabel}</td>
+        <td className="px-3 py-2 text-mist">{productLabel}</td>
         <td className="px-3 py-2 text-right">
-          <div className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(s))}</div>
-          <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
+          <div className="font-semibold text-ink">{formatCurrency(saleIncome(s))}</div>
+          <div className="text-[10px] text-mist">税抜 {formatCurrency(saleIncomeExcl(s))}</div>
           {((s.shippingFee || 0) > 0 || (s.fees ?? []).length > 0) && (
-            <div className="text-[10px] text-[#68756c]">
+            <div className="text-[10px] text-mist">
               商品 {formatCurrency(s.revenue)}
               {(s.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(s.shippingFee)}</>}
               {(s.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(s.fees))}</>}
@@ -221,7 +221,7 @@ export default function ReceivablesPage() {
           <select
             value={s.paymentStatus}
             onChange={e => updateInline(s.id, { paymentStatus: e.target.value as PaymentStatus })}
-            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
           >
             <option value="uninvoiced">{PAYMENT_LABELS.uninvoiced}</option>
             <option value="invoiced">{PAYMENT_LABELS.invoiced}</option>
@@ -233,17 +233,17 @@ export default function ReceivablesPage() {
             type="date"
             value={s.paymentDate ?? ''}
             onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
-            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
           />
         </td>
-        <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#68756c]">
+        <td className="whitespace-nowrap px-3 py-2 text-[11px] text-mist">
           {s.paymentConfirmedAt ? new Date(s.paymentConfirmedAt).toLocaleDateString('ja-JP') : '-'}
         </td>
         <td className="px-3 py-2">
           <select
             value={s.paymentMethod ?? ''}
             onChange={e => updateInline(s.id, { paymentMethod: e.target.value })}
-            className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs"
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
           >
             <option value="">未設定</option>
             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -258,7 +258,7 @@ export default function ReceivablesPage() {
               type="button"
               onClick={() => openConfirm(s)}
               disabled={savingId === s.id}
-              className="inline-flex items-center gap-1 rounded-lg bg-[#174c33] px-2.5 py-1 text-[11px] font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
             >
               <CheckCircle2 size={12} /> 入金確認
             </button>
@@ -267,7 +267,7 @@ export default function ReceivablesPage() {
               type="button"
               onClick={() => unconfirmPaid(s)}
               disabled={savingId === s.id}
-              className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1 text-[11px] font-medium text-[#9d3d28] hover:bg-red-50 disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-alert hover:bg-alert/5 disabled:opacity-60"
             >
               <Undo2 size={12} /> 入金取消
             </button>
@@ -275,7 +275,7 @@ export default function ReceivablesPage() {
           {s.paymentStatus !== 'paid' && isOverdue && (
             <a
               href={`mailto:?subject=${encodeURIComponent('お支払いのお願い')}&body=${encodeURIComponent(`${s.buyerName} 様\n\n下記の請求につきまして、ご入金状況をご確認ください。\n金額: ${formatCurrency(saleIncome(s))}\n期日: ${s.dueDate ?? ''}`)}`}
-              className="ml-1 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+              className="ml-1 inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
               title="督促メール下書き"
             >
               <Mail size={12} />
@@ -289,14 +289,14 @@ export default function ReceivablesPage() {
   const renderSaleCard = (label: string, colorClass: string, list: SaleRecord[]) => (
     <div className={`rounded-2xl border-2 ${colorClass}`}>
       <div className="flex items-center gap-2 px-4 py-3">
-        <h2 className="text-sm font-semibold text-[#173c2a]">{label}</h2>
-        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">
+        <h2 className="text-sm font-semibold text-ink">{label}</h2>
+        <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
           {list.length}件 / {formatCurrency(list.reduce((s, r) => s + saleIncome(r), 0))}
         </span>
       </div>
       <div className="-mx-0.5 overflow-x-auto border-t border-white/60">
         <table className="min-w-[1040px] text-sm">
-          <thead className="bg-white/60 text-[#173c2a]">
+          <thead className="bg-white/60 text-ink">
             <tr>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">期日</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">販売先</th>
@@ -320,10 +320,10 @@ export default function ReceivablesPage() {
       <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-[#173c2a]">入金管理</h1>
-            <p className="text-sm text-[#68756c]">期日が近い／超過した売掛を一目で確認し、入金を一括で記録できます。</p>
+            <h1 className="text-2xl font-semibold text-ink">入金管理</h1>
+            <p className="text-sm text-mist">期日が近い／超過した売掛を一目で確認し、入金を一括で記録できます。</p>
           </div>
-          <Link href="/financials" className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">
+          <Link href="/financials" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">
             収支ダッシュボード →
           </Link>
         </div>
@@ -334,20 +334,20 @@ export default function ReceivablesPage() {
           <KPICard title="今月入金 (確認済・EC込)" value={formatCurrency(kpis.collectedThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#d9d1be] bg-white p-3">
-          <Filter size={14} className="text-[#68756c]" />
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3">
+          <Filter size={14} className="text-mist" />
           <input
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="販売先または商品名で検索"
-            className="flex-1 min-w-[200px] rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="flex-1 min-w-[200px] rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
           />
           {feedback && (
-            <span className="text-xs text-[#174c33]">{feedback}</span>
+            <span className="text-xs text-matchaDeep">{feedback}</span>
           )}
         </div>
 
-        {loading && <p className="text-sm text-[#68756c]">読み込み中…</p>}
+        {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
         {/* バケット＋ECをタブで切り替え */}
         {!loading && (() => {
@@ -375,12 +375,12 @@ export default function ReceivablesPage() {
                       onClick={() => setActiveBucket(b)}
                       className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
                         active === b
-                          ? 'border-[#174c33] text-[#173c2a]'
-                          : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                          ? 'border-[#174c33] text-ink'
+                          : 'border-transparent text-mist hover:text-ink'
                       }`}
                     >
                       {BUCKET_LABELS[b]}
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c]'}`}>{count}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-ink text-paper' : 'bg-bone text-mist'}`}>{count}</span>
                     </button>
                   )
                 })}
@@ -389,24 +389,24 @@ export default function ReceivablesPage() {
                     type="button"
                     onClick={() => setActiveBucket('ec')}
                     className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
-                      isEc ? 'border-[#174c33] text-[#173c2a]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                      isEc ? 'border-[#174c33] text-ink' : 'border-transparent text-mist hover:text-ink'
                     }`}
                   >
                     EC売上
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isEc ? 'bg-[#174c33] text-white' : 'bg-[#f4f2ea] text-[#68756c]'}`}>{ecFiltered.length}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isEc ? 'bg-ink text-paper' : 'bg-bone text-mist'}`}>{ecFiltered.length}</span>
                   </button>
                 )}
               </div>
 
               {isEc ? (
-                <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/30">
+                <div className="rounded-2xl border-2 border-matcha/40 bg-bone">
                   <div className="flex items-center gap-2 px-4 py-3">
-                    <h2 className="text-sm font-semibold text-[#173c2a]">EC売上（入金済・参考）</h2>
-                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-[#68756c]">{ecFiltered.length}件 / 今月 {formatCurrency(ecThisMonth)}</span>
+                    <h2 className="text-sm font-semibold text-ink">EC売上（入金済・参考）</h2>
+                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">{ecFiltered.length}件 / 今月 {formatCurrency(ecThisMonth)}</span>
                   </div>
                   <div className="overflow-x-auto border-t border-white/60">
                     <table className="min-w-full text-sm">
-                      <thead className="bg-white/60 text-[#173c2a]">
+                      <thead className="bg-white/60 text-ink">
                         <tr>
                           <th className="px-3 py-2 text-left font-medium">売上日</th>
                           <th className="px-3 py-2 text-left font-medium">商品</th>
@@ -418,9 +418,9 @@ export default function ReceivablesPage() {
                       <tbody>
                         {ecFiltered.map(e => (
                           <tr key={e.id} className="border-t border-white/60">
-                            <td className="px-3 py-2 text-[#173c2a]">{e.soldOn || '-'}</td>
-                            <td className="px-3 py-2 text-[#68756c]">{e.productName}</td>
-                            <td className="px-3 py-2 text-[#68756c]">{e.orderNumber || '-'}</td>
+                            <td className="px-3 py-2 text-ink">{e.soldOn || '-'}</td>
+                            <td className="px-3 py-2 text-mist">{e.productName}</td>
+                            <td className="px-3 py-2 text-mist">{e.orderNumber || '-'}</td>
                             <td className="px-3 py-2 text-right">{formatKg(e.quantityKg)}</td>
                             <td className="px-3 py-2 text-right font-medium">{formatCurrency(ecRev(e))}</td>
                           </tr>
@@ -428,21 +428,21 @@ export default function ReceivablesPage() {
                       </tbody>
                     </table>
                     {ecSales.length > ecFiltered.length && (
-                      <p className="px-4 py-2 text-[11px] text-[#68756c]">最新 {ecFiltered.length} 件のみ表示しています。</p>
+                      <p className="px-4 py-2 text-[11px] text-mist">最新 {ecFiltered.length} 件のみ表示しています。</p>
                     )}
                   </div>
                 </div>
               ) : active === 'actionNeeded' ? (
                 overGroup.length === 0 && dueGroup.length === 0 ? (
-                  <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">要確認の売掛はありません。</p>
+                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の売掛はありません。</p>
                 ) : (
                   <div className="space-y-4">
-                    {overGroup.length > 0 && renderSaleCard('期限超過', 'border-red-300 bg-red-50', overGroup)}
-                    {dueGroup.length > 0 && renderSaleCard('今月期限', 'border-amber-300 bg-amber-50', dueGroup)}
+                    {overGroup.length > 0 && renderSaleCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
+                    {dueGroup.length > 0 && renderSaleCard('今月期限', 'border-[#a87b1e]/40 bg-bone', dueGroup)}
                   </div>
                 )
               ) : rows.length === 0 ? (
-                <p className="rounded-2xl border border-[#d9d1be] bg-white p-6 text-center text-sm text-[#68756c]">{BUCKET_LABELS[active as Bucket]}の売掛はありません。</p>
+                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{BUCKET_LABELS[active as Bucket]}の売掛はありません。</p>
               ) : (
                 renderSaleCard(BUCKET_LABELS[active as Bucket], BUCKET_COLORS[active as Bucket], rows)
               )}
@@ -456,28 +456,28 @@ export default function ReceivablesPage() {
       {confirmTarget && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={() => setConfirmTarget(null)}>
           <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-[#173c2a]">入金を確認</h2>
-            <p className="mt-2 text-sm text-[#68756c]">
-              <span className="font-medium text-[#173c2a]">{confirmTarget.buyerName}</span> の入金を確認済みにします。
+            <h2 className="text-lg font-semibold text-ink">入金を確認</h2>
+            <p className="mt-2 text-sm text-mist">
+              <span className="font-medium text-ink">{confirmTarget.buyerName}</span> の入金を確認済みにします。
             </p>
             <p className="mt-1 text-sm">
-              請求額（税込）: <span className="font-semibold text-[#173c2a]">{formatCurrency(saleIncome(confirmTarget))}</span>
+              請求額（税込）: <span className="font-semibold text-ink">{formatCurrency(saleIncome(confirmTarget))}</span>
             </p>
-            <label className="mt-4 block text-xs text-[#68756c]">
+            <label className="mt-4 block text-xs text-mist">
               <span className="mb-1 block">入金日</span>
               <input
                 type="date"
                 value={confirmDate}
                 onChange={e => setConfirmDate(e.target.value)}
-                className="w-full rounded-lg border border-[#d9d1be] bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </label>
-            <p className="mt-1 text-[10px] text-[#a59f8c]">確認日時（{todayIso()}）は自動で記録されます。</p>
+            <p className="mt-1 text-[10px] text-mist">確認日時（{todayIso()}）は自動で記録されます。</p>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmTarget(null)}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-line bg-white px-4 py-2 text-sm text-graphite hover:bg-bone"
               >
                 キャンセル
               </button>
@@ -485,7 +485,7 @@ export default function ReceivablesPage() {
                 type="button"
                 onClick={() => markPaid(confirmTarget.id, confirmDate)}
                 disabled={savingId === confirmTarget.id}
-                className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow hover:bg-[#205f43] disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
               >
                 <CheckCircle2 size={14} /> {savingId === confirmTarget.id ? '確定中…' : '入金確認'}
               </button>
@@ -500,8 +500,8 @@ export default function ReceivablesPage() {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-3 py-1 text-sm">
-      <span className="text-[#68756c]">{label}</span>
-      <span className="text-right font-medium text-[#173c2a]">{value}</span>
+      <span className="text-mist">{label}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
     </div>
   )
 }
@@ -517,17 +517,17 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6" onClick={e => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{sale.buyerName}</h2>
-            <p className="mt-1 text-xs text-[#68756c]">販売案件の詳細（読み取り専用）</p>
+            <h2 className="text-xl font-semibold text-ink">{sale.buyerName}</h2>
+            <p className="mt-1 text-xs text-mist">販売案件の詳細（読み取り専用）</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href={`/sales/${sale.id}/document?type=invoice`} className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-xs text-[#174c33] hover:bg-[#eef3eb]">請求書 →</Link>
-            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X size={18} /></button>
+            <Link href={`/sales/${sale.id}/document?type=invoice`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">請求書 →</Link>
+            <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-bone hover:text-mist"><X size={18} /></button>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
             <DetailRow label="販売ステータス" value={SALE_STATUS_LABELS[sale.status]} />
             <DetailRow label="入金ステータス" value={PAYMENT_LABELS[sale.paymentStatus]} />
             <DetailRow label="出荷ステータス" value={SHIPPING_STATUS_LABELS[sale.shippingStatus]} />
@@ -537,7 +537,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
             <DetailRow label="入金確認日" value={sale.paymentConfirmedAt ? new Date(sale.paymentConfirmedAt).toLocaleString('ja-JP') : '-'} />
             <DetailRow label="支払方法" value={sale.paymentMethod || '-'} />
           </div>
-          <div className="rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3">
+          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
             <DetailRow label="商品代金（税抜）" value={formatCurrency(sale.revenue)} />
             <DetailRow label="送料" value={formatCurrency(sale.shippingFee ?? 0)} />
             <DetailRow label="諸費用" value={formatCurrency(sumSaleFees(sale.fees))} />
@@ -551,7 +551,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
           <table className="min-w-full text-sm">
-            <thead className="bg-[#f7f5ee] text-left text-[#173c2a]">
+            <thead className="bg-bone text-left text-ink">
               <tr>
                 <th className="px-3 py-2 font-medium">商品</th>
                 <th className="px-3 py-2 font-medium text-right">数量</th>
@@ -562,8 +562,8 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
             </thead>
             <tbody>
               {(sale.items ?? []).map((item, i) => (
-                <tr key={i} className="border-t border-[#f0ebdf] text-[#173c2a]">
-                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-[#68756c]">({item.productSku})</span>}</td>
+                <tr key={i} className="border-t border-[#f0ebdf] text-ink">
+                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-mist">({item.productSku})</span>}</td>
                   <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
                   <td className="px-3 py-2 text-center">{(item.taxRate ?? 8) === 0 ? '免税' : `${item.taxRate ?? 8}%`}</td>
@@ -575,11 +575,11 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
         </div>
 
         {(sale.shippingAddress || sale.shippingPostalCode || sale.notes) && (
-          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
+          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
             {(sale.shippingPostalCode || sale.shippingAddress) && (
-              <p className="text-[#173c2a]"><span className="text-[#68756c]">配送先：</span>{[sale.shippingPostalCode, sale.shippingAddress].filter(Boolean).join(' ')}</p>
+              <p className="text-ink"><span className="text-mist">配送先：</span>{[sale.shippingPostalCode, sale.shippingAddress].filter(Boolean).join(' ')}</p>
             )}
-            {sale.notes && <p className="mt-1 whitespace-pre-wrap text-[#173c2a]"><span className="text-[#68756c]">メモ：</span>{sale.notes}</p>}
+            {sale.notes && <p className="mt-1 whitespace-pre-wrap text-ink"><span className="text-mist">メモ：</span>{sale.notes}</p>}
           </div>
         )}
       </div>

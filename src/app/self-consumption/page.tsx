@@ -96,16 +96,16 @@ function SelfConsumptionModal({
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '自社消費を編集' : '自社消費を登録'}</h2>
-            <p className="mt-1 text-sm text-[#68756c]">小売やサンプルなど、社内利用分を在庫から差し引きます。</p>
+            <h2 className="text-xl font-semibold text-ink">{initial ? '自社消費を編集' : '自社消費を登録'}</h2>
+            <p className="mt-1 text-sm text-mist">小売やサンプルなど、社内利用分を在庫から差し引きます。</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-bone hover:text-mist">
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">
             {error}
           </div>
         )}
@@ -113,12 +113,12 @@ function SelfConsumptionModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">商品</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">商品</label>
               <select
                 required
                 value={form.productId}
                 onChange={event => setForm(prev => ({ ...prev, productId: event.target.value }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 {products.map(product => (
                   <option key={product.id} value={product.id}>
@@ -128,7 +128,7 @@ function SelfConsumptionModal({
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">数量 (kg)</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">数量 (kg)</label>
               <input
                 required
                 type="number"
@@ -136,28 +136,28 @@ function SelfConsumptionModal({
                 step="0.1"
                 value={form.quantityKg}
                 onChange={event => setForm(prev => ({ ...prev, quantityKg: Number(event.target.value) || 0 }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">日付</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">日付</label>
               <input
                 required
                 type="date"
                 value={form.usedOn}
                 onChange={event => setForm(prev => ({ ...prev, usedOn: event.target.value }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">用途</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">用途</label>
               <select
                 value={form.usageType}
                 onChange={event => setForm(prev => ({ ...prev, usageType: event.target.value as SelfConsumptionUsageType }))}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value="ingredient">原料</option>
                 <option value="retail">小売</option>
@@ -167,19 +167,19 @@ function SelfConsumptionModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">備考</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">備考</label>
             <textarea
               value={form.notes ?? ''}
               onChange={event => setForm(prev => ({ ...prev, notes: event.target.value }))}
               rows={3}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               placeholder="用途の補足やメモ"
             />
           </div>
 
-          <div className="rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4">
-            <p className="text-xs text-[#68756c]">登録後の残在庫</p>
-            <p className={`mt-1 text-lg font-semibold ${remainingStock < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>
+          <div className="rounded-2xl border border-line bg-bone p-4">
+            <p className="text-xs text-mist">登録後の残在庫</p>
+            <p className={`mt-1 text-lg font-semibold ${remainingStock < 0 ? 'text-alert' : 'text-ink'}`}>
               {formatKg(remainingStock)}
             </p>
           </div>
@@ -188,14 +188,14 @@ function SelfConsumptionModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm text-graphite transition hover:bg-bone"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving || products.length === 0}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+              className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
             >
               {saving ? '保存中...' : '保存'}
             </button>
@@ -282,8 +282,8 @@ export default function SelfConsumptionPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">自社消費</h1>
-            <p className="mt-2 text-sm text-[#68756c]">原料・小売・サンプルなどの社内利用分を記録して在庫へ反映します。</p>
+            <h1 className="mt-3 text-3xl font-bold text-ink">自社消費</h1>
+            <p className="mt-2 text-sm text-mist">原料・小売・サンプルなどの社内利用分を記録して在庫へ反映します。</p>
           </div>
           <button
             onClick={() => {
@@ -291,7 +291,7 @@ export default function SelfConsumptionPage() {
               setModalOpen(true)
             }}
             disabled={products.length === 0}
-            className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+            className="inline-flex items-center gap-2 self-start rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
           >
             <Plus size={16} />
             新規作成
@@ -299,7 +299,7 @@ export default function SelfConsumptionPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">
             {message}
           </div>
         )}
@@ -311,12 +311,12 @@ export default function SelfConsumptionPage() {
           <KPICard title="サンプル" value={formatKg(sampleKg)} color="green" icon={<Package2 size={18} />} />
         </div>
 
-        <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-[#173c2a]">自社消費一覧</h2>
+              <h2 className="text-lg font-semibold text-ink">自社消費一覧</h2>
               {products.length === 0 && (
-                <p className="mt-1 text-sm text-[#9d3d28]">先に在庫管理で商品を登録してください。</p>
+                <p className="mt-1 text-sm text-alert">先に在庫管理で商品を登録してください。</p>
               )}
             </div>
             <div className="flex flex-wrap gap-3">
@@ -326,13 +326,13 @@ export default function SelfConsumptionPage() {
                   value={search}
                   onChange={event => setSearch(event.target.value)}
                   placeholder="商品名・SKU・用途で検索"
-                  className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-56"
+                  className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha sm:w-56"
                 />
               </div>
               <select
                 value={usageFilter}
                 onChange={event => setUsageFilter(event.target.value as 'all' | SelfConsumptionUsageType)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-auto"
+                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha sm:w-auto"
               >
                 <option value="all">すべての用途</option>
                 <option value="ingredient">原料</option>
@@ -344,27 +344,27 @@ export default function SelfConsumptionPage() {
 
           <div className="mt-5 space-y-3 md:hidden">
             {!loading && filteredRecords.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+              <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-mist">
                 条件に合う自社消費の記録はありません。
               </div>
             )}
             {filteredRecords.map(record => (
-              <div key={record.id} className="rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4">
+              <div key={record.id} className="rounded-2xl border border-line bg-bone p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-[#173c2a]">{record.productName}</div>
-                    <div className="mt-1 text-xs text-[#68756c]">{record.productSku}</div>
+                    <div className="font-medium text-ink">{record.productName}</div>
+                    <div className="mt-1 text-xs text-mist">{record.productSku}</div>
                   </div>
-                  <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#173c2a]">
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-ink">
                     {usageLabels[record.usageType]}
                   </div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                  <div className="rounded-xl bg-white p-3 text-xs text-mist">
                     <div>日付 {formatDate(record.usedOn)}</div>
-                    <div className="mt-1 font-semibold text-[#173c2a]">数量 {formatKg(record.quantityKg)}</div>
+                    <div className="mt-1 font-semibold text-ink">数量 {formatKg(record.quantityKg)}</div>
                   </div>
-                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                  <div className="rounded-xl bg-white p-3 text-xs text-mist">
                     <div>備考 {record.notes || '-'}</div>
                   </div>
                 </div>
@@ -374,13 +374,13 @@ export default function SelfConsumptionPage() {
                       setEditingRecord(record)
                       setModalOpen(true)
                     }}
-                    className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-[#174c33]"
+                    className="rounded-lg p-2 text-gray-400 transition hover:bg-bone hover:text-matchaDeep"
                   >
                     <Pencil size={16} />
                   </button>
                   <button
                     onClick={() => handleDelete(record)}
-                    className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                    className="rounded-lg p-2 text-gray-400 transition hover:bg-alert/5 hover:text-alert"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -392,7 +392,7 @@ export default function SelfConsumptionPage() {
           <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                <tr className="border-b border-[#e6dfcf] text-left text-mist">
                   <th className="px-3 py-3 font-medium">日付</th>
                   <th className="px-3 py-3 font-medium">商品</th>
                   <th className="px-3 py-3 font-medium">数量</th>
@@ -404,17 +404,17 @@ export default function SelfConsumptionPage() {
               <tbody>
                 {!loading && filteredRecords.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={6} className="px-3 py-10 text-center text-sm text-mist">
                       条件に合う自社消費の記録はありません。
                     </td>
                   </tr>
                 )}
                 {filteredRecords.map(record => (
-                  <tr key={record.id} className="border-b border-[#f0ebdf] text-[#173c2a]">
+                  <tr key={record.id} className="border-b border-[#f0ebdf] text-ink">
                     <td className="px-3 py-4">{formatDate(record.usedOn)}</td>
                     <td className="px-3 py-4">
                       <div className="font-medium">{record.productName}</div>
-                      <div className="text-xs text-[#68756c]">{record.productSku}</div>
+                      <div className="text-xs text-mist">{record.productSku}</div>
                     </td>
                     <td className="px-3 py-4">{formatKg(record.quantityKg)}</td>
                     <td className="px-3 py-4">{usageLabels[record.usageType]}</td>
@@ -426,13 +426,13 @@ export default function SelfConsumptionPage() {
                             setEditingRecord(record)
                             setModalOpen(true)
                           }}
-                          className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-[#174c33]"
+                          className="rounded-lg p-2 text-gray-400 transition hover:bg-bone hover:text-matchaDeep"
                         >
                           <Pencil size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(record)}
-                          className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                          className="rounded-lg p-2 text-gray-400 transition hover:bg-alert/5 hover:text-alert"
                         >
                           <Trash2 size={16} />
                         </button>

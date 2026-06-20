@@ -56,10 +56,10 @@ type TxRow = {
 }
 
 const TX_META: Record<TxKind, { label: string; cls: string }> = {
-  purchase: { label: '仕入', cls: 'bg-blue-100 text-blue-800' },
-  sale: { label: '販売', cls: 'bg-emerald-100 text-emerald-800' },
-  ec: { label: 'EC', cls: 'bg-violet-100 text-violet-800' },
-  self: { label: '自社消費', cls: 'bg-slate-100 text-slate-700' },
+  purchase: { label: '仕入', cls: 'bg-bone text-graphite' },
+  sale: { label: '販売', cls: 'bg-bone text-matcha' },
+  ec: { label: 'EC', cls: 'bg-bone text-graphite' },
+  self: { label: '自社消費', cls: 'bg-bone text-graphite' },
 }
 
 const SALE_STATUS_LABELS: Record<string, string> = {
@@ -254,7 +254,7 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="py-20 text-center text-sm text-[#68756c]">読み込み中…</div>
+        <div className="py-20 text-center text-sm text-mist">読み込み中…</div>
       </AppLayout>
     )
   }
@@ -263,8 +263,8 @@ export default function ProductDetailPage() {
     return (
       <AppLayout>
         <div className="space-y-4 py-20 text-center">
-          <p className="text-sm text-[#68756c]">商品が見つかりませんでした。</p>
-          <Link href="/inventory" className="inline-flex items-center gap-2 text-sm font-medium text-[#174c33] hover:underline">
+          <p className="text-sm text-mist">商品が見つかりませんでした。</p>
+          <Link href="/inventory" className="inline-flex items-center gap-2 text-sm font-medium text-matchaDeep hover:underline">
             <ArrowLeft size={14} /> 在庫管理へ戻る
           </Link>
         </div>
@@ -283,16 +283,16 @@ export default function ProductDetailPage() {
       <div className="space-y-5">
         {/* Header */}
         <div className="flex flex-col gap-3">
-          <Link href="/inventory" className="inline-flex w-fit items-center gap-1.5 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/inventory" className="inline-flex w-fit items-center gap-1.5 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} /> 在庫管理
           </Link>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <StockStatusBadge status={product.stockStatus} />
-              <h1 className="text-2xl font-bold text-[#173c2a]">{product.name}</h1>
-              <span className="font-mono text-sm text-[#68756c]">{product.sku}</span>
+              <h1 className="text-2xl font-bold text-ink">{product.name}</h1>
+              <span className="font-mono text-sm text-mist">{product.sku}</span>
               {product.inquireToOrder && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
               )}
             </div>
             {canEdit && (
@@ -300,7 +300,7 @@ export default function ProductDetailPage() {
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-alert/40 bg-white px-3 py-2 text-sm font-medium text-alert transition hover:bg-alert/5"
                 >
                   <Trash2 size={14} /> 削除
                 </button>
@@ -308,7 +308,7 @@ export default function ProductDetailPage() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
                 >
                   {saving ? '保存中…' : '保存'}
                 </button>
@@ -318,10 +318,10 @@ export default function ProductDetailPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">{message}</div>
         )}
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>
         )}
 
         {/* Tabs */}
@@ -333,8 +333,8 @@ export default function ProductDetailPage() {
               onClick={() => setTab(t.key)}
               className={`-mb-px shrink-0 border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                 tab === t.key
-                  ? 'border-[#174c33] text-[#174c33]'
-                  : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                  ? 'border-[#174c33] text-matchaDeep'
+                  : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {t.label}
@@ -349,22 +349,22 @@ export default function ProductDetailPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={product.imageUrl} alt={product.name} className="aspect-square w-full rounded-xl object-cover" />
               ) : (
-                <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-[#faf8f1] text-sm text-[#9aa39a]">画像なし</div>
+                <div className="flex aspect-square w-full items-center justify-center rounded-xl bg-bone text-sm text-[#9aa39a]">画像なし</div>
               )}
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-              <OverviewCard label="残在庫" value={<span className={product.currentStockKg < 0 ? 'text-red-700' : ''}>{formatKg(product.currentStockKg)}</span>} strong />
+              <OverviewCard label="残在庫" value={<span className={product.currentStockKg < 0 ? 'text-alert' : ''}>{formatKg(product.currentStockKg)}</span>} strong />
               <OverviewCard label="在庫グループ" value={groupName} />
               <OverviewCard label="入荷累計" value={formatKg(product.initialStockKg)} />
               <OverviewCard label="販売引当" value={formatKg(product.salesAllocatedKg)} />
               <OverviewCard label="自社消費" value={formatKg(product.selfConsumedKg)} />
-              <OverviewCard label="EC販売" value={formatKg(product.ecSoldKg)} />
+              <OverviewCard label="Shopify販売" value={formatKg(product.ecSoldKg)} />
               <OverviewCard label="標準卸売単価" value={yen(wholesale)} />
               <OverviewCard label="仕入単価" value={yen(cost)} />
               <OverviewCard
                 label="粗利 (kg)"
                 value={
-                  <span className={margin == null ? '' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}>
+                  <span className={margin == null ? '' : margin < 0 ? 'text-alert' : 'text-matcha'}>
                     {margin == null ? '-' : yen(margin)}{marginRate != null && <span className="ml-1 text-xs">({marginRate.toFixed(1)}%)</span>}
                   </span>
                 }
@@ -372,9 +372,9 @@ export default function ProductDetailPage() {
             </div>
             {(product.salesNote || product.adminNote || product.flavorNotes) && (
               <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 lg:col-span-3">
-                {product.flavorNotes && <p className="text-sm text-[#173c2a]"><span className="text-[#68756c]">フレーバー：</span>{product.flavorNotes}</p>}
-                {product.salesNote && <p className="mt-2 whitespace-pre-wrap text-sm text-[#173c2a]"><span className="text-[#68756c]">販売メモ：</span>{product.salesNote}</p>}
-                {product.adminNote && <p className="mt-2 whitespace-pre-wrap text-sm text-[#173c2a]"><span className="text-[#68756c]">管理メモ：</span>{product.adminNote}</p>}
+                {product.flavorNotes && <p className="text-sm text-ink"><span className="text-mist">フレーバー：</span>{product.flavorNotes}</p>}
+                {product.salesNote && <p className="mt-2 whitespace-pre-wrap text-sm text-ink"><span className="text-mist">販売メモ：</span>{product.salesNote}</p>}
+                {product.adminNote && <p className="mt-2 whitespace-pre-wrap text-sm text-ink"><span className="text-mist">管理メモ：</span>{product.adminNote}</p>}
               </div>
             )}
           </div>
@@ -401,7 +401,7 @@ export default function ProductDetailPage() {
               setPending={setPending}
               stock={stock}
             />
-            <p className="text-xs text-[#68756c]">※ 棚卸や在庫グループを変更したら上部の「保存」を押してください。</p>
+            <p className="text-xs text-mist">※ 棚卸や在庫グループを変更したら上部の「保存」を押してください。</p>
           </fieldset>
         )}
 
@@ -416,19 +416,19 @@ export default function ProductDetailPage() {
             <div className="grid gap-3 sm:grid-cols-4">
               <OverviewCard label="仕入（入荷）計" value={formatKg(txTotals.purchased)} />
               <OverviewCard label="販売計" value={formatKg(txTotals.sold)} />
-              <OverviewCard label="EC販売計" value={formatKg(txTotals.ec)} />
+              <OverviewCard label="Shopify販売計" value={formatKg(txTotals.ec)} />
               <OverviewCard label="自社消費計" value={formatKg(txTotals.self)} />
             </div>
 
             {transactions.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-12 text-center text-sm text-[#68756c]">
+              <div className="rounded-2xl border border-dashed border-line px-4 py-12 text-center text-sm text-mist">
                 この商品の取引はまだありません。
               </div>
             ) : (
               <div className="overflow-hidden rounded-2xl border border-[#e6dfcf] bg-white">
                 <div className="overflow-x-auto">
                   <table className="min-w-[760px] w-full text-sm">
-                    <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                    <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                       <tr>
                         <th className="px-4 py-2 font-medium">日付</th>
                         <th className="px-4 py-2 font-medium">区分</th>
@@ -447,19 +447,19 @@ export default function ProductDetailPage() {
                           <tr
                             key={t.key}
                             onClick={t.href ? () => router.push(t.href!) : undefined}
-                            className={`border-t border-[#f0ebdf] text-[#173c2a] ${t.href ? 'cursor-pointer hover:bg-[#faf8f2]' : ''}`}
+                            className={`border-t border-[#f0ebdf] text-ink ${t.href ? 'cursor-pointer hover:bg-bone' : ''}`}
                           >
-                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{formatDate(t.date) || t.date || '-'}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-mist">{formatDate(t.date) || t.date || '-'}</td>
                             <td className="px-4 py-2.5">
                               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${meta.cls}`}>{meta.label}</span>
                             </td>
                             <td className="px-4 py-2.5">{t.counterparty || '-'}</td>
-                            <td className={`whitespace-nowrap px-4 py-2.5 text-right font-medium ${t.quantityKg >= 0 ? 'text-emerald-700' : 'text-[#173c2a]'}`}>
+                            <td className={`whitespace-nowrap px-4 py-2.5 text-right font-medium ${t.quantityKg >= 0 ? 'text-matcha' : 'text-ink'}`}>
                               {t.quantityKg >= 0 ? '+' : ''}{formatKg(t.quantityKg)}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-[#68756c]">{t.unitPrice != null ? formatCurrency(t.unitPrice) : '-'}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-mist">{t.unitPrice != null ? formatCurrency(t.unitPrice) : '-'}</td>
                             <td className="whitespace-nowrap px-4 py-2.5 text-right">{t.amount != null ? formatCurrency(t.amount) : '-'}</td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{t.status ?? '-'}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-mist">{t.status ?? '-'}</td>
                             <td className="px-4 py-2.5 text-right text-gray-400">{t.href && <ChevronRight size={15} className="inline" />}</td>
                           </tr>
                         )
@@ -469,7 +469,7 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             )}
-            <p className="text-xs text-[#68756c]">数量は仕入を ＋（入荷）、販売・EC・自社消費を −（出庫）で表示しています。</p>
+            <p className="text-xs text-mist">数量は仕入を ＋（入荷）、販売・EC・自社消費を −（出庫）で表示しています。</p>
           </div>
         )}
       </div>
@@ -480,8 +480,8 @@ export default function ProductDetailPage() {
 function OverviewCard({ label, value, strong }: { label: string; value: React.ReactNode; strong?: boolean }) {
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-[#68756c]">{label}</p>
-      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-[#173c2a]' : 'text-sm text-[#173c2a]'}`}>{value}</div>
+      <p className="text-xs font-medium uppercase tracking-wider text-mist">{label}</p>
+      <div className={`mt-1.5 ${strong ? 'text-lg font-semibold text-ink' : 'text-sm text-ink'}`}>{value}</div>
     </div>
   )
 }

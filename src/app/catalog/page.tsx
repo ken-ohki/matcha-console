@@ -44,15 +44,15 @@ const STOCK_LABELS: Record<StockStatus, string> = {
 }
 
 const STOCK_COLORS: Record<StockStatus, string> = {
-  normal: 'bg-green-100 text-green-800',
-  low: 'bg-amber-100 text-amber-800',
-  out: 'bg-red-100 text-red-800',
+  normal: 'bg-bone text-matcha',
+  low: 'bg-bone text-[#a87b1e]',
+  out: 'bg-alert/10 text-alert',
 }
 
 function CatalogStockBadge({ status, ask }: { status: StockStatus; ask: boolean }) {
   if (ask) {
     return (
-      <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+      <span className="inline-flex items-center rounded-full bg-bone px-2.5 py-0.5 text-xs font-medium text-[#a87b1e]">
         ASK
       </span>
     )
@@ -334,28 +334,28 @@ export default function CatalogPage() {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur rounded-2xl mb-4">
               <Lock size={28} className="text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-white">SABO WHOLESALE CATALOG</h1>
-            <p className="mt-2 text-sm text-emerald-50/70">Enter the passcode to continue</p>
+            <h1 className="text-3xl font-bold text-paper">SABO WHOLESALE CATALOG</h1>
+            <p className="mt-2 text-sm text-mist">Enter the passcode to continue</p>
           </div>
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xl p-8">
             <label className="block">
-              <span className="text-sm font-medium text-gray-700">Passcode</span>
+              <span className="text-sm font-medium text-graphite">Passcode</span>
               <input
                 type="password"
                 value={passcode}
                 onChange={event => setPasscode(event.target.value)}
                 required
                 autoFocus
-                className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
+                className="mt-2 w-full rounded-lg border border-line px-4 py-2.5 text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
               />
             </label>
             {authError && (
-              <p className="mt-3 text-sm text-red-600">{authError}</p>
+              <p className="mt-3 text-sm text-alert">{authError}</p>
             )}
             <button
               type="submit"
               disabled={loading}
-              className="mt-6 w-full rounded-lg bg-[#174c33] py-2.5 text-sm font-semibold text-white shadow transition hover:bg-[#205f43] disabled:opacity-50"
+              className="mt-6 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-paper shadow transition hover:bg-[#205f43] disabled:opacity-50"
             >
               {loading ? 'Verifying…' : 'Open catalog'}
             </button>
@@ -366,21 +366,21 @@ export default function CatalogPage() {
   }
 
   const selectClass =
-    'w-full rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1.5 text-sm text-[#173c2a] focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]'
+    'w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]'
   const numberInputClass =
-    'w-full rounded-lg border border-[#d9d1be] bg-white px-2.5 py-1.5 text-sm text-[#173c2a] focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]'
+    'w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]'
 
   return (
-    <div className="min-h-screen bg-[#f4f2ea]">
-      <header className="border-b border-[#d9d1be] bg-white">
+    <div className="min-h-screen bg-bone">
+      <header className="border-b border-line bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#174c33] text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ink text-paper">
               <Leaf size={20} />
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">Product Catalog</p>
-              <h1 className="text-lg font-semibold text-[#173c2a]">SABO WHOLESALE CATALOG</h1>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-mist">Product Catalog</p>
+              <h1 className="text-lg font-semibold text-ink">SABO WHOLESALE CATALOG</h1>
             </div>
           </div>
           <button
@@ -390,7 +390,7 @@ export default function CatalogPage() {
               setData(null)
               setPasscode('')
             }}
-            className="text-xs text-[#68756c] hover:text-[#173c2a]"
+            className="text-xs text-mist hover:text-ink"
           >
             Sign out
           </button>
@@ -400,25 +400,25 @@ export default function CatalogPage() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-sm">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#68756c]" />
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
             <input
               type="search"
               placeholder="Search by name, SKU, or origin"
               value={search}
               onChange={event => setSearch(event.target.value)}
-              className="w-full rounded-lg border border-[#d9d1be] bg-white py-2 pl-9 pr-3 text-sm text-[#173c2a] focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
+              className="w-full rounded-lg border border-line bg-white py-2 pl-9 pr-3 text-sm text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs text-[#68756c]">
+            <p className="text-xs text-mist">
               {filteredProducts.length} / {data.products.length} items
             </p>
             <label className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-[#68756c]">Currency</span>
+              <span className="text-[11px] font-medium text-mist">Currency</span>
               <select
                 value={displayCurrency}
                 onChange={event => handleCurrencyChange(event.target.value as SupportedCurrency)}
-                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs text-[#173c2a] focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
               >
                 {SUPPORTED_CURRENCIES.map(code => (
                   <option key={code} value={code}>{CURRENCY_LABELS[code]}</option>
@@ -426,11 +426,11 @@ export default function CatalogPage() {
               </select>
             </label>
             <label className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-[#68756c]">Sort</span>
+              <span className="text-[11px] font-medium text-mist">Sort</span>
               <select
                 value={sortKey}
                 onChange={event => setSortKey(event.target.value as SortKey)}
-                className="rounded-lg border border-[#d9d1be] bg-white px-2 py-1 text-xs text-[#173c2a] focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
+                className="rounded-lg border border-line bg-white px-2 py-1 text-xs text-ink focus:border-[#174c33] focus:outline-none focus:ring-1 focus:ring-[#174c33]"
               >
                 <option value="default">Default</option>
                 <option value="name-asc">Name (A–Z)</option>
@@ -441,7 +441,7 @@ export default function CatalogPage() {
                 <option value="stock-asc">Stock (Low → High)</option>
               </select>
             </label>
-            <div className="inline-flex rounded-lg border border-[#d9d1be] bg-white p-0.5">
+            <div className="inline-flex rounded-lg border border-line bg-white p-0.5">
               <button
                 type="button"
                 onClick={() => handleViewModeChange('card')}
@@ -449,8 +449,8 @@ export default function CatalogPage() {
                 aria-pressed={viewMode === 'card'}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${
                   viewMode === 'card'
-                    ? 'bg-[#174c33] text-white'
-                    : 'text-[#68756c] hover:text-[#173c2a]'
+                    ? 'bg-ink text-paper'
+                    : 'text-mist hover:text-ink'
                 }`}
               >
                 <LayoutGrid size={14} />
@@ -463,8 +463,8 @@ export default function CatalogPage() {
                 aria-pressed={viewMode === 'list'}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${
                   viewMode === 'list'
-                    ? 'bg-[#174c33] text-white'
-                    : 'text-[#68756c] hover:text-[#173c2a]'
+                    ? 'bg-ink text-paper'
+                    : 'text-mist hover:text-ink'
                 }`}
               >
                 <List size={14} />
@@ -480,8 +480,8 @@ export default function CatalogPage() {
             onClick={() => setActiveGroupId('all')}
             className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
               activeGroupId === 'all'
-                ? 'bg-[#174c33] text-white'
-                : 'bg-white text-[#173c2a] border border-[#d9d1be] hover:bg-[#ece8db]'
+                ? 'bg-ink text-paper'
+                : 'bg-white text-ink border border-line hover:bg-[#ece8db]'
             }`}
           >
             All
@@ -493,8 +493,8 @@ export default function CatalogPage() {
               onClick={() => setActiveGroupId(group.id)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                 activeGroupId === group.id
-                  ? 'bg-[#174c33] text-white'
-                  : 'bg-white text-[#173c2a] border border-[#d9d1be] hover:bg-[#ece8db]'
+                  ? 'bg-ink text-paper'
+                  : 'bg-white text-ink border border-line hover:bg-[#ece8db]'
               }`}
             >
               {group.name}
@@ -504,12 +504,12 @@ export default function CatalogPage() {
 
         <div className="mb-6 rounded-2xl border border-[#e2dccc] bg-white/70 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">Filters</p>
+            <p className="text-[11px] font-medium uppercase tracking-wider text-mist">Filters</p>
             {hasActiveFilter && (
               <button
                 type="button"
                 onClick={resetFilters}
-                className="text-xs text-[#174c33] underline-offset-2 hover:underline"
+                className="text-xs text-matchaDeep underline-offset-2 hover:underline"
               >
                 Reset
               </button>
@@ -517,7 +517,7 @@ export default function CatalogPage() {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-[#68756c]">Origin</span>
+              <span className="mb-1 block text-[11px] font-medium text-mist">Origin</span>
               <select
                 value={originFilter}
                 onChange={event => setOriginFilter(event.target.value)}
@@ -530,7 +530,7 @@ export default function CatalogPage() {
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-[#68756c]">Cultivar</span>
+              <span className="mb-1 block text-[11px] font-medium text-mist">Cultivar</span>
               <select
                 value={cultivarFilter}
                 onChange={event => setCultivarFilter(event.target.value)}
@@ -544,12 +544,12 @@ export default function CatalogPage() {
             </label>
             <div>
               <div className="mb-1 flex items-center gap-1.5">
-                <span className="text-[11px] font-medium text-[#68756c]">Grade</span>
+                <span className="text-[11px] font-medium text-mist">Grade</span>
                 <button
                   type="button"
                   onClick={() => setGradeInfoOpen(true)}
                   aria-label="About grades"
-                  className="rounded-full p-0.5 text-[#68756c] transition hover:bg-[#ece8db] hover:text-[#173c2a]"
+                  className="rounded-full p-0.5 text-mist transition hover:bg-[#ece8db] hover:text-ink"
                 >
                   <Info size={12} />
                 </button>
@@ -567,12 +567,12 @@ export default function CatalogPage() {
             </div>
             <div>
               <div className="mb-1 flex items-center gap-1.5">
-                <span className="text-[11px] font-medium text-[#68756c]">Stock</span>
+                <span className="text-[11px] font-medium text-mist">Stock</span>
                 <button
                   type="button"
                   onClick={() => setStockInfoOpen(true)}
                   aria-label="About stock statuses"
-                  className="rounded-full p-0.5 text-[#68756c] transition hover:bg-[#ece8db] hover:text-[#173c2a]"
+                  className="rounded-full p-0.5 text-mist transition hover:bg-[#ece8db] hover:text-ink"
                 >
                   <Info size={12} />
                 </button>
@@ -589,7 +589,7 @@ export default function CatalogPage() {
               </select>
             </div>
             <div>
-              <span className="mb-1 block text-[11px] font-medium text-[#68756c]">Price range ({displayCurrency} / kg)</span>
+              <span className="mb-1 block text-[11px] font-medium text-mist">Price range ({displayCurrency} / kg)</span>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -600,7 +600,7 @@ export default function CatalogPage() {
                   onChange={event => setPriceMin(event.target.value)}
                   className={numberInputClass}
                 />
-                <span className="text-xs text-[#68756c]">–</span>
+                <span className="text-xs text-mist">–</span>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -616,7 +616,7 @@ export default function CatalogPage() {
         </div>
 
         {filteredProducts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#d9d1be] bg-white/60 py-12 text-center text-sm text-[#68756c]">
+          <div className="rounded-2xl border border-dashed border-line bg-white/60 py-12 text-center text-sm text-mist">
             No products match your filters
           </div>
         ) : viewMode === 'list' ? (
@@ -647,27 +647,27 @@ export default function CatalogPage() {
                       className="h-44 w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-44 w-full items-center justify-center bg-[#f7f5ee] text-xs text-[#a59f8c]">
+                    <div className="flex h-44 w-full items-center justify-center bg-bone text-xs text-mist">
                       No image
                     </div>
                   )}
                   <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.16em] text-[#68756c]">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-mist">
                         {group?.name ?? '-'} · {product.sku || '-'}
                       </p>
-                      <h2 className="mt-1 text-lg font-semibold text-[#173c2a]">{product.name}</h2>
+                      <h2 className="mt-1 text-lg font-semibold text-ink">{product.name}</h2>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <CatalogStockBadge status={product.stockStatus} ask={product.inquireToOrder} />
                       {!product.inquireToOrder && product.stockStatus !== 'out' && (
-                        <span className="text-[11px] text-[#68756c]">{formatStockKg(product.currentStockKg)} available</span>
+                        <span className="text-[11px] text-mist">{formatStockKg(product.currentStockKg)} available</span>
                       )}
                     </div>
                   </div>
 
-                  <dl className="mt-4 space-y-2 text-sm text-[#173c2a]">
+                  <dl className="mt-4 space-y-2 text-sm text-ink">
                     <Row label="Type / Grade" value={[product.teaType, product.grade].filter(Boolean).join(' / ') || '-'} />
                     <Row label="Origin" value={formatList(product.origins)} />
                     <Row label="Cultivar" value={formatList(product.cultivars)} />
@@ -679,10 +679,10 @@ export default function CatalogPage() {
                   </dl>
 
                   <div className="mt-5 flex items-end justify-between border-t border-[#ece8db] pt-4">
-                    <span className="text-xs text-[#68756c]">Wholesale price</span>
-                    <span className="text-lg font-semibold text-[#173c2a]">
+                    <span className="text-xs text-mist">Wholesale price</span>
+                    <span className="text-lg font-semibold text-ink">
                       {formatCurrency(convertPrice(product.standardWholesalePrice, exchangeRate), displayCurrency)}
-                      <span className="ml-1 text-xs font-normal text-[#68756c]">/ kg</span>
+                      <span className="ml-1 text-xs font-normal text-mist">/ kg</span>
                     </span>
                   </div>
                   </div>
@@ -692,7 +692,7 @@ export default function CatalogPage() {
           </div>
         )}
 
-        <p className="mt-10 text-center text-[11px] text-[#a59f8c]">
+        <p className="mt-10 text-center text-[11px] text-mist">
           Prices and stock levels shown here are for reference. Please contact us for formal orders and quotes.
         </p>
       </main>
@@ -722,7 +722,7 @@ function Row({ label, value }: { label: string; value: string }) {
   if (value === '-') return null
   return (
     <div className="flex gap-3">
-      <dt className="w-24 shrink-0 text-xs text-[#68756c]">{label}</dt>
+      <dt className="w-24 shrink-0 text-xs text-mist">{label}</dt>
       <dd className="flex-1 text-sm">{value}</dd>
     </div>
   )
@@ -744,7 +744,7 @@ function ProductList({
   const gridCols = 'md:grid-cols-[1.6fr_0.9fr_0.9fr_1fr_1.2fr_0.9fr_0.9fr]'
   return (
     <div className="overflow-hidden rounded-2xl border border-[#e2dccc] bg-white shadow-sm">
-      <div className={`hidden gap-3 border-b border-[#ece8db] bg-[#f8f6ef] px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-[#68756c] md:grid ${gridCols}`}>
+      <div className={`hidden gap-3 border-b border-[#ece8db] bg-[#f8f6ef] px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-mist md:grid ${gridCols}`}>
         <span>Product / SKU</span>
         <span>Type</span>
         <span>Grade</span>
@@ -759,7 +759,7 @@ function ProductList({
             <button
               type="button"
               onClick={() => onSelect(product.id)}
-              className={`grid w-full grid-cols-1 gap-2 px-4 py-3 text-left transition hover:bg-[#faf8f1] focus:bg-[#faf8f1] focus:outline-none md:items-center md:gap-3 ${gridCols}`}
+              className={`grid w-full grid-cols-1 gap-2 px-4 py-3 text-left transition hover:bg-bone focus:bg-bone focus:outline-none md:items-center md:gap-3 ${gridCols}`}
             >
               <div className="flex min-w-0 items-center gap-3">
                 {product.imageUrl ? (
@@ -772,40 +772,40 @@ function ProductList({
                     className="h-12 w-12 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#f0ecde] text-[9px] text-[#a59f8c]">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-bone text-[9px] text-mist">
                     No img
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#173c2a]">{product.name}</p>
-                  <p className="text-[11px] text-[#68756c]">{product.sku || '-'}</p>
+                  <p className="truncate text-sm font-semibold text-ink">{product.name}</p>
+                  <p className="text-[11px] text-mist">{product.sku || '-'}</p>
                 </div>
               </div>
-              <div className="text-sm text-[#173c2a] md:truncate">
-                <span className="md:hidden text-[11px] text-[#68756c] mr-2">Type:</span>
+              <div className="text-sm text-ink md:truncate">
+                <span className="md:hidden text-[11px] text-mist mr-2">Type:</span>
                 {product.teaType || '-'}
               </div>
-              <div className="text-sm text-[#173c2a] md:truncate">
-                <span className="md:hidden text-[11px] text-[#68756c] mr-2">Grade:</span>
+              <div className="text-sm text-ink md:truncate">
+                <span className="md:hidden text-[11px] text-mist mr-2">Grade:</span>
                 {product.grade || '-'}
               </div>
-              <div className="text-sm text-[#173c2a] md:truncate">
-                <span className="md:hidden text-[11px] text-[#68756c] mr-2">Origin:</span>
+              <div className="text-sm text-ink md:truncate">
+                <span className="md:hidden text-[11px] text-mist mr-2">Origin:</span>
                 {product.origins.join(', ') || '-'}
               </div>
-              <div className="text-sm text-[#173c2a] md:truncate">
-                <span className="md:hidden text-[11px] text-[#68756c] mr-2">Cultivar:</span>
+              <div className="text-sm text-ink md:truncate">
+                <span className="md:hidden text-[11px] text-mist mr-2">Cultivar:</span>
                 {product.cultivars.join(', ') || '-'}
               </div>
-              <div className="text-sm font-semibold text-[#173c2a] md:text-right">
-                <span className="md:hidden text-[11px] font-normal text-[#68756c] mr-2">Price:</span>
+              <div className="text-sm font-semibold text-ink md:text-right">
+                <span className="md:hidden text-[11px] font-normal text-mist mr-2">Price:</span>
                 {formatCurrency(convertPrice(product.standardWholesalePrice, rate), currency)}
-                <span className="ml-1 text-[11px] font-normal text-[#68756c]">/ kg</span>
+                <span className="ml-1 text-[11px] font-normal text-mist">/ kg</span>
               </div>
               <div className="flex items-center gap-2 md:flex-col md:items-end md:gap-1">
                 <CatalogStockBadge status={product.stockStatus} ask={product.inquireToOrder} />
                 {!product.inquireToOrder && product.stockStatus !== 'out' && (
-                  <span className="text-[11px] text-[#68756c]">{formatStockKg(product.currentStockKg)} available</span>
+                  <span className="text-[11px] text-mist">{formatStockKg(product.currentStockKg)} available</span>
                 )}
               </div>
             </button>
@@ -852,7 +852,7 @@ function ProductDetailModal({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-1.5 text-[#68756c] backdrop-blur transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+          className="absolute right-3 top-3 z-10 rounded-full bg-white/80 p-1.5 text-mist backdrop-blur transition hover:bg-bone hover:text-ink"
         >
           <X size={18} />
         </button>
@@ -866,17 +866,17 @@ function ProductDetailModal({
           />
         )}
         <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-mist">
             {groupName ?? '-'} · {product.sku || '-'}
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-[#173c2a]">{product.name}</h2>
+          <h2 className="mt-1 text-xl font-semibold text-ink">{product.name}</h2>
           <div className="mt-3 flex items-center gap-3">
             <CatalogStockBadge status={product.stockStatus} ask={product.inquireToOrder} />
             {product.inquireToOrder ? (
-              <span className="text-xs text-[#68756c]">Contact us for availability</span>
+              <span className="text-xs text-mist">Contact us for availability</span>
             ) : (
               product.stockStatus !== 'out' && (
-                <span className="text-xs text-[#68756c]">{formatStockKg(product.currentStockKg)} available</span>
+                <span className="text-xs text-mist">{formatStockKg(product.currentStockKg)} available</span>
               )
             )}
           </div>
@@ -896,8 +896,8 @@ function ProductDetailModal({
 
           {product.flavorNotes && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">Flavor Notes</p>
-              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-[#faf8f1] p-3 text-sm leading-relaxed text-[#173c2a]">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-mist">Flavor Notes</p>
+              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-bone p-3 text-sm leading-relaxed text-ink">
                 {product.flavorNotes}
               </p>
             </div>
@@ -905,33 +905,33 @@ function ProductDetailModal({
 
           {product.salesNote && (
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">Notes</p>
-              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-[#faf8f1] p-3 text-sm leading-relaxed text-[#173c2a]">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-mist">Notes</p>
+              <p className="mt-1 whitespace-pre-wrap rounded-xl border border-[#ece8db] bg-bone p-3 text-sm leading-relaxed text-ink">
                 {product.salesNote}
               </p>
             </div>
           )}
         </div>
-        <div className="border-t border-[#ece8db] bg-[#faf8f1] px-6 py-4 rounded-b-2xl sm:rounded-b-2xl">
+        <div className="border-t border-[#ece8db] bg-bone px-6 py-4 rounded-b-2xl sm:rounded-b-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-[#68756c]">Wholesale price</span>
-            <span className="text-xl font-semibold text-[#173c2a]">
+            <span className="text-xs uppercase tracking-wider text-mist">Wholesale price</span>
+            <span className="text-xl font-semibold text-ink">
               {formatCurrency(convertPrice(product.standardWholesalePrice, rate), currency)}
-              <span className="ml-1 text-xs font-normal text-[#68756c]">/ kg</span>
+              <span className="ml-1 text-xs font-normal text-mist">/ kg</span>
             </span>
           </div>
           {product.standardWholesalePrice != null && (
-            <div className="mt-3 space-y-1 border-t border-[#ece8db] pt-3 text-xs text-[#68756c]">
+            <div className="mt-3 space-y-1 border-t border-[#ece8db] pt-3 text-xs text-mist">
               <p className="mb-1 text-[10px] uppercase tracking-wider">For reference</p>
               <div className="flex items-center justify-between">
                 <span>Per 30 g</span>
-                <span className="font-medium text-[#173c2a]">
+                <span className="font-medium text-ink">
                   {formatCurrency(convertPrice(product.standardWholesalePrice * 0.03, rate), currency)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Per 3 g (one matcha latte serving)</span>
-                <span className="font-medium text-[#173c2a]">
+                <span className="font-medium text-ink">
                   {formatCurrency(convertPrice(product.standardWholesalePrice * 0.003, rate), currency)}
                 </span>
               </div>
@@ -967,19 +967,19 @@ function StockInfoModal({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+          className="absolute right-3 top-3 rounded-full p-1.5 text-mist transition hover:bg-bone hover:text-ink"
         >
           <X size={18} />
         </button>
         <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">Stock status</p>
-          <h2 className="mt-1 text-xl font-semibold text-[#173c2a]">About stock statuses</h2>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-mist">Stock status</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink">About stock statuses</h2>
         </div>
         <div className="space-y-4 px-6 py-5">
           {STOCK_DEFINITIONS.map(item => (
             <div key={item.name}>
-              <h3 className="text-sm font-semibold text-[#173c2a]">{item.name}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-[#4a5249]">{item.description}</p>
+              <h3 className="text-sm font-semibold text-ink">{item.name}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-graphite">{item.description}</p>
             </div>
           ))}
         </div>
@@ -1012,16 +1012,16 @@ function GradeInfoModal({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+          className="absolute right-3 top-3 rounded-full p-1.5 text-mist transition hover:bg-bone hover:text-ink"
         >
           <X size={18} />
         </button>
         <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#68756c]">Grade definitions</p>
-          <h2 className="mt-1 text-xl font-semibold text-[#173c2a]">About our grades</h2>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-mist">Grade definitions</p>
+          <h2 className="mt-1 text-xl font-semibold text-ink">About our grades</h2>
         </div>
         <div className="space-y-4 px-6 py-5">
-          <div className="rounded-xl bg-[#f4f2ea] p-4 text-sm leading-relaxed text-[#4a5249]">
+          <div className="rounded-xl bg-bone p-4 text-sm leading-relaxed text-graphite">
             <p>
               We do not use the term <strong>&ldquo;Ceremonial Grade.&rdquo;</strong> The concept of &ldquo;Ceremonial Grade&rdquo; does not exist in Japan — it is a vague label used primarily for marketing purposes.
             </p>
@@ -1031,8 +1031,8 @@ function GradeInfoModal({ onClose }: { onClose: () => void }) {
           </div>
           {GRADE_DEFINITIONS.map(grade => (
             <div key={grade.name}>
-              <h3 className="text-sm font-semibold text-[#173c2a]">{grade.name}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-[#4a5249]">{grade.description}</p>
+              <h3 className="text-sm font-semibold text-ink">{grade.name}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-graphite">{grade.description}</p>
             </div>
           ))}
         </div>
@@ -1045,8 +1045,8 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
   const display = value && value.trim() ? value : null
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">{label}</dt>
-      <dd className="mt-0.5 text-sm text-[#173c2a]">{display ?? <span className="text-[#a59f8c]">-</span>}</dd>
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-mist">{label}</dt>
+      <dd className="mt-0.5 text-sm text-ink">{display ?? <span className="text-mist">-</span>}</dd>
     </div>
   )
 }

@@ -1,3 +1,55 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================================
+   SWISS / INTERNATIONAL TYPOGRAPHIC STYLE — shared design language with
+   SABO WHOLESALE. Mono caps for the technical register (folios, kickers),
+   sharp controls (no radii), hairline rules, near-black ink on paper.
+   ============================================================================ */
+@layer components {
+  /* Kicker / section label — mono caps in the accent. */
+  .kicker {
+    @apply font-mono text-[11px] uppercase tracking-brand text-matcha;
+  }
+  .kicker-mute {
+    @apply font-mono text-[11px] uppercase tracking-brand text-mist;
+  }
+  /* Folio / index numeral — mono, for section numbers & data. */
+  .folio {
+    @apply font-mono text-[11px] uppercase tracking-folio text-mist;
+  }
+  .display-1 {
+    @apply font-display font-bold tracking-tightest;
+  }
+  .display-2 {
+    @apply font-display font-bold tracking-tighter2;
+  }
+  .hairline {
+    @apply border-t border-ink;
+  }
+  .hairline-soft {
+    @apply border-t border-line;
+  }
+
+  /* ---- Controls (rounded) ---------------------------------------------- */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-ink px-5 py-2.5 font-mono text-xs uppercase tracking-brand text-paper transition-colors hover:bg-matchaDeep disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-ink px-5 py-2.5 font-mono text-xs uppercase tracking-brand text-ink transition-colors hover:bg-ink hover:text-paper disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-alert px-5 py-2.5 font-mono text-xs uppercase tracking-brand text-alert transition-colors hover:bg-alert hover:text-paper;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-ink;
+  }
+  .field-label {
+    @apply font-mono text-[11px] uppercase tracking-brand text-graphite;
+  }
+  /* Card surface — white panel floating on the gray canvas with a soft shadow. */
+  .panel {
+    @apply rounded-xl border border-line bg-paper shadow-[0_1px_3px_rgba(17,17,17,0.06),0_1px_2px_rgba(17,17,17,0.04)];
+  }
+}

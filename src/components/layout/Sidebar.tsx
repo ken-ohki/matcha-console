@@ -46,7 +46,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: '卸売サイト',
+    label: 'SABO WHOLESALE（卸売）',
     items: [
       { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
       { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
@@ -85,18 +85,18 @@ export function Sidebar({
         }`}
         onClick={onClose}
       />
-      <aside className={`fixed left-0 top-0 z-40 flex h-full w-72 max-w-[85vw] flex-col bg-[#173c2a] transition-transform md:w-60 md:max-w-none md:translate-x-0 md:pointer-events-auto ${
+      <aside className={`fixed left-0 top-0 z-40 flex h-full w-72 max-w-[85vw] flex-col border-r border-line bg-[#e7e7e7] shadow-[1px_0_4px_rgba(17,17,17,0.04)] transition-transform md:w-60 md:max-w-none md:translate-x-0 md:pointer-events-auto ${
         open ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:pointer-events-auto'
       }`}>
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-ink px-6 py-5">
           <div>
-          <p className="mb-1 text-xs uppercase tracking-[0.2em] text-emerald-100/70">Tea Ops</p>
-          <h1 className="text-lg font-bold leading-tight text-white">Matcha Console</h1>
+            <p className="kicker-mute mb-1">Tea Ops</p>
+            <h1 className="display-2 text-lg leading-tight text-ink">Matcha Console</h1>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-emerald-50/80 transition hover:bg-white/10 hover:text-white md:hidden"
+            className="p-2 text-mist transition hover:text-ink md:hidden"
             aria-label="メニューを閉じる"
           >
             <X size={18} />
@@ -105,10 +105,8 @@ export function Sidebar({
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           {navGroups.map(group => (
-            <div key={group.label} className="mb-4 last:mb-0">
-              <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100/45">
-                {group.label}
-              </p>
+            <div key={group.label} className="mb-3.5 last:mb-0">
+              <p className="folio mb-1 px-3">{group.label}</p>
               {group.items.map(item => {
                 const Icon = item.icon
                 const matchPaths = item.match ?? [item.href]
@@ -118,13 +116,13 @@ export function Sidebar({
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
-                    className={`mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`mb-px flex items-center gap-3 rounded-md border-l-2 py-1.5 pl-2.5 pr-3 text-[13px] font-bold transition-colors ${
                       active
-                        ? 'bg-[#285e3f] text-white'
-                        : 'text-emerald-50/80 hover:bg-white/10 hover:text-white'
+                        ? 'border-matcha bg-paper text-ink'
+                        : 'border-transparent text-graphite hover:bg-paper/60 hover:text-ink'
                     }`}
                   >
-                    <Icon size={18} />
+                    <Icon size={17} strokeWidth={active ? 2 : 1.6} />
                     {item.label}
                   </Link>
                 )
@@ -133,23 +131,23 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="border-t border-white/10 px-3 py-4">
+        <div className="border-t border-line px-3 py-4">
           <a
             href="/catalog"
             target="_blank"
             rel="noopener noreferrer"
-            className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/15"
+            className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-[13px] font-bold text-graphite transition-colors hover:border-ink hover:text-ink"
           >
             <span className="flex items-center gap-3">
-              <Leaf size={18} />
+              <Leaf size={17} strokeWidth={1.6} />
               カタログを開く
             </span>
-            <ExternalLink size={14} className="text-emerald-50/70" />
+            <ExternalLink size={14} className="text-mist" />
           </a>
           {user && (
             <div className="mb-2 px-3 py-2">
-              <p className="truncate text-xs text-emerald-50/60">{user.email}</p>
-              <span className={`text-xs font-medium ${user.role === 'admin' ? 'text-emerald-300' : 'text-emerald-50/50'}`}>
+              <p className="truncate text-xs text-mist">{user.email}</p>
+              <span className={`font-mono text-[10px] uppercase tracking-brand ${user.role === 'admin' ? 'text-matcha' : 'text-mist'}`}>
                 {user.role === 'admin' ? 'Admin' : 'Viewer'}
               </span>
             </div>
@@ -159,9 +157,9 @@ export function Sidebar({
               onClose()
               void logout()
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-50/80 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] font-bold text-graphite transition-colors hover:bg-paper/60 hover:text-ink"
           >
-            <LogOut size={18} />
+            <LogOut size={17} strokeWidth={1.6} />
             ログアウト
           </button>
         </div>

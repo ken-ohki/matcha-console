@@ -258,13 +258,13 @@ export default function DocumentPage() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-[#f4f2ea] p-8 text-center text-sm text-[#68756c]">読み込み中…</div>
+    return <div className="min-h-screen bg-bone p-8 text-center text-sm text-mist">読み込み中…</div>
   }
   if (error || !sale || !doc || !totals) {
     return (
-      <div className="min-h-screen bg-[#f4f2ea] p-8">
-        <p className="text-sm text-red-600">{error || 'ドキュメントを生成できません'}</p>
-        <button type="button" onClick={() => router.back()} className="mt-4 underline text-sm text-[#174c33]">戻る</button>
+      <div className="min-h-screen bg-bone p-8">
+        <p className="text-sm text-alert">{error || 'ドキュメントを生成できません'}</p>
+        <button type="button" onClick={() => router.back()} className="mt-4 underline text-sm text-matchaDeep">戻る</button>
       </div>
     )
   }
@@ -277,35 +277,35 @@ export default function DocumentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f2ea]">
+    <div className="min-h-screen bg-bone">
       {/* Toolbar */}
-      <div className="no-print sticky top-0 z-20 border-b border-[#d9d1be] bg-white shadow-sm">
+      <div className="no-print sticky top-0 z-20 border-b border-line bg-white shadow-sm">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link href="/sales" className="inline-flex items-center gap-1 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/sales" className="inline-flex items-center gap-1 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} />
             販売管理に戻る
           </Link>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-[#d9d1be] bg-white p-0.5">
+            <div className="inline-flex rounded-lg border border-line bg-white p-0.5">
               {(['invoice', 'delivery', 'quotation'] as DocumentType[]).map(t => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => handleTypeChange(t)}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    type === t ? 'bg-[#174c33] text-white' : 'text-[#68756c] hover:text-[#173c2a]'
+                    type === t ? 'bg-ink text-paper' : 'text-mist hover:text-ink'
                   }`}
                 >
                   {DOCUMENT_LABELS[t].title.replace(/　/g, '')}
                 </button>
               ))}
             </div>
-            <div className="inline-flex rounded-lg border border-[#d9d1be] bg-white p-0.5">
+            <div className="inline-flex rounded-lg border border-line bg-white p-0.5">
               <button
                 type="button"
                 onClick={() => handleLangChange('ja')}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  language === 'ja' ? 'bg-[#174c33] text-white' : 'text-[#68756c] hover:text-[#173c2a]'
+                  language === 'ja' ? 'bg-ink text-paper' : 'text-mist hover:text-ink'
                 }`}
               >
                 日本語
@@ -314,14 +314,14 @@ export default function DocumentPage() {
                 type="button"
                 onClick={() => handleLangChange('en')}
                 className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                  language === 'en' ? 'bg-[#174c33] text-white' : 'text-[#68756c] hover:text-[#173c2a]'
+                  language === 'en' ? 'bg-ink text-paper' : 'text-mist hover:text-ink'
                 }`}
               >
                 English
               </button>
             </div>
             {!isJa && (type === 'invoice' || type === 'quotation') && (
-              <label className="inline-flex items-center gap-1 text-xs text-[#68756c]">
+              <label className="inline-flex items-center gap-1 text-xs text-mist">
                 <input
                   type="checkbox"
                   checked={includeTerms}
@@ -334,7 +334,7 @@ export default function DocumentPage() {
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#174c33] bg-white px-3 py-2 text-sm font-medium text-[#174c33] transition hover:bg-[#ece8db]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#174c33] bg-white px-3 py-2 text-sm font-medium text-matchaDeep transition hover:bg-[#ece8db]"
             >
               <Printer size={14} />
               {isJa ? '印刷' : 'Print'}
@@ -343,7 +343,7 @@ export default function DocumentPage() {
               type="button"
               onClick={handleGeneratePdf}
               disabled={generating}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
             >
               <FileDown size={14} />
               {generating ? (isJa ? '生成中…' : 'Generating…') : (isJa ? 'PDFを発行' : 'Issue PDF')}
@@ -355,15 +355,15 @@ export default function DocumentPage() {
       {/* PDF preview modal */}
       {pdfUrl && (
         <div className="no-print fixed inset-0 z-50 flex flex-col bg-black/60">
-          <div className="flex flex-wrap items-center gap-2 border-b border-[#d9d1be] bg-white px-4 py-2.5">
-            <span className="text-sm font-medium text-[#173c2a]">{isJa ? 'PDFプレビュー' : 'PDF Preview'}</span>
-            {pdfSaved && <span className="text-xs font-medium text-emerald-700">{isJa ? '✓ 発行履歴に保存しました' : '✓ Saved to history'}</span>}
-            {pdfError && <span className="text-xs text-red-600">{pdfError}</span>}
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2.5">
+            <span className="text-sm font-medium text-ink">{isJa ? 'PDFプレビュー' : 'PDF Preview'}</span>
+            {pdfSaved && <span className="text-xs font-medium text-matcha">{isJa ? '✓ 発行履歴に保存しました' : '✓ Saved to history'}</span>}
+            {pdfError && <span className="text-xs text-alert">{pdfError}</span>}
             <div className="ml-auto flex items-center gap-2">
               <a
                 href={pdfUrl}
                 download={documentBaseName}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink hover:bg-bone"
               >
                 {isJa ? 'ダウンロード' : 'Download'}
               </a>
@@ -371,14 +371,14 @@ export default function DocumentPage() {
                 type="button"
                 onClick={handleSavePdf}
                 disabled={savingPdf || pdfSaved}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
               >
                 {savingPdf ? (isJa ? '保存中…' : 'Saving…') : pdfSaved ? (isJa ? '保存済み' : 'Saved') : (isJa ? '発行（履歴に保存）' : 'Issue (save)')}
               </button>
               <button
                 type="button"
                 onClick={closePdfPreview}
-                className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-lg p-1.5 text-mist hover:bg-bone hover:text-graphite"
                 aria-label={isJa ? '閉じる' : 'Close'}
               >
                 <X size={18} />
@@ -391,25 +391,25 @@ export default function DocumentPage() {
 
       {/* Document */}
       <main className="mx-auto max-w-4xl px-4 py-6 print:p-0 print:max-w-none">
-        <div className="rounded-lg border border-gray-300 bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none">
-          <h1 className="text-center text-3xl font-semibold tracking-[0.4em] text-[#173c2a]">{labels.title}</h1>
+        <div className="rounded-lg border border-line bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none">
+          <h1 className="text-center text-3xl font-semibold tracking-[0.4em] text-ink">{labels.title}</h1>
 
           <div className="mt-8 grid grid-cols-[1fr_auto] gap-8">
             <div>
-              <div className="flex items-baseline gap-2 border-b-2 border-[#173c2a] pb-1">
-                {!isJa && <span className="text-base text-[#173c2a]">To:</span>}
+              <div className="flex items-baseline gap-2 border-b-2 border-ink pb-1">
+                {!isJa && <span className="text-base text-ink">To:</span>}
                 <EditableInput
                   value={doc.recipientName}
                   onChange={v => updateField('recipientName', v)}
                   placeholder={isJa ? 'お客様名' : 'Customer name'}
-                  className="flex-1 text-xl font-medium text-[#173c2a]"
+                  className="flex-1 text-xl font-medium text-ink"
                 />
                 {isJa && (
                   <EditableInput
                     value={doc.recipientHonorific}
                     onChange={v => updateField('recipientHonorific', v)}
                     placeholder="御中"
-                    className="w-16 text-base font-medium text-[#173c2a]"
+                    className="w-16 text-base font-medium text-ink"
                   />
                 )}
               </div>
@@ -418,7 +418,7 @@ export default function DocumentPage() {
                   value={doc.recipientPostalCode}
                   onChange={v => updateField('recipientPostalCode', v)}
                   placeholder="〒"
-                  className="mt-2 block w-full text-xs text-[#68756c]"
+                  className="mt-2 block w-full text-xs text-mist"
                 />
               )}
               <EditableTextarea
@@ -426,13 +426,13 @@ export default function DocumentPage() {
                 onChange={v => updateField('recipientAddress', v)}
                 placeholder={isJa ? '住所' : 'Address'}
                 rows={2}
-                className="text-xs text-[#68756c]"
+                className="text-xs text-mist"
               />
               <p className="mt-6 text-sm">{labels.intro}</p>
             </div>
             <div className="text-sm space-y-1">
               <div className="flex gap-2 justify-end">
-                <span className="text-[#68756c]">{isJa ? '発行日：' : 'Issue Date:'}</span>
+                <span className="text-mist">{isJa ? '発行日：' : 'Issue Date:'}</span>
                 <EditableInput
                   type="date"
                   value={doc.issueDate}
@@ -441,13 +441,13 @@ export default function DocumentPage() {
                 />
               </div>
               <div className="mt-3 text-right">
-                <p className="font-medium text-[#173c2a]">{isJa ? issuer.company : issuer.companyEn}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? issuer.postalCode : ''}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? issuer.address : issuer.addressEn}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? 'TEL：' : 'TEL: '}{issuer.tel}</p>
-                <p className="text-xs text-[#68756c]">{isJa ? 'E-Mail：' : 'Email: '}{issuer.email}</p>
+                <p className="font-medium text-ink">{isJa ? issuer.company : issuer.companyEn}</p>
+                <p className="text-xs text-mist">{isJa ? issuer.postalCode : ''}</p>
+                <p className="text-xs text-mist">{isJa ? issuer.address : issuer.addressEn}</p>
+                <p className="text-xs text-mist">{isJa ? 'TEL：' : 'TEL: '}{issuer.tel}</p>
+                <p className="text-xs text-mist">{isJa ? 'E-Mail：' : 'Email: '}{issuer.email}</p>
                 {isJa && (
-                  <p className="text-xs text-[#68756c]">登録番号：{issuer.registrationNumber}</p>
+                  <p className="text-xs text-mist">登録番号：{issuer.registrationNumber}</p>
                 )}
               </div>
             </div>
@@ -480,27 +480,27 @@ export default function DocumentPage() {
           </div>
 
           {/* Total */}
-          <div className="mt-6 grid grid-cols-[140px_1fr_80px] items-center gap-2 border-y-2 border-double border-[#173c2a] py-3">
-            <span className="text-sm font-medium text-[#173c2a]">{labels.amountLabel}</span>
-            <span className="text-right text-3xl font-semibold text-[#173c2a]">
+          <div className="mt-6 grid grid-cols-[140px_1fr_80px] items-center gap-2 border-y-2 border-double border-ink py-3">
+            <span className="text-sm font-medium text-ink">{labels.amountLabel}</span>
+            <span className="text-right text-3xl font-semibold text-ink">
               ¥ {formatYen(doc.taxExempt ? totals.subtotal : totals.total)}
             </span>
-            <span className="text-xs text-[#68756c]">{isJa ? '（税込）' : doc.taxExempt ? '(tax exempt)' : '(tax incl.)'}</span>
+            <span className="text-xs text-mist">{isJa ? '（税込）' : doc.taxExempt ? '(tax exempt)' : '(tax incl.)'}</span>
           </div>
 
           {/* Lines */}
-          <div className="mt-6 overflow-hidden rounded border border-gray-300">
+          <div className="mt-6 overflow-hidden rounded border border-line">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-[#f7f5ee] text-[#173c2a]">
-                  <th className="border-b border-r border-gray-300 px-2 py-2 text-left">{isJa ? '明細' : EN_META_LABELS.description}</th>
+                <tr className="bg-bone text-ink">
+                  <th className="border-b border-r border-line px-2 py-2 text-left">{isJa ? '明細' : EN_META_LABELS.description}</th>
                   {!doc.taxExempt && (
-                    <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-center">{isJa ? '8%対象' : '8% rate'}</th>
+                    <th className="w-16 border-b border-r border-line px-2 py-2 text-center">{isJa ? '8%対象' : '8% rate'}</th>
                   )}
-                  <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-right">{isJa ? '数量' : EN_META_LABELS.qty}</th>
-                  <th className="w-14 border-b border-r border-gray-300 px-2 py-2 text-center">{isJa ? '単位' : EN_META_LABELS.unit}</th>
-                  <th className="w-24 border-b border-r border-gray-300 px-2 py-2 text-right">{isJa ? '単価' : EN_META_LABELS.unitPrice}</th>
-                  <th className="w-28 border-b border-gray-300 px-2 py-2 text-right">{isJa ? '金額' : EN_META_LABELS.amount}</th>
+                  <th className="w-16 border-b border-r border-line px-2 py-2 text-right">{isJa ? '数量' : EN_META_LABELS.qty}</th>
+                  <th className="w-14 border-b border-r border-line px-2 py-2 text-center">{isJa ? '単位' : EN_META_LABELS.unit}</th>
+                  <th className="w-24 border-b border-r border-line px-2 py-2 text-right">{isJa ? '単価' : EN_META_LABELS.unitPrice}</th>
+                  <th className="w-28 border-b border-line px-2 py-2 text-right">{isJa ? '金額' : EN_META_LABELS.amount}</th>
                 </tr>
               </thead>
               <tbody>
@@ -508,16 +508,16 @@ export default function DocumentPage() {
                   const amount = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)
                   return (
                     <tr key={line.id}>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
+                      <td className="border-r border-b border-line px-2 py-1">
                         <EditableInput value={line.description} onChange={v => updateLine(line.id, { description: v })} className="w-full" />
                       </td>
                       {!doc.taxExempt && (
-                        <td className="border-r border-b border-gray-200 px-2 py-1 text-center">{line.isReducedRate ? '✓' : ''}</td>
+                        <td className="border-r border-b border-line px-2 py-1 text-center">{line.isReducedRate ? '✓' : ''}</td>
                       )}
-                      <td className="border-r border-b border-gray-200 px-2 py-1 text-right">{line.quantity}</td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1 text-center">{line.unit}</td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(Number(line.unitPrice) || 0)}</td>
-                      <td className="border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(amount)}</td>
+                      <td className="border-r border-b border-line px-2 py-1 text-right">{line.quantity}</td>
+                      <td className="border-r border-b border-line px-2 py-1 text-center">{line.unit}</td>
+                      <td className="border-r border-b border-line px-2 py-1 text-right">¥{formatYen(Number(line.unitPrice) || 0)}</td>
+                      <td className="border-b border-line px-2 py-1 text-right">¥{formatYen(amount)}</td>
                     </tr>
                   )
                 })}
@@ -528,28 +528,28 @@ export default function DocumentPage() {
           {/* Tax summary */}
           {!doc.taxExempt && (
             <div className="mt-3 grid grid-cols-[1fr_auto] gap-6 text-sm">
-              <p className="text-xs text-[#68756c]">{isJa ? '*軽減税率対象商品' : EN_META_LABELS.taxNote}</p>
+              <p className="text-xs text-mist">{isJa ? '*軽減税率対象商品' : EN_META_LABELS.taxNote}</p>
               <table className="text-sm">
                 <tbody>
                   <tr>
-                    <td className="px-2 text-[#68756c]">{isJa ? '10%対象' : '10% rate'}</td>
+                    <td className="px-2 text-mist">{isJa ? '10%対象' : '10% rate'}</td>
                     <td className="px-2 text-right">{isJa ? '対象額（税抜）' : 'Pre-tax'}</td>
                     <td className="px-2 text-right font-medium">¥{formatYen(totals.standardSubtotal)}</td>
-                    <td className="px-2 text-[#68756c]">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
+                    <td className="px-2 text-mist">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
                     <td className="px-2 text-right font-medium">¥{formatYen(totals.standardTax)}</td>
                   </tr>
                   <tr>
-                    <td className="px-2 text-[#68756c]">{isJa ? '8%対象' : '8% rate'}</td>
+                    <td className="px-2 text-mist">{isJa ? '8%対象' : '8% rate'}</td>
                     <td className="px-2 text-right">{isJa ? '対象額（税抜）' : 'Pre-tax'}</td>
                     <td className="px-2 text-right font-medium">¥{formatYen(totals.reducedSubtotal)}</td>
-                    <td className="px-2 text-[#68756c]">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
+                    <td className="px-2 text-mist">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
                     <td className="px-2 text-right font-medium">¥{formatYen(totals.reducedTax)}</td>
                   </tr>
-                  <tr className="border-t border-gray-300">
+                  <tr className="border-t border-line">
                     <td className="px-2 font-medium">{isJa ? '小計' : EN_META_LABELS.subtotal}</td>
                     <td className="px-2 text-right"></td>
                     <td className="px-2 text-right font-semibold">¥{formatYen(totals.subtotal)}</td>
-                    <td className="px-2 text-[#68756c]">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
+                    <td className="px-2 text-mist">{isJa ? '消費税' : EN_META_LABELS.tax}</td>
                     <td className="px-2 text-right font-semibold">¥{formatYen(totals.tax)}</td>
                   </tr>
                 </tbody>
@@ -559,7 +559,7 @@ export default function DocumentPage() {
 
           {/* Notes */}
           <div className="mt-6">
-            <p className="mb-1 text-xs font-medium text-[#68756c]">{isJa ? '備考' : EN_META_LABELS.notes}</p>
+            <p className="mb-1 text-xs font-medium text-mist">{isJa ? '備考' : EN_META_LABELS.notes}</p>
             <EditableTextarea
               value={doc.notes}
               onChange={v => updateField('notes', v)}
@@ -569,19 +569,19 @@ export default function DocumentPage() {
             />
           </div>
 
-          <p className="mt-10 text-center text-xs text-[#68756c]">{isJa ? '※PDF を原本とする' : '* PDF serves as the official document.'}</p>
+          <p className="mt-10 text-center text-xs text-mist">{isJa ? '※PDF を原本とする' : '* PDF serves as the official document.'}</p>
         </div>
 
         {/* English Terms & Conditions (appears as additional pages in print) */}
         {!isJa && (type === 'invoice' || type === 'quotation') && includeTerms && (
-          <div className="terms-page mt-6 rounded-lg border border-gray-300 bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none print:mt-0">
-            <h2 className="text-center text-2xl font-semibold tracking-[0.2em] text-[#173c2a]">TERMS &amp; CONDITIONS OF SALE</h2>
-            <p className="mt-2 text-center text-xs text-[#68756c]">{issuer.companyEn}　·　{issuer.addressEn}</p>
+          <div className="terms-page mt-6 rounded-lg border border-line bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none print:mt-0">
+            <h2 className="text-center text-2xl font-semibold tracking-[0.2em] text-ink">TERMS &amp; CONDITIONS OF SALE</h2>
+            <p className="mt-2 text-center text-xs text-mist">{issuer.companyEn}　·　{issuer.addressEn}</p>
 
             <div className="mt-8 space-y-4 text-sm leading-relaxed text-[#1f2a23]">
               {terms.map((section, i) => (
                 <div key={i}>
-                  <h3 className="font-semibold text-[#173c2a]">{section.heading}</h3>
+                  <h3 className="font-semibold text-ink">{section.heading}</h3>
                   <p className="mt-1 whitespace-pre-wrap">{section.body}</p>
                 </div>
               ))}
@@ -589,17 +589,17 @@ export default function DocumentPage() {
 
             <div className="mt-12 grid grid-cols-2 gap-8 text-sm">
               <div>
-                <p className="text-[#68756c]">Seller</p>
-                <p className="mt-1 font-medium text-[#173c2a]">{issuer.companyEn}</p>
-                <p className="text-xs text-[#68756c]">{issuer.addressEn}</p>
+                <p className="text-mist">Seller</p>
+                <p className="mt-1 font-medium text-ink">{issuer.companyEn}</p>
+                <p className="text-xs text-mist">{issuer.addressEn}</p>
               </div>
               <div>
-                <p className="text-[#68756c]">{type === 'quotation' ? 'Buyer (acknowledged upon order)' : 'Buyer (acknowledged by payment)'}</p>
-                <p className="mt-1 font-medium text-[#173c2a]">{doc.recipientName}</p>
+                <p className="text-mist">{type === 'quotation' ? 'Buyer (acknowledged upon order)' : 'Buyer (acknowledged by payment)'}</p>
+                <p className="mt-1 font-medium text-ink">{doc.recipientName}</p>
               </div>
             </div>
 
-            <p className="mt-12 text-center text-xs text-[#68756c]">
+            <p className="mt-12 text-center text-xs text-mist">
               {type === 'quotation'
                 ? 'By placing an order based on this quotation, the Buyer acknowledges and agrees to these Terms & Conditions of Sale.'
                 : 'By making payment, the Buyer acknowledges and agrees to these Terms & Conditions of Sale.'}
@@ -607,7 +607,7 @@ export default function DocumentPage() {
           </div>
         )}
 
-        <p className="mt-3 text-center text-xs text-[#68756c] no-print">※ 数量・単価・金額は販売管理から自動反映されます。その他の項目はこの画面で編集して印刷／PDF発行できます（編集内容は保存されません）。</p>
+        <p className="mt-3 text-center text-xs text-mist no-print">※ 数量・単価・金額は販売管理から自動反映されます。その他の項目はこの画面で編集して印刷／PDF発行できます（編集内容は保存されません）。</p>
       </main>
 
       <style jsx global>{`
@@ -637,7 +637,7 @@ export default function DocumentPage() {
           }
           input:focus, textarea:focus { background: transparent !important; }
           /* Remove background hover/focus tints */
-          .bg-yellow-50, .focus\\:bg-yellow-50 { background: transparent !important; }
+          .bg-bone, .focus\\:bg-bone { background: transparent !important; }
           /* Hide the row-delete trash buttons cleanly */
           table .no-print { display: none !important; }
           /* Borders should be clear in print */
@@ -719,8 +719,8 @@ function MetaRow({
 }) {
   return (
     <>
-      <div className="flex items-center justify-center bg-[#f7f5ee] px-2 py-1 text-center text-xs font-medium text-[#173c2a]">{label}</div>
-      <div className="border-b border-gray-200 px-1 py-1 text-sm">
+      <div className="flex items-center justify-center bg-bone px-2 py-1 text-center text-xs font-medium text-ink">{label}</div>
+      <div className="border-b border-line px-1 py-1 text-sm">
         {multiline
           ? <EditableTextarea value={value} onChange={onChange} rows={rows ?? 2} />
           : <EditableInput value={value} onChange={onChange} className="w-full" />}

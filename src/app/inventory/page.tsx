@@ -104,15 +104,15 @@ function InventoryFilterBar({
   }
 
   const pillBase = 'rounded-full border px-2.5 py-1 text-xs transition'
-  const pillOn = 'border-[#174c33] bg-[#174c33] text-white'
-  const pillOff = 'border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#f7f5ee]'
+  const pillOn = 'border-[#174c33] bg-ink text-paper'
+  const pillOff = 'border-line bg-white text-ink hover:bg-bone'
 
   return (
-    <div className="space-y-2 rounded-2xl border border-[#e6dfcf] bg-[#faf8f1] p-3 text-sm">
+    <div className="space-y-2 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">フィルター</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-mist">フィルター</span>
         {anyActive && (
-          <button type="button" onClick={clearAll} className="text-xs text-[#174c33] underline hover:text-[#205f43]">
+          <button type="button" onClick={clearAll} className="text-xs text-matchaDeep underline hover:text-matchaDeep">
             すべてクリア
           </button>
         )}
@@ -120,7 +120,7 @@ function InventoryFilterBar({
 
       {gradeOptions.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-[#68756c] mr-1">グレード:</span>
+          <span className="text-xs text-mist mr-1">グレード:</span>
           {gradeOptions.map(g => (
             <button
               key={g}
@@ -136,7 +136,7 @@ function InventoryFilterBar({
 
       {originOptions.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-[#68756c] mr-1">産地:</span>
+          <span className="text-xs text-mist mr-1">産地:</span>
           {originOptions.map(o => (
             <button
               key={o}
@@ -151,7 +151,7 @@ function InventoryFilterBar({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-[#68756c] mr-1">状態:</span>
+        <span className="text-xs text-mist mr-1">状態:</span>
         {([
           ['normal', '在庫あり'],
           ['low', '少'],
@@ -169,7 +169,7 @@ function InventoryFilterBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-[#68756c] mr-1">カタログ:</span>
+        <span className="text-xs text-mist mr-1">カタログ:</span>
         {([
           ['all', 'すべて'],
           ['visible', '公開'],
@@ -184,7 +184,7 @@ function InventoryFilterBar({
             {label}
           </button>
         ))}
-        <span className="text-xs text-[#68756c] ml-3 mr-1">ASK:</span>
+        <span className="text-xs text-mist ml-3 mr-1">ASK:</span>
         {([
           ['all', 'すべて'],
           ['ask', 'ASK'],
@@ -224,11 +224,11 @@ function SortableTh({
   const active = current === sortKey
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
-    <th className={`px-4 py-3 font-medium text-[#68756c] ${align === 'right' ? 'text-right' : 'text-left'}`}>
+    <th className={`px-4 py-3 font-medium text-mist ${align === 'right' ? 'text-right' : 'text-left'}`}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className={`inline-flex items-center gap-1 transition hover:text-[#173c2a] ${active ? 'text-[#173c2a]' : ''}`}
+        className={`inline-flex items-center gap-1 transition hover:text-ink ${active ? 'text-ink' : ''}`}
       >
         <span>{label}</span>
         <Icon size={11} className={active ? '' : 'opacity-40'} />
@@ -280,27 +280,27 @@ function GroupModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? 'グループ編集' : 'グループ追加'}</h2>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+          <h2 className="text-xl font-semibold text-ink">{initial ? 'グループ編集' : 'グループ追加'}</h2>
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-bone hover:text-mist">
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">グループ名</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">グループ名</label>
             <input
               required
               autoFocus
               value={name}
               onChange={event => setName(event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </div>
 
@@ -308,14 +308,14 @@ function GroupModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm text-graphite transition hover:bg-bone"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+              className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
             >
               {saving ? '保存中...' : '保存'}
             </button>
@@ -664,7 +664,7 @@ export default function InventoryPage() {
   if (loading) {
     return (
       <AppLayout>
-        <div className="text-sm text-[#68756c]">在庫データを読み込み中...</div>
+        <div className="text-sm text-mist">在庫データを読み込み中...</div>
       </AppLayout>
     )
   }
@@ -674,14 +674,14 @@ export default function InventoryPage() {
       <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-[#173c2a]">在庫管理</h1>
-            <p className="mt-1 text-sm text-[#68756c]">全{products.length}件 / 茶葉マスターを画像定義に更新</p>
+            <h1 className="text-2xl font-bold text-ink">在庫管理</h1>
+            <p className="mt-1 text-sm text-mist">全{products.length}件 / 茶葉マスターを画像定義に更新</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={handleExportExcel}
               disabled={filtered.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-graphite transition-colors hover:bg-bone disabled:opacity-50"
             >
               <Download size={16} />
               Excel 書き出し
@@ -693,14 +693,14 @@ export default function InventoryPage() {
                     setEditingGroup(null)
                     setGroupModalOpen(true)
                   }}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-graphite transition-colors hover:bg-bone"
                 >
                   <Plus size={16} />
                   グループ追加
                 </button>
                 <button
                   onClick={() => setModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#174c33] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#123723]"
+                  className="inline-flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-matchaDeep"
                 >
                   <Plus size={16} />
                   商品登録
@@ -713,32 +713,32 @@ export default function InventoryPage() {
         {feedbackMessage && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             feedbackTone === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
+              ? 'border-matcha/40 bg-bone text-matcha'
+              : 'border-alert/40 bg-alert/5 text-alert'
           }`}>
             {feedbackMessage}
           </div>
         )}
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <p className="text-sm text-[#68756c]">総商品数</p>
-            <p className="mt-1 text-3xl font-bold text-[#173c2a]">{groupProducts.length}</p>
+          <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <p className="text-sm text-mist">総商品数</p>
+            <p className="mt-1 text-3xl font-bold text-ink">{groupProducts.length}</p>
           </div>
-          <div className="rounded-2xl border border-[#d9d1be] bg-white p-5 shadow-sm">
-            <p className="text-sm text-[#68756c]">残在庫量</p>
-            <p className={`mt-1 text-3xl font-bold ${totalCurrentStockKg <= totalInitialStockKg * 0.2 ? 'text-amber-600' : 'text-[#173c2a]'}`}>
+          <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <p className="text-sm text-mist">残在庫量</p>
+            <p className={`mt-1 text-3xl font-bold ${totalCurrentStockKg <= totalInitialStockKg * 0.2 ? 'text-[#a87b1e]' : 'text-ink'}`}>
               {totalCurrentStockKg.toFixed(1)} kg
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-200">
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-line">
           <div
             className={`flex shrink-0 items-center gap-1 border-b-2 px-4 py-2.5 text-sm font-medium -mb-px cursor-pointer transition-colors ${
               activeGroupId === 'all'
-                ? 'border-[#174c33] text-[#174c33]'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                ? 'border-[#174c33] text-matchaDeep'
+                : 'border-transparent text-mist hover:border-line hover:text-graphite'
             }`}
             onClick={() => setActiveGroupId('all')}
           >
@@ -763,8 +763,8 @@ export default function InventoryPage() {
               }}
               className={`group flex shrink-0 items-center gap-1 border-b-2 px-4 py-2.5 text-sm font-medium -mb-px cursor-pointer transition-colors ${
                 activeGroupId === group.id
-                  ? 'border-[#174c33] text-[#174c33]'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  ? 'border-[#174c33] text-matchaDeep'
+                  : 'border-transparent text-mist hover:border-line hover:text-graphite'
               } ${dragOverGroupId === group.id && dragGroupId !== group.id ? 'bg-[#eef3eb]' : ''} ${dragGroupId === group.id ? 'opacity-50' : ''}`}
               onClick={() => setActiveGroupId(group.id)}
             >
@@ -781,7 +781,7 @@ export default function InventoryPage() {
                       setEditingGroup(group)
                       setGroupModalOpen(true)
                     }}
-                    className="p-0.5 text-gray-400 opacity-0 transition-all hover:text-[#174c33] group-hover:opacity-100"
+                    className="p-0.5 text-gray-400 opacity-0 transition-all hover:text-matchaDeep group-hover:opacity-100"
                   >
                     <Pencil size={12} />
                   </button>
@@ -790,7 +790,7 @@ export default function InventoryPage() {
                       event.stopPropagation()
                       void handleDeleteGroup(group)
                     }}
-                    className="p-0.5 text-gray-400 opacity-0 transition-all hover:text-red-600 group-hover:opacity-100"
+                    className="p-0.5 text-gray-400 opacity-0 transition-all hover:text-alert group-hover:opacity-100"
                   >
                     <Trash2 size={12} />
                   </button>
@@ -807,7 +807,7 @@ export default function InventoryPage() {
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="SKU / 商品名 / 仕入商品名 / 仕入先 / 品種で検索..."
-              className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 md:w-[32rem]"
+              className="w-full rounded-xl border border-line py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-matcha md:w-[32rem]"
             />
           </div>
           <InventoryFilterBar
@@ -831,24 +831,24 @@ export default function InventoryPage() {
             <div
               key={product.id}
               onClick={() => openDetail(product.id)}
-              className="cursor-pointer rounded-2xl border border-[#d9d1be] bg-white p-4 shadow-sm transition hover:border-[#bcb39a]"
+              className="cursor-pointer rounded-2xl border border-line bg-white p-4 shadow-sm transition hover:border-[#bcb39a]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-[#173c2a]">{product.name}</span>
+                    <span className="font-medium text-ink">{product.name}</span>
                     {product.inquireToOrder && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                      <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
                     )}
                   </div>
-                  <div className="mt-1 font-mono text-xs text-[#68756c]">{product.sku}</div>
+                  <div className="mt-1 font-mono text-xs text-mist">{product.sku}</div>
                 </div>
                 <StockStatusBadge status={product.stockStatus} />
               </div>
 
-              <div className="mt-4 rounded-xl bg-[#f7f5ee] p-3">
-                <p className="text-xs text-[#68756c]">残在庫</p>
-                <p className={`mt-1 text-lg font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{formatKg(product.currentStockKg)}</p>
+              <div className="mt-4 rounded-xl bg-bone p-3">
+                <p className="text-xs text-mist">残在庫</p>
+                <p className={`mt-1 text-lg font-semibold ${product.currentStockKg < 0 ? 'text-alert' : 'text-ink'}`}>{formatKg(product.currentStockKg)}</p>
               </div>
 
               {user?.role === 'admin' && (
@@ -856,13 +856,13 @@ export default function InventoryPage() {
                   <button
                     onClick={e => { e.stopPropagation(); handleDuplicateProduct(product) }}
                     aria-label="複製"
-                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                    className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                   >
                     <Copy size={16} />
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteProduct(product) }}
-                    className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                    className="rounded-lg p-2 text-alert transition hover:bg-alert/5 hover:text-alert"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -871,37 +871,37 @@ export default function InventoryPage() {
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="rounded-2xl border border-[#d9d1be] bg-white px-4 py-12 text-center text-[#68756c] shadow-sm">
+            <div className="rounded-2xl border border-line bg-white px-4 py-12 text-center text-mist shadow-sm">
               商品がありません
             </div>
           )}
         </div>
 
-        <div className="hidden overflow-hidden rounded-2xl border border-[#d9d1be] bg-white shadow-sm md:block">
+        <div className="hidden overflow-hidden rounded-2xl border border-line bg-white shadow-sm md:block">
           <div className="overflow-x-auto">
             <table className="w-max min-w-full text-sm">
-              <thead className="bg-[#f7f5ee]">
+              <thead className="bg-bone">
                 <tr className="whitespace-nowrap">
-                  {user?.role === 'admin' && <th className="w-10 px-3 py-3 text-left font-medium text-[#68756c]" />}
+                  {user?.role === 'admin' && <th className="w-10 px-3 py-3 text-left font-medium text-mist" />}
                   <SortableTh label="SKU" sortKey="sku" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="茶種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">グレード</th>
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">品種</th>
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">摘採</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">グレード</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">品種</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">摘採</th>
                   <SortableTh label="産地" sortKey="origin" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">仕入先</th>
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">認証</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">仕入先</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">認証</th>
                   <SortableTh label="残在庫" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
                   <SortableTh label="卸単価" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
-                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">仕入単価</th>
-                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利</th>
-                  <th className="px-3 py-3 text-right font-medium text-[#68756c]">粗利率</th>
+                  <th className="px-3 py-3 text-right font-medium text-mist">仕入単価</th>
+                  <th className="px-3 py-3 text-right font-medium text-mist">粗利</th>
+                  <th className="px-3 py-3 text-right font-medium text-mist">粗利率</th>
                   <SortableTh label="状態" sortKey="status" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">カタログ</th>
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">おすすめ</th>
-                  <th className="px-3 py-3 text-left font-medium text-[#68756c]">サンプル</th>
-                  {user?.role === 'admin' && <th className="px-3 py-3 text-right font-medium text-[#68756c]">操作</th>}
+                  <th className="px-3 py-3 text-left font-medium text-mist">カタログ</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">おすすめ</th>
+                  <th className="px-3 py-3 text-left font-medium text-mist">サンプル</th>
+                  {user?.role === 'admin' && <th className="px-3 py-3 text-right font-medium text-mist">操作</th>}
                 </tr>
               </thead>
               <tbody>
@@ -923,47 +923,47 @@ export default function InventoryPage() {
                     onDragLeave={() => setDragOverId(prev => (prev === product.id ? null : prev))}
                     onDrop={() => handleProductDrop(product.id)}
                     onClick={() => openDetail(product.id)}
-                    className={`cursor-pointer whitespace-nowrap border-t border-[#ece5d7] hover:bg-[#faf8f2] ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
+                    className={`cursor-pointer whitespace-nowrap border-t border-line hover:bg-bone ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
                   >
                     {user?.role === 'admin' && (
                       <td className="px-3 py-3 text-gray-400" onClick={e => e.stopPropagation()}>
                         <GripVertical size={16} />
                       </td>
                     )}
-                    <td className="px-3 py-3 font-mono text-gray-700">{product.sku}</td>
+                    <td className="px-3 py-3 font-mono text-graphite">{product.sku}</td>
                     <td className="px-3 py-3">
-                      <span className="font-medium text-[#173c2a]">{product.name}</span>
+                      <span className="font-medium text-ink">{product.name}</span>
                       {product.inquireToOrder && (
-                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">ASK</span>
+                        <span className="ml-2 rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-gray-700">{translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType ?? '-'}</td>
-                    <td className="px-3 py-3 text-gray-700">{translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade ?? '-'}</td>
-                    <td className="px-3 py-3 text-gray-700">{formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</td>
-                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'plucking', product.pluckingMethods))}</td>
-                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'origin', product.origins))}</td>
-                    <td className="px-3 py-3 text-gray-700">{compactText(product.supplier)}</td>
-                    <td className="px-3 py-3 text-gray-700">{formatOptionList(translateValues(masters, 'certification', product.certifications))}</td>
-                    <td className={`px-3 py-3 text-right font-semibold ${product.currentStockKg < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{product.currentStockKg.toFixed(1)} kg</td>
-                    <td className="px-3 py-3 text-right font-semibold text-[#173c2a]">{formatCurrency(wholesale)}</td>
-                    <td className="px-3 py-3 text-right text-gray-700">{formatCurrency(cost)}</td>
-                    <td className={`px-3 py-3 text-right ${margin == null ? 'text-[#68756c]' : margin < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>
-                    <td className={`px-3 py-3 text-right text-xs ${marginRate == null ? 'text-[#68756c]' : marginRate < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{marginRate == null ? '-' : `${marginRate.toFixed(1)}%`}</td>
+                    <td className="px-3 py-3 text-graphite">{translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType ?? '-'}</td>
+                    <td className="px-3 py-3 text-graphite">{translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade ?? '-'}</td>
+                    <td className="px-3 py-3 text-graphite">{formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</td>
+                    <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'plucking', product.pluckingMethods))}</td>
+                    <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'origin', product.origins))}</td>
+                    <td className="px-3 py-3 text-graphite">{compactText(product.supplier)}</td>
+                    <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'certification', product.certifications))}</td>
+                    <td className={`px-3 py-3 text-right font-semibold ${product.currentStockKg < 0 ? 'text-alert' : 'text-ink'}`}>{product.currentStockKg.toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right font-semibold text-ink">{formatCurrency(wholesale)}</td>
+                    <td className="px-3 py-3 text-right text-graphite">{formatCurrency(cost)}</td>
+                    <td className={`px-3 py-3 text-right ${margin == null ? 'text-mist' : margin < 0 ? 'text-alert' : 'text-matcha'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>
+                    <td className={`px-3 py-3 text-right text-xs ${marginRate == null ? 'text-mist' : marginRate < 0 ? 'text-alert' : 'text-matcha'}`}>{marginRate == null ? '-' : `${marginRate.toFixed(1)}%`}</td>
                     <td className="px-3 py-3"><StockStatusBadge status={product.stockStatus} /></td>
                     <td className="px-3 py-3">
                       {product.showInCatalog !== false
-                        ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">表示</span>
-                        : <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">非表示</span>}
+                        ? <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-matcha">表示</span>
+                        : <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-mist">非表示</span>}
                     </td>
                     <td className="px-3 py-3">
                       {product.featured
-                        ? <span className="rounded-full bg-[#ece8ff] px-2 py-0.5 text-xs text-[#5e44a8]">おすすめ</span>
-                        : <span className="text-xs text-[#a59f8c]">—</span>}
+                        ? <span className="rounded-full bg-[#ece8ff] px-2 py-0.5 text-xs text-graphite">おすすめ</span>
+                        : <span className="text-xs text-mist">—</span>}
                     </td>
                     <td className="px-3 py-3">
                       {product.sampleAvailable
-                        ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">可</span>
-                        : <span className="text-xs text-[#a59f8c]">不可</span>}
+                        ? <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-matcha">可</span>
+                        : <span className="text-xs text-mist">不可</span>}
                     </td>
                     {user?.role === 'admin' && (
                       <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
@@ -971,13 +971,13 @@ export default function InventoryPage() {
                           <button
                             onClick={() => handleDuplicateProduct(product)}
                             aria-label="複製"
-                            className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                            className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                           >
                             <Copy size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product)}
-                            className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                            className="rounded-lg p-2 text-alert transition hover:bg-alert/5 hover:text-alert"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -989,7 +989,7 @@ export default function InventoryPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={user?.role === 'admin' ? 20 : 18} className="px-4 py-12 text-center text-[#68756c]">
+                    <td colSpan={user?.role === 'admin' ? 20 : 18} className="px-4 py-12 text-center text-mist">
                       商品がありません
                     </td>
                   </tr>

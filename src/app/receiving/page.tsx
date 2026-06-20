@@ -42,7 +42,7 @@ function isLineReceived(order: PurchaseOrder, lineIndex: number): boolean {
 
 function UnlistedBadge() {
   return (
-    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+    <span className="inline-flex items-center rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">
       未登録
     </span>
   )
@@ -162,66 +162,66 @@ function ReceiveModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-xl sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#173c2a]">入荷登録</h2>
-          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-[#68756c] hover:bg-[#f7f5ee]">
+          <h2 className="text-lg font-bold text-ink">入荷登録</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-mist hover:bg-bone">
             <X size={18} />
           </button>
         </div>
 
-        <div className="mb-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f2] p-3 text-sm">
-          <div className="flex items-center gap-2 font-medium text-[#173c2a]">
+        <div className="mb-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
+          <div className="flex items-center gap-2 font-medium text-ink">
             {line.productName || '-'}
             {isUnlisted && <UnlistedBadge />}
           </div>
-          <div className="mt-1 text-xs text-[#68756c]">
+          <div className="mt-1 text-xs text-mist">
             {pending.order.supplierName}・{formatKg(line.quantityKg)}
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">入荷日</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">入荷日</label>
             <input
               type="date"
               value={arrivalDate}
               onChange={e => setArrivalDate(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </div>
 
           {isUnlisted && (
             <div className="space-y-3">
               <div className="flex flex-col gap-2 rounded-2xl border border-[#e6dfcf] p-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-[#173c2a]">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink">
                   <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
                   新規商品として登録
                 </label>
                 {mode === 'new' && (
                   <div className="space-y-2 pl-6">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-700">商品名</label>
+                      <label className="mb-1 block text-xs font-medium text-graphite">商品名</label>
                       <input
                         type="text"
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-700">SKU</label>
+                      <label className="mb-1 block text-xs font-medium text-graphite">SKU</label>
                       <input
                         type="text"
                         value={newSku}
                         onChange={e => setNewSku(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-700">在庫グループ</label>
+                      <label className="mb-1 block text-xs font-medium text-graphite">在庫グループ</label>
                       <select
                         value={newGroupId}
                         onChange={e => setNewGroupId(e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       >
                         <option value="">選択してください</option>
                         {inventoryGroups.map(g => (
@@ -230,12 +230,12 @@ function ReceiveModal({
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-gray-700">仕入単価</label>
+                      <label className="mb-1 block text-xs font-medium text-graphite">仕入単価</label>
                       <input
                         type="number"
                         value={newUnitPrice}
                         onChange={e => setNewUnitPrice(Number(e.target.value) || 0)}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                        className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       />
                     </div>
                   </div>
@@ -243,7 +243,7 @@ function ReceiveModal({
               </div>
 
               <div className="flex flex-col gap-2 rounded-2xl border border-[#e6dfcf] p-3">
-                <label className="flex items-center gap-2 text-sm font-medium text-[#173c2a]">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink">
                   <input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} />
                   既存商品に紐付け
                 </label>
@@ -252,7 +252,7 @@ function ReceiveModal({
                     <select
                       value={existingProductId}
                       onChange={e => setExistingProductId(e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                     >
                       <option value="">選択してください</option>
                       {products.map(p => (
@@ -265,20 +265,20 @@ function ReceiveModal({
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-alert">{error}</p>}
 
           <div className="flex gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-[#d9d1be] px-4 py-2.5 text-sm font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
+              className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-ink hover:bg-bone"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#173c2a] disabled:opacity-60"
+              className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper hover:bg-ink disabled:opacity-60"
             >
               {saving ? '処理中…' : '入荷を登録'}
             </button>
@@ -406,26 +406,26 @@ export default function ReceivingPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <PackageOpen size={22} className="text-[#174c33]" />
-            <h1 className="text-2xl font-bold text-[#173c2a]">入荷管理</h1>
+            <PackageOpen size={22} className="text-matchaDeep" />
+            <h1 className="text-2xl font-bold text-ink">入荷管理</h1>
           </div>
-          <p className="text-sm text-[#68756c]">
+          <p className="text-sm text-mist">
             発注した商品の入荷を登録します。在庫未登録の商品は入荷時に新規登録または既存商品への紐付けができます。
           </p>
           <div className="mt-1">
-            <span className="inline-flex items-center rounded-full bg-[#173c2a] px-3 py-1 text-sm font-medium text-white">
+            <span className="inline-flex items-center rounded-full bg-ink px-3 py-1 text-sm font-medium text-paper">
               入荷待ち {pendingLines.length}件
             </span>
           </div>
         </div>
 
         {loading ? (
-          <p className="text-sm text-[#68756c]">読み込み中…</p>
+          <p className="text-sm text-mist">読み込み中…</p>
         ) : (
           <>
             <div className="overflow-hidden rounded-3xl border border-[#e6dfcf] bg-white">
               <table className="w-full text-sm">
-                <thead className="bg-[#f7f5ee] text-left text-xs uppercase tracking-wider text-[#68756c]">
+                <thead className="bg-bone text-left text-xs uppercase tracking-wider text-mist">
                   <tr>
                     <th className="px-4 py-3">発注日</th>
                     <th className="px-4 py-3">仕入先</th>
@@ -438,29 +438,29 @@ export default function ReceivingPage() {
                 <tbody>
                   {pendingLines.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-[#68756c]">入荷待ちの商品はありません</td>
+                      <td colSpan={6} className="px-4 py-8 text-center text-mist">入荷待ちの商品はありません</td>
                     </tr>
                   ) : (
                     pendingLines.map(({ order, lineIndex }) => {
                       const item = order.items[lineIndex]
                       return (
                         <tr key={`${order.id}:${lineIndex}`} className="border-t border-[#f0ebdf]">
-                          <td className="px-4 py-3 text-[#173c2a]">{order.orderDate || '-'}</td>
-                          <td className="px-4 py-3 text-[#173c2a]">{order.supplierName}</td>
+                          <td className="px-4 py-3 text-ink">{order.orderDate || '-'}</td>
+                          <td className="px-4 py-3 text-ink">{order.supplierName}</td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2 text-[#173c2a]">
+                            <div className="flex items-center gap-2 text-ink">
                               {item.productName || '-'}
                               {!item.productId && <UnlistedBadge />}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-[#173c2a]">{formatKg(item.quantityKg)}</td>
-                          <td className="px-4 py-3 text-[#68756c]">{order.expectedDeliveryDate || '-'}</td>
+                          <td className="px-4 py-3 text-ink">{formatKg(item.quantityKg)}</td>
+                          <td className="px-4 py-3 text-mist">{order.expectedDeliveryDate || '-'}</td>
                           <td className="px-4 py-3 text-right">
                             {isAdmin && (
                               <button
                                 type="button"
                                 onClick={() => openReceive({ order, lineIndex })}
-                                className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#173c2a]"
+                                className="inline-flex items-center gap-1 rounded-xl bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink"
                               >
                                 <Check size={14} />
                                 入荷
@@ -476,23 +476,23 @@ export default function ReceivingPage() {
             </div>
 
             {orphanArrivals.length > 0 && (
-              <div className="mt-6 overflow-hidden rounded-3xl border-2 border-amber-300 bg-amber-50">
+              <div className="mt-6 overflow-hidden rounded-3xl border-2 border-[#a87b1e]/40 bg-bone">
                 <button
                   type="button"
                   onClick={() => setShowOrphans(prev => !prev)}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >
                   <div className="flex items-center gap-2">
-                    <FilePlus size={16} className="text-amber-700" />
-                    <h2 className="text-sm font-semibold text-amber-900">未登録の入荷（発注なしで在庫追加された記録）</h2>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-amber-800">{orphanArrivals.length}件</span>
+                    <FilePlus size={16} className="text-[#a87b1e]" />
+                    <h2 className="text-sm font-semibold text-[#a87b1e]">未登録の入荷（発注なしで在庫追加された記録）</h2>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-[#a87b1e]">{orphanArrivals.length}件</span>
                   </div>
-                  <span className="text-xs text-amber-800">{showOrphans ? '隠す' : '表示'}</span>
+                  <span className="text-xs text-[#a87b1e]">{showOrphans ? '隠す' : '表示'}</span>
                 </button>
                 {showOrphans && (
-                  <div className="overflow-x-auto border-t border-amber-200 bg-white">
+                  <div className="overflow-x-auto border-t border-[#a87b1e]/40 bg-white">
                     <table className="w-full text-sm">
-                      <thead className="bg-amber-50 text-left text-xs uppercase tracking-wider text-amber-900">
+                      <thead className="bg-bone text-left text-xs uppercase tracking-wider text-[#a87b1e]">
                         <tr>
                           <th className="px-4 py-3">入荷日</th>
                           <th className="px-4 py-3">商品</th>
@@ -502,20 +502,20 @@ export default function ReceivingPage() {
                       </thead>
                       <tbody>
                         {orphanArrivals.map(({ product, arrival }) => (
-                          <tr key={`${product.id}:${arrival.id}`} className="border-t border-amber-100">
-                            <td className="px-4 py-3 text-[#173c2a]">{arrival.arrivalDate || '-'}</td>
-                            <td className="px-4 py-3 text-[#173c2a]">
+                          <tr key={`${product.id}:${arrival.id}`} className="border-t border-[#a87b1e]/40">
+                            <td className="px-4 py-3 text-ink">{arrival.arrivalDate || '-'}</td>
+                            <td className="px-4 py-3 text-ink">
                               {product.name}
-                              {product.sku && <span className="ml-1 text-[11px] text-[#68756c]">({product.sku})</span>}
+                              {product.sku && <span className="ml-1 text-[11px] text-mist">({product.sku})</span>}
                             </td>
-                            <td className="px-4 py-3 text-[#173c2a]">{formatKg(arrival.quantityKg)}</td>
+                            <td className="px-4 py-3 text-ink">{formatKg(arrival.quantityKg)}</td>
                             <td className="px-4 py-3 text-right">
                               {isAdmin && (
                                 <div className="inline-flex items-center gap-1">
                                   <button
                                     type="button"
                                     onClick={() => setOrphanTarget({ product, arrival })}
-                                    className="inline-flex items-center gap-1 rounded-xl bg-[#174c33] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#173c2a]"
+                                    className="inline-flex items-center gap-1 rounded-xl bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-ink"
                                   >
                                     <FilePlus size={14} />
                                     発注として登録
@@ -529,7 +529,7 @@ export default function ReceivingPage() {
                                       await load()
                                     }}
                                     title="入荷記録を削除"
-                                    className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                                    className="inline-flex items-center gap-1 rounded-xl border border-alert/40 px-3 py-1.5 text-xs font-medium text-alert hover:bg-alert/5"
                                   >
                                     <Trash2 size={14} />
                                     削除
@@ -550,14 +550,14 @@ export default function ReceivingPage() {
               <button
                 type="button"
                 onClick={() => setShowReceived(prev => !prev)}
-                className="text-sm font-medium text-[#174c33] hover:underline"
+                className="text-sm font-medium text-matchaDeep hover:underline"
               >
                 入荷済み（{receivedLines.length}件）{showReceived ? 'を隠す' : 'を表示'}
               </button>
               {showReceived && (
                 <div className="mt-3 overflow-hidden rounded-3xl border border-[#e6dfcf] bg-white">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#f7f5ee] text-left text-xs uppercase tracking-wider text-[#68756c]">
+                    <thead className="bg-bone text-left text-xs uppercase tracking-wider text-mist">
                       <tr>
                         <th className="px-4 py-3">仕入先</th>
                         <th className="px-4 py-3">商品</th>
@@ -568,22 +568,22 @@ export default function ReceivingPage() {
                     <tbody>
                       {receivedLines.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-[#68756c]">入荷済みの商品はありません</td>
+                          <td colSpan={4} className="px-4 py-8 text-center text-mist">入荷済みの商品はありません</td>
                         </tr>
                       ) : (
                         receivedLines.map(({ order, lineIndex }) => {
                           const item = order.items[lineIndex]
                           return (
                             <tr key={`${order.id}:${lineIndex}`} className="border-t border-[#f0ebdf]">
-                              <td className="px-4 py-3 text-[#173c2a]">{order.supplierName}</td>
-                              <td className="px-4 py-3 text-[#173c2a]">{item.productName || '-'}</td>
-                              <td className="px-4 py-3 text-[#173c2a]">{formatKg(item.quantityKg)}</td>
+                              <td className="px-4 py-3 text-ink">{order.supplierName}</td>
+                              <td className="px-4 py-3 text-ink">{item.productName || '-'}</td>
+                              <td className="px-4 py-3 text-ink">{formatKg(item.quantityKg)}</td>
                               <td className="px-4 py-3 text-right">
                                 {isAdmin && (
                                   <button
                                     type="button"
                                     onClick={() => handleUnreceive({ order, lineIndex })}
-                                    className="inline-flex items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-1.5 text-xs font-medium text-[#173c2a] hover:bg-[#f7f5ee]"
+                                    className="inline-flex items-center gap-1 rounded-xl border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-bone"
                                   >
                                     <Undo2 size={14} />
                                     取消
@@ -689,47 +689,47 @@ function OrphanConvertModal({
       <div className="max-h-[100vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">発注として登録</h2>
-            <p className="mt-1 text-xs text-[#68756c]">
+            <h2 className="text-xl font-semibold text-ink">発注として登録</h2>
+            <p className="mt-1 text-xs text-mist">
               {target.product.name}{target.product.sku && `（${target.product.sku}）`} / {formatKg(target.arrival.quantityKg)} / 入荷日 {target.arrival.arrivalDate}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-bone hover:text-mist">
             <X size={18} />
           </button>
         </div>
 
-        {error && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+        {error && <div className="mb-3 rounded-xl border border-alert/40 bg-alert/5 px-3 py-2 text-sm text-alert">{error}</div>}
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">仕入先</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">仕入先</label>
             <input
               required
               value={supplierName}
               onChange={e => setSupplierName(e.target.value)}
               placeholder="例: 鹿児島茶葉商会（不明な場合は「不明」など）"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">税抜単価</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">税抜単価</label>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={unitPrice}
                 onChange={e => setUnitPrice(Number(e.target.value) || 0)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">税率</label>
+              <label className="mb-1 block text-sm font-medium text-graphite">税率</label>
               <select
                 value={taxRate}
                 onChange={e => setTaxRate(Number(e.target.value) === 10 ? 10 : 8)}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value={8}>8%軽減</option>
                 <option value={10}>10%</option>
@@ -737,36 +737,36 @@ function OrphanConvertModal({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">発注日</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">発注日</label>
             <input
               type="date"
               value={orderDate}
               onChange={e => setOrderDate(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">備考（任意）</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">備考（任意）</label>
             <textarea
               rows={2}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="未入力時は「期首在庫から自動変換」"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             />
           </div>
 
-          <div className="rounded-xl bg-[#f7f5ee] p-3 text-xs text-[#68756c]">
-            <div className="flex justify-between"><span>金額（税抜）</span><span className="font-medium text-[#173c2a]">¥{new Intl.NumberFormat('ja-JP').format(lineTotal)}</span></div>
+          <div className="rounded-xl bg-bone p-3 text-xs text-mist">
+            <div className="flex justify-between"><span>金額（税抜）</span><span className="font-medium text-ink">¥{new Intl.NumberFormat('ja-JP').format(lineTotal)}</span></div>
             <div className="flex justify-between"><span>消費税</span><span>¥{new Intl.NumberFormat('ja-JP').format(tax)}</span></div>
-            <div className="mt-1 flex justify-between border-t border-[#e6dfcf] pt-1 font-semibold text-[#173c2a]"><span>税込合計</span><span>¥{new Intl.NumberFormat('ja-JP').format(lineTotal + tax)}</span></div>
+            <div className="mt-1 flex justify-between border-t border-[#e6dfcf] pt-1 font-semibold text-ink"><span>税込合計</span><span>¥{new Intl.NumberFormat('ja-JP').format(lineTotal + tax)}</span></div>
           </div>
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm text-graphite hover:bg-bone">
               キャンセル
             </button>
-            <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#173c2a] disabled:opacity-60">
+            <button type="submit" disabled={saving} className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper hover:bg-ink disabled:opacity-60">
               {saving ? '登録中…' : '発注を作成'}
             </button>
           </div>

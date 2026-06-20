@@ -16,6 +16,35 @@ function handleAuthError(err: unknown) {
   return NextResponse.json({ error: 'internal', detail: err instanceof Error ? err.message : 'unknown' }, { status: 500 })
 }
 
+const WHOLESALE_BASE_URL = process.env.WHOLESALE_BASE_URL || 'https://wholesale.sabo-matcha.jp'
+
+// Quick-create a manual member — delegate to the wholesale app (owns the model).
+export async function POST(request: Request) {
+  try {
+    await requireAdmin(request)
+  } catch (err) {
+    return handleAuthError(err)
+  }
+  const auth = request.headers.get('authorization') ?? ''
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
+  }
+  try {
+    const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/members`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: auth },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json().catch(() => ({}))
+    return NextResponse.json(data, { status: res.status })
+  } catch (err) {
+    return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+  }
+}
+
 export async function GET(request: Request) {
   try {
     await requireAdmin(request)

@@ -31,16 +31,16 @@ export const SHIPPING_LABELS: Record<ShippingStatus, string> = {
 }
 
 const PAYMENT_BADGE: Record<PaymentStatus, { label: string; cls: string }> = {
-  uninvoiced: { label: '未請求', cls: 'bg-slate-100 text-slate-700' },
-  invoiced: { label: '請求済', cls: 'bg-amber-100 text-amber-800' },
-  paid: { label: '入金済', cls: 'bg-emerald-100 text-emerald-800' },
+  uninvoiced: { label: '未請求', cls: 'bg-bone text-graphite' },
+  invoiced: { label: '請求済', cls: 'bg-bone text-[#a87b1e]' },
+  paid: { label: '入金済', cls: 'bg-bone text-matcha' },
 }
 
 const SHIPPING_BADGE: Record<ShippingStatus, string> = {
-  ordering: 'bg-slate-100 text-slate-700',
-  producing: 'bg-blue-100 text-blue-800',
-  ready_to_ship: 'bg-amber-100 text-amber-800',
-  shipped: 'bg-emerald-100 text-emerald-800',
+  ordering: 'bg-bone text-graphite',
+  producing: 'bg-bone text-graphite',
+  ready_to_ship: 'bg-bone text-[#a87b1e]',
+  shipped: 'bg-bone text-matcha',
 }
 
 export function PaymentBadge({ status }: { status: PaymentStatus }) {
@@ -206,22 +206,22 @@ export function ProductSelectCombobox({
         onFocus={() => { setQuery(''); setFocused(true) }}
         onBlur={() => setTimeout(() => setFocused(false), 150)}
         placeholder="商品名・SKUで検索"
-        className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+        className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
       />
       {focused && (
-        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-line bg-white shadow-lg">
           {suggestions.map(p => (
             <button
               key={p.id}
               type="button"
               onMouseDown={() => { onSelect(p.id); setQuery(''); setFocused(false) }}
-              className="block w-full border-b border-[#f0ebe0] px-3 py-2 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+              className="block w-full border-b border-[#f0ebe0] px-3 py-2 text-left last:border-b-0 hover:bg-bone"
             >
-              <div className="text-sm font-medium text-[#173c2a]">
+              <div className="text-sm font-medium text-ink">
                 {p.name}
                 <span className="ml-1 text-xs font-normal text-[#9a8f76]">{p.sku}</span>
               </div>
-              {productSubLabel(p) && <div className="text-[11px] text-[#68756c]">{productSubLabel(p)}</div>}
+              {productSubLabel(p) && <div className="text-[11px] text-mist">{productSubLabel(p)}</div>}
             </button>
           ))}
           {suggestions.length === 0 && (
@@ -241,7 +241,7 @@ type FormProps = {
 }
 
 const fieldCls =
-  'w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  'w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha'
 
 export function SaleBasicSection({ form, setForm, buyers }: FormProps & { buyers: Buyer[] }) {
   const [buyerFocused, setBuyerFocused] = useState(false)
@@ -273,7 +273,7 @@ export function SaleBasicSection({ form, setForm, buyers }: FormProps & { buyers
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">販売ステータス</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">販売ステータス</label>
           <select
             value={form.status}
             onChange={event => setForm(prev => ({ ...prev, status: event.target.value as SaleStatus }))}
@@ -285,7 +285,7 @@ export function SaleBasicSection({ form, setForm, buyers }: FormProps & { buyers
           </select>
         </div>
         <div className="relative">
-          <label className="mb-1 block text-sm font-medium text-gray-700">販売先</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">販売先</label>
           <input
             required
             value={form.buyerName}
@@ -296,19 +296,19 @@ export function SaleBasicSection({ form, setForm, buyers }: FormProps & { buyers
             placeholder="例: Tea Atelier SORA"
           />
           {buyerFocused && buyerSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-[#d9d1be] bg-white shadow-lg">
+            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-10 overflow-hidden rounded-xl border border-line bg-white shadow-lg">
               {buyerSuggestions.map(buyer => (
                 <button
                   key={buyer.id}
                   type="button"
                   onMouseDown={event => { event.preventDefault(); applyBuyer(buyer) }}
-                  className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-[#f7f5ee]"
+                  className="flex w-full items-start justify-between gap-3 border-b border-[#f0ebdf] px-3 py-2.5 text-left last:border-b-0 hover:bg-bone"
                 >
                   <span>
-                    <span className="block text-sm font-medium text-[#173c2a]">{buyer.name}</span>
-                    <span className="block text-xs text-[#68756c]">{buyer.country || '国未設定'}{buyer.terms ? ` / ${buyer.terms}` : ''}</span>
+                    <span className="block text-sm font-medium text-ink">{buyer.name}</span>
+                    <span className="block text-xs text-mist">{buyer.country || '国未設定'}{buyer.terms ? ` / ${buyer.terms}` : ''}</span>
                   </span>
-                  <span className="shrink-0 text-xs text-[#68756c]">{buyer.saleCount}件</span>
+                  <span className="shrink-0 text-xs text-mist">{buyer.saleCount}件</span>
                 </button>
               ))}
             </div>
@@ -318,14 +318,14 @@ export function SaleBasicSection({ form, setForm, buyers }: FormProps & { buyers
 
       {buyers.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-[#68756c]">最近の販売先</p>
+          <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-mist">最近の販売先</p>
           <div className="flex flex-wrap gap-2">
             {buyers.slice(0, 6).map(buyer => (
               <button
                 key={buyer.id}
                 type="button"
                 onClick={() => applyBuyer(buyer)}
-                className="rounded-full border border-[#d9d1be] bg-[#f7f5ee] px-3 py-1.5 text-xs text-[#173c2a] transition hover:border-[#b5aa90] hover:bg-white"
+                className="rounded-full border border-line bg-bone px-3 py-1.5 text-xs text-ink transition hover:border-[#b5aa90] hover:bg-white"
               >
                 {buyer.name}
               </button>
@@ -370,8 +370,8 @@ export function SaleItemsSection({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">商品</label>
-        <span className="text-xs text-[#68756c]">合計 {formatCurrency(revenue)}</span>
+        <label className="block text-sm font-medium text-graphite">商品</label>
+        <span className="text-xs text-mist">合計 {formatCurrency(revenue)}</span>
       </div>
       <div className="space-y-2">
         {form.items.map((line, index) => {
@@ -385,7 +385,7 @@ export function SaleItemsSection({
           const lineProfit = lineRevenue - lineCost
           const lineMargin = lineRevenue > 0 ? (lineProfit / lineRevenue) * 100 : null
           return (
-            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
+            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-bone p-3 md:grid-cols-[1.3fr,0.6fr,0.7fr,0.55fr,auto,auto]">
               <ProductSelectCombobox
                 products={products}
                 value={line.productId}
@@ -399,7 +399,7 @@ export function SaleItemsSection({
                 value={line.quantityKg}
                 placeholder="数量 (kg)"
                 onChange={event => updateItem(index, { quantityKg: Number(event.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
               <input
                 required
@@ -409,7 +409,7 @@ export function SaleItemsSection({
                 value={line.unitPrice}
                 placeholder="税抜単価"
                 onChange={event => updateItem(index, { unitPrice: Number(event.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
               <select
                 value={lineRate}
@@ -418,16 +418,16 @@ export function SaleItemsSection({
                   updateItem(index, { taxRate: v === 0 ? 0 : v === 10 ? 10 : 8 })
                 }}
                 title="消費税区分"
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value={0}>免税</option>
                 <option value={8}>8%軽減</option>
                 <option value={10}>10%</option>
               </select>
               <div className="flex flex-col items-end justify-center text-xs md:px-2">
-                <span className="font-medium text-[#173c2a]">{formatCurrency(lineIncl)}</span>
-                <span className="text-[10px] text-[#68756c]">税抜 {formatCurrency(lineRevenue)}</span>
-                <span className={`text-[10px] ${lineProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                <span className="font-medium text-ink">{formatCurrency(lineIncl)}</span>
+                <span className="text-[10px] text-mist">税抜 {formatCurrency(lineRevenue)}</span>
+                <span className={`text-[10px] ${lineProfit >= 0 ? 'text-matcha' : 'text-alert'}`}>
                   粗利 {formatCurrency(lineProfit)}{lineMargin != null && ` (${lineMargin.toFixed(1)}%)`}
                 </span>
               </div>
@@ -436,7 +436,7 @@ export function SaleItemsSection({
                 onClick={() => removeItem(index)}
                 disabled={form.items.length <= 1}
                 aria-label="削除"
-                className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-red-600 disabled:opacity-30"
+                className="self-center rounded-lg p-2 text-mist transition hover:bg-bone hover:text-alert disabled:opacity-30"
               >
                 <X size={16} />
               </button>
@@ -447,7 +447,7 @@ export function SaleItemsSection({
       <button
         type="button"
         onClick={addItem}
-        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]"
+        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-matchaDeep transition hover:bg-[#ece8db]"
       >
         <Plus size={14} />
         商品を追加
@@ -462,7 +462,7 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">発注日</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">発注日</label>
           <input
             type="date"
             value={form.orderDate ?? ''}
@@ -471,7 +471,7 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">国</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">国</label>
           <select
             required
             value={form.country}
@@ -488,7 +488,7 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">納期</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">納期</label>
           <input
             type="date"
             value={form.dueDate}
@@ -497,7 +497,7 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">取引条件</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">取引条件</label>
           <select
             value={form.terms ?? ''}
             onChange={event => setForm(prev => ({ ...prev, terms: event.target.value }))}
@@ -514,7 +514,7 @@ export function SaleTermsSection({ form, setForm, masters }: FormProps & { maste
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">メモ</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">メモ</label>
         <textarea
           value={form.notes}
           onChange={event => setForm(prev => ({ ...prev, notes: event.target.value }))}
@@ -538,11 +538,11 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <label className="block text-sm font-medium text-gray-700">諸費用（包装代・手数料など・請求額に加算）</label>
+        <label className="block text-sm font-medium text-graphite">諸費用（包装代・手数料など・請求額に加算）</label>
         <button
           type="button"
           onClick={addFee}
-          className="inline-flex items-center gap-1 rounded-lg border border-[#d9d1be] bg-white px-3 py-1.5 text-xs font-medium text-[#174c33] transition hover:bg-[#ece8db]"
+          className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-matchaDeep transition hover:bg-[#ece8db]"
         >
           <Plus size={14} /> 諸費用を追加
         </button>
@@ -552,12 +552,12 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
       ) : (
         <div className="space-y-2">
           {feesList.map((fee, index) => (
-            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-[#faf8f2] p-3 md:grid-cols-[1.3fr,0.6fr,0.55fr,0.7fr,0.55fr,auto]">
+            <div key={index} className="grid gap-2 rounded-xl border border-[#e6dfcf] bg-bone p-3 md:grid-cols-[1.3fr,0.6fr,0.55fr,0.7fr,0.55fr,auto]">
               <input
                 type="text"
                 value={fee.name}
                 onChange={e => updateFee(index, { name: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                 placeholder="項目名（例: 包装代）"
               />
               <input
@@ -566,14 +566,14 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
                 step="0.1"
                 value={fee.quantity}
                 onChange={e => updateFee(index, { quantity: Number(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                 placeholder="数量"
               />
               <input
                 type="text"
                 value={fee.unit}
                 onChange={e => updateFee(index, { unit: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                 placeholder="単位"
               />
               <input
@@ -582,14 +582,14 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
                 step="1"
                 value={fee.unitPrice}
                 onChange={e => updateFee(index, { unitPrice: Number(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                 placeholder="単価"
               />
               <select
                 value={fee.taxRate}
                 onChange={e => updateFee(index, { taxRate: Number(e.target.value) as TaxRate })}
                 title="消費税区分"
-                className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-lg border border-line px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value={10}>10%</option>
                 <option value={8}>8%軽減</option>
@@ -598,7 +598,7 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
               <button
                 type="button"
                 onClick={() => removeFee(index)}
-                className="self-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-red-600"
+                className="self-center rounded-lg p-2 text-mist transition hover:bg-bone hover:text-alert"
                 aria-label="削除"
               >
                 <X size={16} />
@@ -614,37 +614,37 @@ export function SaleFeesSection({ form, setForm }: FormProps) {
 // readOnly: 詳細ページの「商品・金額」タブで使用。送料・支払手数料は表示のみ
 // （送料は発送タブ、支払手数料は請求・入金タブで編集）。作成モーダルでは編集可。
 export function SaleChargesSection({ form, setForm, derived, readOnly = false }: FormProps & { derived: SaleDerived; readOnly?: boolean }) {
-  const readOnlyBox = 'mt-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-[#173c2a]'
+  const readOnlyBox = 'mt-1 rounded-xl border border-line bg-bone px-3 py-2 text-sm text-ink'
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">費用・請求</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">費用・請求</p>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">送料{readOnly && '（発送タブで編集）'}</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">送料{readOnly && '（発送タブで編集）'}</label>
           {readOnly ? (
             <div className={readOnlyBox}>{formatCurrency(form.shippingFee ?? 0)}</div>
           ) : (
             <input type="number" min="0" step="1" value={form.shippingFee ?? 0}
               onChange={event => setForm(prev => ({ ...prev, shippingFee: Number(event.target.value) || 0 }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
           )}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">支払手数料（粗利から差引）{readOnly && '（請求・入金タブで編集）'}</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">支払手数料（粗利から差引）{readOnly && '（請求・入金タブで編集）'}</label>
           {readOnly ? (
             <div className={readOnlyBox}>{formatCurrency(form.paymentFee ?? 0)}</div>
           ) : (
             <input type="number" min="0" step="1" value={form.paymentFee ?? 0}
               onChange={event => setForm(prev => ({ ...prev, paymentFee: Number(event.target.value) || 0 }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
           )}
         </div>
         {!readOnly && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">支払い方法</label>
+            <label className="mb-1 block text-xs font-medium text-graphite">支払い方法</label>
             <select value={form.paymentMethod ?? ''}
               onChange={event => setForm(prev => ({ ...prev, paymentMethod: event.target.value || undefined }))}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600">
+              className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha">
               <option value="">未設定</option>
               {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
               {form.paymentMethod && !PAYMENT_METHODS.includes(form.paymentMethod as never) && (
@@ -654,13 +654,13 @@ export function SaleChargesSection({ form, setForm, derived, readOnly = false }:
           </div>
         )}
         <div className="md:col-span-2">
-          <p className="mb-1 text-xs font-medium text-gray-700">請求額（税込・自動）</p>
-          <p className="mt-1 rounded-xl border border-dashed border-[#d9d1be] bg-[#f7f5ee] px-3 py-2 text-base font-semibold text-[#173c2a]">
+          <p className="mb-1 text-xs font-medium text-graphite">請求額（税込・自動）</p>
+          <p className="mt-1 rounded-xl border border-dashed border-line bg-bone px-3 py-2 text-base font-semibold text-ink">
             {formatCurrency(derived.invoiceAmount + derived.taxTotal)}
-            <span className="ml-2 text-[11px] font-normal text-[#68756c]">税抜 {formatCurrency(derived.invoiceAmount)}</span>
+            <span className="ml-2 text-[11px] font-normal text-mist">税抜 {formatCurrency(derived.invoiceAmount)}</span>
           </p>
-          <p className="mt-1 text-[10px] text-[#68756c]">商品代金 + 送料{derived.feesTotal > 0 ? ' + 諸費用' : ''}</p>
-          <p className="mt-1 text-[10px] text-[#68756c]">消費税: 10%対象 {formatCurrency(derived.tax10)} / 8%対象 {formatCurrency(derived.tax8)} / 合計 {formatCurrency(derived.taxTotal)}</p>
+          <p className="mt-1 text-[10px] text-mist">商品代金 + 送料{derived.feesTotal > 0 ? ' + 諸費用' : ''}</p>
+          <p className="mt-1 text-[10px] text-mist">消費税: 10%対象 {formatCurrency(derived.tax10)} / 8%対象 {formatCurrency(derived.tax8)} / 合計 {formatCurrency(derived.taxTotal)}</p>
         </div>
       </div>
     </div>
@@ -669,11 +669,11 @@ export function SaleChargesSection({ form, setForm, derived, readOnly = false }:
 
 export function SalePaymentSection({ form, setForm }: FormProps) {
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">請求・入金</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">請求・入金</p>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">支払いステータス</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">支払いステータス</label>
           <select value={form.paymentStatus}
             onChange={e => setForm(p => ({ ...p, paymentStatus: e.target.value as PaymentStatus }))}
             className={fieldCls}>
@@ -683,7 +683,7 @@ export function SalePaymentSection({ form, setForm }: FormProps) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">支払い方法</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">支払い方法</label>
           <select value={form.paymentMethod ?? ''}
             onChange={e => setForm(p => ({ ...p, paymentMethod: e.target.value || undefined }))}
             className={fieldCls}>
@@ -695,17 +695,17 @@ export function SalePaymentSection({ form, setForm }: FormProps) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">支払期日</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">支払期日</label>
           <input type="date" value={form.dueDate ?? ''}
             onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} className={fieldCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">入金日</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">入金日</label>
           <input type="date" value={form.paymentDate ?? ''}
             onChange={e => setForm(p => ({ ...p, paymentDate: e.target.value }))} className={fieldCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">支払手数料（粗利から差引）</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">支払手数料（粗利から差引）</label>
           <input type="number" min="0" step="1" value={form.paymentFee ?? 0}
             onChange={e => setForm(p => ({ ...p, paymentFee: Number(e.target.value) || 0 }))} className={fieldCls} />
         </div>
@@ -716,11 +716,11 @@ export function SalePaymentSection({ form, setForm }: FormProps) {
 
 export function SaleShippingSection({ form, setForm, buyerShippingAddress, shippingMethods }: FormProps & { buyerShippingAddress?: string; shippingMethods?: MasterOption[] }) {
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-[#68756c]">発送</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-mist">発送</p>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">発送ステータス</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">発送ステータス</label>
           <select value={form.shippingStatus}
             onChange={e => setForm(p => ({ ...p, shippingStatus: e.target.value as ShippingStatus }))}
             className={fieldCls}>
@@ -730,12 +730,12 @@ export function SaleShippingSection({ form, setForm, buyerShippingAddress, shipp
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">送料</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">送料</label>
           <input type="number" min="0" step="1" value={form.shippingFee ?? 0}
             onChange={e => setForm(p => ({ ...p, shippingFee: Number(e.target.value) || 0 }))} className={fieldCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">発送方法</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">発送方法</label>
           {shippingMethods && shippingMethods.length > 0 ? (
             <select value={form.shippingMethod ?? ''} onChange={e => setForm(p => ({ ...p, shippingMethod: e.target.value }))} className={fieldCls}>
               <option value="">未設定</option>
@@ -750,31 +750,31 @@ export function SaleShippingSection({ form, setForm, buyerShippingAddress, shipp
           )}
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">発送日</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">発送日</label>
           <input type="date" value={form.shippingDate ?? ''}
             onChange={e => setForm(p => ({ ...p, shippingDate: e.target.value }))} className={fieldCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">追跡番号</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">追跡番号</label>
           <input value={form.trackingNumber ?? ''}
             onChange={e => setForm(p => ({ ...p, trackingNumber: e.target.value }))} className={fieldCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">郵便番号</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">郵便番号</label>
           <input value={form.shippingPostalCode ?? ''}
             onChange={e => setForm(p => ({ ...p, shippingPostalCode: e.target.value }))} className={fieldCls} placeholder="〒" />
         </div>
         <div className="md:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-gray-700">発送先</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">発送先</label>
           <textarea rows={2} value={form.shippingAddress ?? ''}
             onChange={e => setForm(p => ({ ...p, shippingAddress: e.target.value }))}
             className={fieldCls} placeholder={buyerShippingAddress || '住所'} />
         </div>
         <div className="md:col-span-2">
-          <label className="mb-1 block text-xs font-medium text-gray-700">発送担当者へのメモ</label>
+          <label className="mb-1 block text-xs font-medium text-graphite">発送担当者へのメモ</label>
           <textarea rows={2} value={form.shippingNote ?? ''}
             onChange={e => setForm(p => ({ ...p, shippingNote: e.target.value }))}
-            className="w-full rounded-xl border border-amber-300 bg-amber-50/40 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="w-full rounded-xl border border-[#a87b1e]/40 bg-bone/40 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             placeholder="例: ギフト包装、納品書同梱不可、冷蔵便 など（発送管理に表示されます）" />
         </div>
       </div>
@@ -784,38 +784,38 @@ export function SaleShippingSection({ form, setForm, buyerShippingAddress, shipp
 
 export function SaleSummarySection({ derived }: { derived: SaleDerived }) {
   return (
-    <div className="grid gap-3 rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4 md:grid-cols-6">
+    <div className="grid gap-3 rounded-2xl border border-line bg-bone p-4 md:grid-cols-6">
       <div>
-        <p className="text-xs text-[#68756c]">商品代金</p>
-        <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(derived.revenue)}</p>
+        <p className="text-xs text-mist">商品代金</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(derived.revenue)}</p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">原価</p>
-        <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(derived.costAmount)}</p>
+        <p className="text-xs text-mist">原価</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(derived.costAmount)}</p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">請求額（税込）</p>
-        <p className="mt-1 text-lg font-semibold text-[#173c2a]">{formatCurrency(derived.invoiceAmount + derived.taxTotal)}</p>
-        <p className="text-[10px] text-[#68756c]">税抜 {formatCurrency(derived.invoiceAmount)}</p>
+        <p className="text-xs text-mist">請求額（税込）</p>
+        <p className="mt-1 text-lg font-semibold text-ink">{formatCurrency(derived.invoiceAmount + derived.taxTotal)}</p>
+        <p className="text-[10px] text-mist">税抜 {formatCurrency(derived.invoiceAmount)}</p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">粗利</p>
-        <p className={`mt-1 text-lg font-semibold ${derived.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>{formatCurrency(derived.grossProfit)}</p>
+        <p className="text-xs text-mist">粗利</p>
+        <p className={`mt-1 text-lg font-semibold ${derived.grossProfit >= 0 ? 'text-matcha' : 'text-alert'}`}>{formatCurrency(derived.grossProfit)}</p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">粗利率</p>
-        <p className={`mt-1 text-lg font-semibold ${derived.grossProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+        <p className="text-xs text-mist">粗利率</p>
+        <p className={`mt-1 text-lg font-semibold ${derived.grossProfit >= 0 ? 'text-matcha' : 'text-alert'}`}>
           {derived.revenue > 0 ? `${((derived.grossProfit / derived.revenue) * 100).toFixed(1)}%` : '-'}
         </p>
       </div>
       <div>
-        <p className="text-xs text-[#68756c]">登録後の残在庫（最少）</p>
-        <p className={`mt-1 text-lg font-semibold ${derived.minRemaining < 0 ? 'text-red-700' : 'text-[#173c2a]'}`}>{formatKg(derived.minRemaining)}</p>
+        <p className="text-xs text-mist">登録後の残在庫（最少）</p>
+        <p className={`mt-1 text-lg font-semibold ${derived.minRemaining < 0 ? 'text-alert' : 'text-ink'}`}>{formatKg(derived.minRemaining)}</p>
         {derived.minRemaining < 0 && (
-          <p className="mt-1 text-[10px] font-medium text-red-700">在庫不足（マイナス）ですが登録できます。入荷後に解消されます。</p>
+          <p className="mt-1 text-[10px] font-medium text-alert">在庫不足（マイナス）ですが登録できます。入荷後に解消されます。</p>
         )}
         {derived.stockSummary.length > 1 && (
-          <p className="mt-1 text-[10px] text-[#68756c]">{derived.stockSummary.map(s => `${s.name}: ${s.remaining.toFixed(1)}kg`).join(' / ')}</p>
+          <p className="mt-1 text-[10px] text-mist">{derived.stockSummary.map(s => `${s.name}: ${s.remaining.toFixed(1)}kg`).join(' / ')}</p>
         )}
       </div>
     </div>

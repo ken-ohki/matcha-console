@@ -18,10 +18,10 @@ const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   shipped: '発送完了',
 }
 const SHIPPING_COLORS: Record<ShippingStatus, string> = {
-  ordering: 'bg-slate-100 text-slate-700',
-  producing: 'bg-blue-100 text-blue-800',
-  ready_to_ship: 'bg-amber-100 text-amber-800',
-  shipped: 'bg-emerald-100 text-emerald-800',
+  ordering: 'bg-bone text-graphite',
+  producing: 'bg-bone text-graphite',
+  ready_to_ship: 'bg-bone text-[#a87b1e]',
+  shipped: 'bg-bone text-matcha',
 }
 
 function ShippingBadge({ status }: { status: ShippingStatus }) {
@@ -154,8 +154,8 @@ export default function ShippingPage() {
             <Truck size={15} />
             発送管理
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">発送管理</h1>
-          <p className="mt-2 text-sm text-[#68756c]">
+          <h1 className="mt-3 text-3xl font-bold text-ink">発送管理</h1>
+          <p className="mt-2 text-sm text-mist">
             確定済みの販売案件の発送状況を管理できます。行をクリックすると発送内容の確認・編集ができます。
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function ShippingPage() {
               type="button"
               onClick={() => setView(key)}
               className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-                view === key ? 'border-[#174c33] text-[#174c33]' : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                view === key ? 'border-[#174c33] text-matchaDeep' : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {label}
@@ -184,7 +184,7 @@ export default function ShippingPage() {
           ))}
         </div>
 
-        <div className="rounded-3xl border border-[#d9d1be] bg-white p-4 shadow-sm">
+        <div className="rounded-3xl border border-line bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
             {view === 'list' && (
               <div className="flex flex-wrap gap-1.5">
@@ -202,8 +202,8 @@ export default function ShippingPage() {
                     onClick={() => setFilterChip(key as FilterChip)}
                     className={`rounded-full border px-2.5 py-1 text-xs transition ${
                       filterChip === key
-                        ? 'border-[#174c33] bg-[#174c33] text-white'
-                        : 'border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#f7f5ee]'
+                        ? 'border-[#174c33] bg-ink text-paper'
+                        : 'border-line bg-white text-ink hover:bg-bone'
                     }`}
                   >
                     {label}
@@ -218,7 +218,7 @@ export default function ShippingPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="販売先・商品・追跡番号・発送方法"
-                className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </div>
           </div>
@@ -227,7 +227,7 @@ export default function ShippingPage() {
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                  <tr className="border-b border-[#e6dfcf] text-left text-mist">
                     <th className="px-3 py-3 font-medium">ステータス</th>
                     <th className="px-3 py-3 font-medium">販売先 / 国</th>
                     <th className="px-3 py-3 font-medium">商品</th>
@@ -241,7 +241,7 @@ export default function ShippingPage() {
                 </thead>
                 <tbody>
                   {!loading && filtered.length === 0 && (
-                    <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-[#68756c]">該当する販売案件がありません。</td></tr>
+                    <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-mist">該当する販売案件がありません。</td></tr>
                   )}
                   {filtered.map(sale => {
                     const first = sale.items[0]
@@ -251,26 +251,26 @@ export default function ShippingPage() {
                       <tr
                         key={sale.id}
                         onClick={() => openDetail(sale.id)}
-                        className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-[#faf8f2]'}`}
+                        className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-alert/5/50 hover:bg-alert/5' : 'hover:bg-bone'}`}
                       >
                         <td className="whitespace-nowrap px-3 py-3"><ShippingBadge status={sale.shippingStatus} /></td>
                         <td className="px-3 py-3">
-                          <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
-                          <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                          <div className="font-medium text-ink">{sale.buyerName}</div>
+                          <div className="text-[11px] text-mist">{sale.country || '-'}</div>
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-medium">{first?.productName ?? '-'}</div>
-                          <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest} ／ {formatKg(sale.quantityKg)}</div>
+                          <div className="text-[11px] text-mist">{first?.productSku}{rest} ／ {formatKg(sale.quantityKg)}</div>
                         </td>
                         <td className="px-3 py-3">
                           {sale.shippingNote
-                            ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">メモ有</span>
-                            : <span className="text-[11px] text-[#a59f8c]">-</span>}
+                            ? <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">メモ有</span>
+                            : <span className="text-[11px] text-mist">-</span>}
                         </td>
-                        <td className={`whitespace-nowrap px-3 py-3 ${overdue ? 'font-medium text-red-700' : 'text-[#68756c]'}`}>{sale.dueDate || '-'}</td>
-                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-[#a59f8c]">-</span>}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingDate || '-'}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.trackingNumber || '-'}</td>
+                        <td className={`whitespace-nowrap px-3 py-3 ${overdue ? 'font-medium text-alert' : 'text-mist'}`}>{sale.dueDate || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-mist">-</span>}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.shippingDate || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.trackingNumber || '-'}</td>
                         <td className="px-3 py-3 text-right text-gray-400"><ChevronRight size={16} className="inline" /></td>
                       </tr>
                     )
@@ -283,16 +283,16 @@ export default function ShippingPage() {
           {view === 'history' && (
             <div className="mt-4 space-y-5">
               {!loading && historyGroups.length === 0 && (
-                <p className="py-10 text-center text-sm text-[#68756c]">発送完了の履歴がありません。</p>
+                <p className="py-10 text-center text-sm text-mist">発送完了の履歴がありません。</p>
               )}
               {historyGroups.map(group => (
                 <div key={group.key || '(none)'} className="overflow-hidden rounded-2xl border border-[#e6dfcf]">
-                  <div className="flex items-center justify-between bg-[#faf8f1] px-4 py-2.5">
-                    <span className="text-sm font-semibold text-[#173c2a]">{group.label}</span>
-                    <span className="text-xs text-[#68756c]">{group.items.length}件 ／ {formatKg(group.totalKg)}</span>
+                  <div className="flex items-center justify-between bg-bone px-4 py-2.5">
+                    <span className="text-sm font-semibold text-ink">{group.label}</span>
+                    <span className="text-xs text-mist">{group.items.length}件 ／ {formatKg(group.totalKg)}</span>
                   </div>
                   <table className="min-w-full text-sm">
-                    <thead className="text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                    <thead className="text-left text-[11px] uppercase tracking-wider text-mist">
                       <tr className="border-b border-[#f0ebdf]">
                         <th className="px-4 py-2 font-medium">発送日</th>
                         <th className="px-4 py-2 font-medium">販売先 / 国</th>
@@ -306,17 +306,17 @@ export default function ShippingPage() {
                         const first = sale.items[0]
                         const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
                         return (
-                          <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] last:border-b-0 transition hover:bg-[#faf8f2]">
-                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{sale.shippingDate || '-'}</td>
+                          <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] last:border-b-0 transition hover:bg-bone">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-mist">{sale.shippingDate || '-'}</td>
                             <td className="px-4 py-2.5">
-                              <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
-                              <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                              <div className="font-medium text-ink">{sale.buyerName}</div>
+                              <div className="text-[11px] text-mist">{sale.country || '-'}</div>
                             </td>
                             <td className="px-4 py-2.5">
                               <div>{first?.productName ?? '-'}{rest}</div>
-                              <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
+                              <div className="text-[11px] text-mist">{formatKg(sale.quantityKg)}</div>
                             </td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-[#68756c]">{sale.trackingNumber || '-'}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-mist">{sale.trackingNumber || '-'}</td>
                             <td className="px-4 py-2.5 text-right text-gray-400"><ChevronRight size={15} className="inline" /></td>
                           </tr>
                         )
@@ -332,7 +332,7 @@ export default function ShippingPage() {
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                  <tr className="border-b border-[#e6dfcf] text-left text-mist">
                     <th className="px-3 py-3 font-medium">添付日</th>
                     <th className="px-3 py-3 font-medium">販売先 / 国</th>
                     <th className="px-3 py-3 font-medium">商品</th>
@@ -344,24 +344,24 @@ export default function ShippingPage() {
                 </thead>
                 <tbody>
                   {!loading && slipList.length === 0 && (
-                    <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-[#68756c]">発送伝票が添付された案件がありません。</td></tr>
+                    <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-mist">発送伝票が添付された案件がありません。</td></tr>
                   )}
                   {slipList.map(sale => {
                     const first = sale.items[0]
                     const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
                     return (
-                      <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] transition hover:bg-[#faf8f2]">
-                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingSlip?.uploadedAt || '-'}</td>
+                      <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] transition hover:bg-bone">
+                        <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.shippingSlip?.uploadedAt || '-'}</td>
                         <td className="px-3 py-3">
-                          <div className="font-medium text-[#173c2a]">{sale.buyerName}</div>
-                          <div className="text-[11px] text-[#68756c]">{sale.country || '-'}</div>
+                          <div className="font-medium text-ink">{sale.buyerName}</div>
+                          <div className="text-[11px] text-mist">{sale.country || '-'}</div>
                         </td>
                         <td className="px-3 py-3">
                           <div>{first?.productName ?? '-'}{rest}</div>
-                          <div className="text-[11px] text-[#68756c]">{formatKg(sale.quantityKg)}</div>
+                          <div className="text-[11px] text-mist">{formatKg(sale.quantityKg)}</div>
                         </td>
-                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-[#a59f8c]">-</span>}</td>
-                        <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{sale.shippingDate || '-'}</td>
+                        <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-mist">-</span>}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.shippingDate || '-'}</td>
                         <td className="px-3 py-3">
                           {sale.shippingSlip && (
                             <a
@@ -369,7 +369,7 @@ export default function ShippingPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 rounded-lg bg-[#f7f5ee] px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+                              className="inline-flex items-center gap-1 rounded-lg bg-bone px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
                               title={sale.shippingSlip.name}
                             >
                               <FileText size={12} /> 開く
@@ -386,7 +386,7 @@ export default function ShippingPage() {
           )}
         </div>
 
-        <div className="text-xs text-[#68756c]">
+        <div className="text-xs text-mist">
           ※発送方法は「
           <Link href="/settings/masters" className="underline">設定 → マスター管理 → 発送方法</Link>
           」で登録できます。

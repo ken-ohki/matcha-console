@@ -148,12 +148,12 @@ export default function SettingsMastersPage() {
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-graphite">
             <Settings size={15} />
             設定
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">マスター管理</h1>
-          <p className="mt-2 text-sm text-[#68756c]">
+          <h1 className="mt-3 text-3xl font-bold text-ink">マスター管理</h1>
+          <p className="mt-2 text-sm text-mist">
             英語名（DB に保存される値）と日本語訳（管理画面の表示）を編集できます。カタログには英語名がそのまま使われます。
           </p>
         </div>
@@ -161,7 +161,7 @@ export default function SettingsMastersPage() {
         <div className="flex flex-wrap gap-2 text-sm">
           <Link
             href="/settings/masters"
-            className="rounded-full bg-[#174c33] px-3 py-1.5 text-white"
+            className="rounded-full bg-ink px-3 py-1.5 text-paper"
           >
             マスター管理
           </Link>
@@ -169,31 +169,31 @@ export default function SettingsMastersPage() {
             <>
               <Link
                 href="/settings/users"
-                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
               >
                 ユーザー管理
               </Link>
               <Link
                 href="/settings/terms"
-                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
               >
                 請求書 T&amp;C
               </Link>
               <Link
                 href="/settings/bank-accounts"
-                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
               >
                 入金口座
               </Link>
               <Link
                 href="/settings/issuer"
-                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
               >
                 自社情報
               </Link>
               <Link
                 href="/settings/wholesale"
-                className="rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]"
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
               >
                 卸売設定
               </Link>
@@ -201,8 +201,8 @@ export default function SettingsMastersPage() {
           )}
         </div>
 
-        <div className="overflow-x-auto rounded-3xl border border-[#d9d1be] bg-white shadow-sm">
-          <div className="flex min-w-max border-b border-gray-200">
+        <div className="overflow-x-auto rounded-3xl border border-line bg-white shadow-sm">
+          <div className="flex min-w-max border-b border-line">
             {TYPE_TABS.map(tab => (
               <button
                 key={tab.type}
@@ -210,8 +210,8 @@ export default function SettingsMastersPage() {
                 onClick={() => setActiveType(tab.type)}
                 className={`flex shrink-0 items-center gap-2 border-b-2 px-5 py-3 text-sm font-medium -mb-px transition-colors ${
                   activeType === tab.type
-                    ? 'border-[#174c33] text-[#174c33]'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    ? 'border-[#174c33] text-matchaDeep'
+                    : 'border-transparent text-mist hover:border-line hover:text-graphite'
                 }`}
               >
                 {tab.label}
@@ -223,10 +223,10 @@ export default function SettingsMastersPage() {
           <div className="p-5">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-[#173c2a]">
+                <h2 className="text-lg font-semibold text-ink">
                   {TYPE_TABS.find(t => t.type === activeType)?.label}
                 </h2>
-                <p className="text-xs text-[#68756c]">
+                <p className="text-xs text-mist">
                   {TYPE_TABS.find(t => t.type === activeType)?.description}
                 </p>
               </div>
@@ -234,7 +234,7 @@ export default function SettingsMastersPage() {
                 <button
                   type="button"
                   onClick={handleAddRow}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#d9d1be] bg-white px-3 py-1.5 text-sm font-medium text-[#174c33] transition hover:bg-[#eef3eb]"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-1.5 text-sm font-medium text-matchaDeep transition hover:bg-[#eef3eb]"
                 >
                   <Plus size={14} />
                   追加
@@ -243,12 +243,12 @@ export default function SettingsMastersPage() {
             </div>
 
             {loading ? (
-              <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
+              <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
             ) : drafts.length === 0 ? (
-              <p className="py-10 text-center text-sm text-[#68756c]">登録されていません。</p>
+              <p className="py-10 text-center text-sm text-mist">登録されていません。</p>
             ) : (
               <div className="space-y-2">
-                <div className="hidden grid-cols-[1fr_1fr_60px_60px] gap-3 px-3 text-[11px] uppercase tracking-wider text-[#68756c] md:grid">
+                <div className="hidden grid-cols-[1fr_1fr_60px_60px] gap-3 px-3 text-[11px] uppercase tracking-wider text-mist md:grid">
                   <span>英語名（DB に保存）</span>
                   <span>日本語名（表示）</span>
                   <span className="text-center">並び順</span>
@@ -258,7 +258,7 @@ export default function SettingsMastersPage() {
                   <div
                     key={row.id ?? `new-${index}`}
                     className={`grid grid-cols-1 gap-2 rounded-xl border px-3 py-2 md:grid-cols-[1fr_1fr_60px_60px] md:items-center ${
-                      row.dirty ? 'border-amber-300 bg-amber-50/50' : 'border-[#e6dfcf] bg-white'
+                      row.dirty ? 'border-[#a87b1e]/40 bg-bone/50' : 'border-[#e6dfcf] bg-white'
                     }`}
                   >
                     <input
@@ -267,7 +267,7 @@ export default function SettingsMastersPage() {
                       onChange={e => handleUpdateField(index, 'englishName', e.target.value)}
                       placeholder="例: Yabukita"
                       disabled={!isAdmin}
-                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-gray-50"
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha disabled:bg-bone"
                     />
                     <input
                       type="text"
@@ -275,15 +275,15 @@ export default function SettingsMastersPage() {
                       onChange={e => handleUpdateField(index, 'japaneseName', e.target.value)}
                       placeholder="例: やぶきた"
                       disabled={!isAdmin}
-                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:bg-gray-50"
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha disabled:bg-bone"
                     />
-                    <span className="text-center text-xs text-gray-500">{index + 1}</span>
+                    <span className="text-center text-xs text-mist">{index + 1}</span>
                     {isAdmin && (
                       <button
                         type="button"
                         onClick={() => handleRemove(index)}
                         aria-label="削除"
-                        className="justify-self-center rounded-lg p-1.5 text-red-500 transition hover:bg-red-50"
+                        className="justify-self-center rounded-lg p-1.5 text-alert transition hover:bg-alert/5"
                       >
                         {row.id === null ? <X size={16} /> : <Trash2 size={16} />}
                       </button>
@@ -296,7 +296,7 @@ export default function SettingsMastersPage() {
             {isAdmin && (
               <div className="mt-5 flex items-center justify-between">
                 {feedback && (
-                  <p className={`text-sm ${feedback.tone === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
+                  <p className={`text-sm ${feedback.tone === 'success' ? 'text-matcha' : 'text-alert'}`}>
                     {feedback.message}
                   </p>
                 )}
@@ -304,7 +304,7 @@ export default function SettingsMastersPage() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="ml-auto inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+                  className="ml-auto inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
                 >
                   <Save size={14} />
                   {saving ? '保存中…' : '変更を保存'}

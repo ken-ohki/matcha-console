@@ -87,25 +87,25 @@ export default function SettingsWholesalePage() {
   if (!isAdmin) {
     return (
       <AppLayout>
-        <div className="rounded-2xl border border-dashed border-[#d9d1be] bg-white p-10 text-center text-sm text-[#68756c]">
+        <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center text-sm text-mist">
           このページは管理者のみアクセスできます。
         </div>
       </AppLayout>
     )
   }
 
-  const tabCls = 'rounded-full border border-[#d9d1be] bg-white px-3 py-1.5 text-[#173c2a] transition hover:bg-[#ece8db]'
+  const tabCls = 'rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]'
 
   return (
     <AppLayout>
       <div className="space-y-6">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-graphite">
             <SettingsIcon size={15} />
             設定
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">卸売設定</h1>
-          <p className="mt-2 text-sm text-[#68756c]">
+          <h1 className="mt-3 text-3xl font-bold text-ink">卸売設定</h1>
+          <p className="mt-2 text-sm text-mist">
             卸売サイト(wholesale.sabo-matcha.jp)のセルフ決済しきい値を全商品共通で設定します。この数量以上の注文はセルフ決済せず、問い合わせに誘導されます。
           </p>
         </div>
@@ -116,73 +116,73 @@ export default function SettingsWholesalePage() {
           <Link href="/settings/terms" className={tabCls}>請求書 T&amp;C</Link>
           <Link href="/settings/bank-accounts" className={tabCls}>入金口座</Link>
           <Link href="/settings/issuer" className={tabCls}>自社情報</Link>
-          <Link href="/settings/wholesale" className="rounded-full bg-[#174c33] px-3 py-1.5 text-white">卸売設定</Link>
+          <Link href="/settings/wholesale" className="rounded-full bg-ink px-3 py-1.5 text-paper">卸売設定</Link>
         </div>
 
         {feedback && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
             feedback.tone === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : 'border-red-200 bg-red-50 text-red-700'
+              ? 'border-matcha/40 bg-bone text-matcha'
+              : 'border-alert/40 bg-alert/5 text-alert'
           }`}>
             {feedback.message}
           </div>
         )}
 
         {loading ? (
-          <p className="py-10 text-center text-sm text-[#68756c]">読み込み中…</p>
+          <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
         ) : (
-          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="max-w-xs">
-                <label className="mb-1 block text-sm font-medium text-[#173c2a]">セルフ決済しきい値 (kg)</label>
+                <label className="mb-1 block text-sm font-medium text-ink">セルフ決済しきい値 (kg)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.1"
                   value={threshold}
                   onChange={e => setThreshold(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                   placeholder={String(DEFAULT_THRESHOLD)}
                 />
-                <p className="mt-1 text-[11px] text-[#68756c]">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
+                <p className="mt-1 text-[11px] text-mist">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
               </div>
               <div className="max-w-xs">
-                <label className="mb-1 block text-sm font-medium text-[#173c2a]">サンプル手数料 (円・税抜)</label>
+                <label className="mb-1 block text-sm font-medium text-ink">サンプル手数料 (円・税抜)</label>
                 <input
                   type="number"
                   min="0"
                   step="1"
                   value={sampleFee}
                   onChange={e => setSampleFee(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                   placeholder="100"
                 />
-                <p className="mt-1 text-[11px] text-[#68756c]">サンプル価格 ＝ 卸売単価 × 0.01（10g相当）＋ この手数料。全商品共通（初期値 100円）。</p>
+                <p className="mt-1 text-[11px] text-mist">サンプル価格 ＝ 卸売単価 × 0.01（10g相当）＋ この手数料。全商品共通（初期値 100円）。</p>
               </div>
             </div>
           </div>
         )}
 
         {!loading && (
-          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold text-[#173c2a]">顧客ランク別 割引率（%）</h2>
-              <p className="mt-1 text-[11px] text-[#68756c]">会員の顧客ランクに応じて卸売商品価格に適用される割引率です（サンプル・小分け・送料は対象外）。ランクは各顧客ページで設定します。</p>
+              <h2 className="text-sm font-semibold text-ink">顧客ランク別 割引率（%）</h2>
+              <p className="mt-1 text-[11px] text-mist">会員の顧客ランクに応じて卸売商品価格に適用される割引率です（サンプル・小分け・送料は対象外）。ランクは各顧客ページで設定します。</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
               {(['standard', 'premium', 'exclusive'] as const).map(rk => (
                 <div key={rk}>
-                  <label className="mb-1 block text-sm font-medium capitalize text-[#173c2a]">{rk}</label>
+                  <label className="mb-1 block text-sm font-medium capitalize text-ink">{rk}</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number" min="0" max="100" step="1"
                       value={rankDiscounts[rk] || ''}
                       onChange={e => setRankDiscounts(prev => ({ ...prev, [rk]: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }))}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       placeholder="0"
                     />
-                    <span className="text-sm text-[#68756c]">%</span>
+                    <span className="text-sm text-mist">%</span>
                   </div>
                 </div>
               ))}
@@ -191,30 +191,30 @@ export default function SettingsWholesalePage() {
         )}
 
         {!loading && (
-          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-[#173c2a]">国内発送 重量別送料（税抜・全国一律）</h2>
-                <p className="mt-1 text-[11px] text-[#68756c]">
+                <h2 className="text-sm font-semibold text-ink">国内発送 重量別送料（税抜・全国一律）</h2>
+                <p className="mt-1 text-[11px] text-mist">
                   注文重量（kg）が「上限kg」以下のとき、その送料を自動適用します。最大の上限を超える注文は最も上の段の送料を適用するため、十分大きな段を用意してください。海外発送は注文ごとに手動見積です。
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setTiers(prev => [...prev, { uptoKg: 0, feeJpy: 0 }])}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-1.5 text-sm text-[#173c2a] hover:bg-[#f4f2ea]"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line px-3 py-1.5 text-sm text-ink hover:bg-bone"
               >
                 <Plus size={14} /> 段を追加
               </button>
             </div>
 
             {tiers.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-6 text-center text-sm text-[#a59f8c]">
+              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">
                 送料段がありません。「段を追加」で重量階段を作成してください。
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 text-[11px] text-[#a59f8c]">
+                <div className="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 text-[11px] text-mist">
                   <span>上限重量 (kg 以下)</span>
                   <span>送料 (円・税抜)</span>
                   <span />
@@ -224,19 +224,19 @@ export default function SettingsWholesalePage() {
                     <input
                       type="number" min="0" step="0.1" value={t.uptoKg || ''}
                       onChange={e => setTiers(prev => prev.map((x, j) => (j === i ? { ...x, uptoKg: Number(e.target.value) } : x)))}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       placeholder="例: 5"
                     />
                     <input
                       type="number" min="0" step="1" value={t.feeJpy || ''}
                       onChange={e => setTiers(prev => prev.map((x, j) => (j === i ? { ...x, feeJpy: Number(e.target.value) } : x)))}
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                      className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                       placeholder="例: 800"
                     />
                     <button
                       type="button"
                       onClick={() => setTiers(prev => prev.filter((_, j) => j !== i))}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-alert hover:bg-bone"
                       aria-label="削除"
                     >
                       <Trash2 size={14} />
@@ -249,51 +249,51 @@ export default function SettingsWholesalePage() {
         )}
 
         {!loading && (
-          <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+          <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-[#173c2a]">注文オプション（小分けサービス等）</h2>
-                <p className="mt-1 text-[11px] text-[#68756c]">
+                <h2 className="text-sm font-semibold text-ink">注文オプション（小分けサービス等）</h2>
+                <p className="mt-1 text-[11px] text-mist">
                   卸売サイトで選べる注文オプションを定義します。小分けは「袋数 × 1袋単価」で課金（注文重量 ÷ 内容量＝袋数）。商品ごとの有効化は各商品の編集画面で行います。
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOptions(prev => [...prev, { id: uid(), type: 'repackage', name: '小分けサービス', unitLabel: '袋', active: true, tiers: [] }])}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-1.5 text-sm text-[#173c2a] hover:bg-[#f4f2ea]"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line px-3 py-1.5 text-sm text-ink hover:bg-bone"
               >
                 <Plus size={14} /> オプションを追加
               </button>
             </div>
 
             {options.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-6 text-center text-sm text-[#a59f8c]">
+              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">
                 オプションがありません。「オプションを追加」で小分けサービスを作成してください。
               </p>
             ) : (
               <div className="space-y-4">
                 {options.map((o, oi) => (
-                  <div key={o.id} className="rounded-2xl border border-[#e7e1d2] p-4">
+                  <div key={o.id} className="rounded-2xl border border-line p-4">
                     <div className="flex flex-wrap items-end gap-3">
                       <label className="flex-1 min-w-[160px]">
-                        <span className="mb-1 block text-[11px] text-[#a59f8c]">オプション名</span>
+                        <span className="mb-1 block text-[11px] text-mist">オプション名</span>
                         <input
                           value={o.name}
                           onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, name: e.target.value } : x)))}
-                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                           placeholder="小分けサービス"
                         />
                       </label>
                       <label className="w-24">
-                        <span className="mb-1 block text-[11px] text-[#a59f8c]">数量単位</span>
+                        <span className="mb-1 block text-[11px] text-mist">数量単位</span>
                         <input
                           value={o.unitLabel ?? ''}
                           onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, unitLabel: e.target.value } : x)))}
-                          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                          className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                           placeholder="袋"
                         />
                       </label>
-                      <label className="flex items-center gap-2 pb-2 text-sm text-[#173c2a]">
+                      <label className="flex items-center gap-2 pb-2 text-sm text-ink">
                         <input
                           type="checkbox"
                           checked={o.active}
@@ -305,29 +305,29 @@ export default function SettingsWholesalePage() {
                       <button
                         type="button"
                         onClick={() => setOptions(prev => prev.filter((_, j) => j !== oi))}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-alert hover:bg-bone"
                         aria-label="オプション削除"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
 
-                    <div className="mt-3 border-t border-[#f0ece0] pt-3">
+                    <div className="mt-3 border-t border-line pt-3">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-medium text-[#68756c]">小分けサイズ</span>
+                        <span className="text-[11px] font-medium text-mist">小分けサイズ</span>
                         <button
                           type="button"
                           onClick={() => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: [...x.tiers, { id: uid(), label: '', portionKg: 0, pricePerBagJpy: 0 }] } : x)))}
-                          className="inline-flex items-center gap-1 text-xs text-[#174c33] hover:underline"
+                          className="inline-flex items-center gap-1 text-xs text-matchaDeep hover:underline"
                         >
                           <Plus size={12} /> サイズを追加
                         </button>
                       </div>
                       {o.tiers.length === 0 ? (
-                        <p className="text-[11px] text-[#a59f8c]">サイズが未設定です。「サイズを追加」で 1kg・100g 等を作成してください。</p>
+                        <p className="text-[11px] text-mist">サイズが未設定です。「サイズを追加」で 1kg・100g 等を作成してください。</p>
                       ) : (
                         <div className="space-y-2">
-                          <div className="grid grid-cols-[1fr_1fr_1fr_36px] gap-2 px-1 text-[10px] text-[#a59f8c]">
+                          <div className="grid grid-cols-[1fr_1fr_1fr_36px] gap-2 px-1 text-[10px] text-mist">
                             <span>表示名（例: 100g）</span>
                             <span>内容量 (kg/袋)</span>
                             <span>単価 (円/袋・税抜)</span>
@@ -338,25 +338,25 @@ export default function SettingsWholesalePage() {
                               <input
                                 value={t.label}
                                 onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, label: e.target.value } : y)) } : x)))}
-                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                                 placeholder="100g"
                               />
                               <input
                                 type="number" min="0" step="0.01" value={t.portionKg || ''}
                                 onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, portionKg: Number(e.target.value) } : y)) } : x)))}
-                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                                 placeholder="0.1"
                               />
                               <input
                                 type="number" min="0" step="1" value={t.pricePerBagJpy || ''}
                                 onChange={e => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.map((y, k) => (k === ti ? { ...y, pricePerBagJpy: Number(e.target.value) } : y)) } : x)))}
-                                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                                className="w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                                 placeholder="150"
                               />
                               <button
                                 type="button"
                                 onClick={() => setOptions(prev => prev.map((x, j) => (j === oi ? { ...x, tiers: x.tiers.filter((_, k) => k !== ti) } : x)))}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#d9d1be] text-[#9d3d28] hover:bg-[#fff0ec]"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-alert hover:bg-bone"
                                 aria-label="サイズ削除"
                               >
                                 <Trash2 size={13} />
@@ -378,7 +378,7 @@ export default function SettingsWholesalePage() {
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
           >
             <Save size={14} />
             {saving ? '保存中…' : '変更を保存'}

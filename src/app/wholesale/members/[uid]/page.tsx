@@ -146,57 +146,57 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
   return (
     <AppLayout>
       <div className="mx-auto max-w-5xl">
-        <Link href="/wholesale/members" className="mb-4 inline-flex items-center gap-1 text-sm text-[#68756c] hover:text-[#173c2a]">
+        <Link href="/wholesale/members" className="mb-4 inline-flex items-center gap-1 text-sm text-mist hover:text-ink">
           <ArrowLeft size={15} /> 会員一覧へ戻る
         </Link>
 
-        {error && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}
-        {loading && <p className="text-sm text-[#68756c]">読み込み中…</p>}
+        {error && <p className="mb-4 rounded-lg border border-alert/40 bg-alert/5 px-4 py-2 text-sm text-alert">{error}</p>}
+        {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
         {member && (
           <>
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-[#173c2a]">{member.companyName ?? '(社名未設定)'}</h1>
-                  <span className="rounded-full bg-[#eff8f0] px-2.5 py-0.5 text-xs text-[#174c33]">{STATUS_LABEL[member.status ?? ''] ?? member.status}</span>
+                  <h1 className="text-2xl font-bold text-ink">{member.companyName ?? '(社名未設定)'}</h1>
+                  <span className="rounded-full bg-[#eff8f0] px-2.5 py-0.5 text-xs text-matchaDeep">{STATUS_LABEL[member.status ?? ''] ?? member.status}</span>
                 </div>
-                <p className="mt-1 text-sm text-[#68756c]">{member.contactName} · {member.email}</p>
-                <p className="text-xs text-[#a59f8c]">登録日: {fmtDate(member.createdAtMs)}</p>
+                <p className="mt-1 text-sm text-mist">{member.contactName} · {member.email}</p>
+                <p className="text-xs text-mist">登録日: {fmtDate(member.createdAtMs)}</p>
               </div>
               <div className={`flex shrink-0 items-center gap-2 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
-                <button onClick={load} className="flex items-center gap-1 rounded-xl border border-[#d9d1be] px-3 py-2 text-sm text-[#173c2a] hover:bg-[#f4f2ea]">
+                <button onClick={load} className="flex items-center gap-1 rounded-xl border border-line px-3 py-2 text-sm text-ink hover:bg-bone">
                   <RefreshCw size={15} /> 更新
                 </button>
                 {member.status === 'pending' && (
                   <>
-                    <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-[#174c33] px-3 py-1.5 text-sm text-white hover:opacity-90"><Check size={14} /> 承認</button>
-                    <button onClick={() => act('reject')} className="flex items-center gap-1 rounded-lg border border-[#d9d1be] px-3 py-1.5 text-sm text-[#9d3d28] hover:bg-[#fff0ec]"><X size={14} /> 却下</button>
+                    <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-sm text-paper hover:opacity-90"><Check size={14} /> 承認</button>
+                    <button onClick={() => act('reject')} className="flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm text-alert hover:bg-bone"><X size={14} /> 却下</button>
                   </>
                 )}
                 {member.status === 'approved' && (
-                  <button onClick={() => act('suspend')} className="flex items-center gap-1 rounded-lg border border-[#d9d1be] px-3 py-1.5 text-sm text-[#8d5b08] hover:bg-[#fff6e5]"><Ban size={14} /> 停止</button>
+                  <button onClick={() => act('suspend')} className="flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm text-[#a87b1e] hover:bg-bone"><Ban size={14} /> 停止</button>
                 )}
                 {(member.status === 'suspended' || member.status === 'rejected') && (
-                  <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-[#174c33] px-3 py-1.5 text-sm text-white hover:opacity-90"><Check size={14} /> 承認</button>
+                  <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-sm text-paper hover:opacity-90"><Check size={14} /> 承認</button>
                 )}
               </div>
             </div>
 
             {/* Rank */}
-            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#d9d1be] bg-white p-4">
-              <span className="text-sm font-medium text-[#173c2a]">顧客ランク</span>
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-white p-4">
+              <span className="text-sm font-medium text-ink">顧客ランク</span>
               <select
                 value={member.rank ?? 'standard'}
                 onChange={e => setRank(e.target.value)}
                 disabled={busy}
-                className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-60"
+                className="rounded-xl border border-line px-3 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-matcha disabled:opacity-60"
               >
                 {RANKS.map(r => (
                   <option key={r} value={r}>{r}</option>
                 ))}
               </select>
-              <span className="text-[11px] text-[#68756c]">割引率は「設定 → 卸売設定」で定義します。</span>
+              <span className="text-[11px] text-mist">割引率は「設定 → 卸売設定」で定義します。</span>
             </div>
 
             {/* Summary stats */}
@@ -207,8 +207,8 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
             </div>
 
             {/* Customer info */}
-            <section className="mb-8 rounded-2xl border border-[#d9d1be] bg-white p-5">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#68756c]">顧客情報</h2>
+            <section className="mb-8 rounded-2xl border border-line bg-white p-5">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mist">顧客情報</h2>
               <dl className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
                 <Field label="会社名 / 屋号" value={member.companyName} />
                 <Field label="ご担当者名" value={member.contactName} />
@@ -228,15 +228,15 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
             </section>
 
             {/* Purchase history */}
-            <section className="rounded-2xl border border-[#d9d1be] bg-white p-5">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#68756c]">購入履歴 ({orders.length})</h2>
+            <section className="rounded-2xl border border-line bg-white p-5">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mist">購入履歴 ({orders.length})</h2>
               {orders.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-[#d9d1be] px-4 py-6 text-center text-sm text-[#a59f8c]">購入履歴はありません。</p>
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">購入履歴はありません。</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-sm">
                     <thead>
-                      <tr className="border-b border-[#e7e1d2] text-left text-xs text-[#a59f8c]">
+                      <tr className="border-b border-line text-left text-xs text-mist">
                         <th className="py-2 pr-3 font-medium">注文番号</th>
                         <th className="py-2 pr-3 font-medium">日付</th>
                         <th className="py-2 pr-3 font-medium">明細</th>
@@ -247,19 +247,19 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                     </thead>
                     <tbody>
                       {orders.map(o => (
-                        <tr key={o.id} className="border-b border-[#f0ece0]">
-                          <td className="py-2.5 pr-3 font-mono text-[#173c2a]">{o.orderNumber ?? o.id}</td>
-                          <td className="py-2.5 pr-3 text-[#68756c]">{fmtDate(o.createdAtMs)}</td>
-                          <td className="py-2.5 pr-3 text-[#68756c]">
+                        <tr key={o.id} className="border-b border-line">
+                          <td className="py-2.5 pr-3 font-mono text-ink">{o.orderNumber ?? o.id}</td>
+                          <td className="py-2.5 pr-3 text-mist">{fmtDate(o.createdAtMs)}</td>
+                          <td className="py-2.5 pr-3 text-mist">
                             {(o.items ?? [])
                               .map(i => `${i.productName ?? ''}${i.kind === 'sample' ? `(試供${(i.sampleUnits ?? 0) * 10}g)` : ` ×${i.quantityKg ?? 0}kg`}`)
                               .join(' / ') || '—'}
                           </td>
                           <td className="py-2.5 pr-3">
-                            <span className="rounded-full bg-[#f4f2ea] px-2 py-0.5 text-xs text-[#173c2a]">{ORDER_STATUS_LABEL[o.status ?? ''] ?? o.status}</span>
+                            <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-ink">{ORDER_STATUS_LABEL[o.status ?? ''] ?? o.status}</span>
                           </td>
-                          <td className="py-2.5 pr-3 text-[#68756c]">{o.paymentMethod === 'bank_transfer' ? '銀行振込' : 'カード'}</td>
-                          <td className="py-2.5 pr-3 text-right font-semibold text-[#173c2a]">¥{(o.totalJpy ?? 0).toLocaleString()}</td>
+                          <td className="py-2.5 pr-3 text-mist">{o.paymentMethod === 'bank_transfer' ? '銀行振込' : 'カード'}</td>
+                          <td className="py-2.5 pr-3 text-right font-semibold text-ink">¥{(o.totalJpy ?? 0).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -276,18 +276,18 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
 
 function Stat({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-white p-4">
-      <p className="text-xs text-[#a59f8c]">{label}</p>
-      <p className={`mt-1 text-lg font-semibold text-[#173c2a] ${mono ? 'font-mono text-sm' : ''}`}>{value}</p>
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="text-xs text-mist">{label}</p>
+      <p className={`mt-1 text-lg font-semibold text-ink ${mono ? 'font-mono text-sm' : ''}`}>{value}</p>
     </div>
   )
 }
 
 function Field({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-[#f0ece0] py-1.5">
-      <dt className="shrink-0 text-xs text-[#a59f8c]">{label}</dt>
-      <dd className="text-right text-sm text-[#173c2a]">{value || '—'}</dd>
+    <div className="flex justify-between gap-4 border-b border-line py-1.5">
+      <dt className="shrink-0 text-xs text-mist">{label}</dt>
+      <dd className="text-right text-sm text-ink">{value || '—'}</dd>
     </div>
   )
 }

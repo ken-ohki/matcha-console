@@ -1,6 +1,11 @@
 import type { Metadata } from 'next'
+import { Inter, Noto_Sans_JP, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const notoSansJp = Noto_Sans_JP({ subsets: ['latin'], variable: '--font-noto-sans-jp', display: 'swap' })
+const plexMono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-mono', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'Matcha Console',
@@ -9,8 +14,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja">
-      <body className="antialiased">
+    <html lang="ja" className={`${inter.variable} ${notoSansJp.variable} ${plexMono.variable}`}>
+      <body className="font-jp bg-canvas text-ink antialiased">
         <AuthProvider>
           {children}
         </AuthProvider>

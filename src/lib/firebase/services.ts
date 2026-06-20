@@ -2021,7 +2021,7 @@ export function createFirebaseServices(): IServices {
 
     async updateEcSaleRecord(id, input) {
       const snap = await getDoc(doc(db, COLLECTIONS.ecSales, id))
-      if (!snap.exists()) throw new Error('EC販売の記録が見つかりません')
+      if (!snap.exists()) throw new Error('Shopify販売の記録が見つかりません')
       const current = mapEcSale(snap.id, snap.data() ?? {})
 
       const merged: EcSaleRecordInput = {

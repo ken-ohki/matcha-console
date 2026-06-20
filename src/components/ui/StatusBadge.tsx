@@ -7,9 +7,9 @@ const stockLabels: Record<StockStatus, string> = {
 }
 
 const stockColors: Record<StockStatus, string> = {
-  normal: 'bg-green-100 text-green-800',
-  low: 'bg-amber-100 text-amber-800',
-  out: 'bg-red-100 text-red-800',
+  normal: 'bg-bone text-matcha',
+  low: 'bg-bone text-[#a87b1e]',
+  out: 'bg-alert/10 text-alert',
 }
 
 export function StockStatusBadge({ status }: { status: StockStatus }) {
@@ -27,9 +27,9 @@ const salesLabels: Record<SaleStatus, string> = {
 }
 
 const salesColors: Record<SaleStatus, string> = {
-  negotiating: 'bg-amber-100 text-amber-800',
-  confirmed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-slate-100 text-slate-600',
+  negotiating: 'bg-bone text-[#a87b1e]',
+  confirmed: 'bg-bone text-matcha',
+  cancelled: 'bg-bone text-graphite',
 }
 
 export function SalesStatusBadge({ status }: { status: SaleStatus }) {

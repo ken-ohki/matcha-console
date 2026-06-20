@@ -137,13 +137,13 @@ export default function PurchaseOrderDocumentPage() {
   const issuerInfo = useMemo(() => effectiveIssuer(issuer), [issuer])
 
   if (loading) {
-    return <div className="min-h-screen bg-[#f4f2ea] p-8 text-center text-sm text-[#68756c]">読み込み中…</div>
+    return <div className="min-h-screen bg-bone p-8 text-center text-sm text-mist">読み込み中…</div>
   }
   if (error || !order || !doc) {
     return (
-      <div className="min-h-screen bg-[#f4f2ea] p-8">
-        <p className="text-sm text-red-600">{error || 'ドキュメントを生成できません'}</p>
-        <button type="button" onClick={() => router.back()} className="mt-4 underline text-sm text-[#174c33]">戻る</button>
+      <div className="min-h-screen bg-bone p-8">
+        <p className="text-sm text-alert">{error || 'ドキュメントを生成できません'}</p>
+        <button type="button" onClick={() => router.back()} className="mt-4 underline text-sm text-matchaDeep">戻る</button>
       </div>
     )
   }
@@ -162,17 +162,17 @@ export default function PurchaseOrderDocumentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f2ea]">
-      <div className="no-print sticky top-0 z-20 border-b border-[#d9d1be] bg-white shadow-sm">
+    <div className="min-h-screen bg-bone">
+      <div className="no-print sticky top-0 z-20 border-b border-line bg-white shadow-sm">
         <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3">
-          <Link href="/purchase-orders" className="inline-flex items-center gap-1 text-sm text-[#68756c] hover:text-[#173c2a]">
+          <Link href="/purchase-orders" className="inline-flex items-center gap-1 text-sm text-mist hover:text-ink">
             <ArrowLeft size={14} />
             発注管理に戻る
           </Link>
           <button
             type="button"
             onClick={() => window.print()}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-[#174c33] px-3 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43]"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43]"
           >
             <Printer size={14} />
             印刷 / PDF
@@ -181,20 +181,20 @@ export default function PurchaseOrderDocumentPage() {
       </div>
 
       <main className="mx-auto max-w-4xl px-4 py-6 print:p-0 print:max-w-none">
-        <div className="rounded-lg border border-gray-300 bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none">
-          <h1 className="text-center text-3xl font-semibold tracking-[0.4em] text-[#173c2a]">発　注　書</h1>
+        <div className="rounded-lg border border-line bg-white p-8 shadow-sm print:border-0 print:shadow-none print:rounded-none">
+          <h1 className="text-center text-3xl font-semibold tracking-[0.4em] text-ink">発　注　書</h1>
 
           <div className="mt-8 grid grid-cols-[1fr_auto] gap-8">
             <div>
-              <div className="flex items-baseline gap-2 border-b-2 border-[#173c2a] pb-1">
+              <div className="flex items-baseline gap-2 border-b-2 border-ink pb-1">
                 <EditableInput
-                  className="flex-1 text-xl font-medium text-[#173c2a]"
+                  className="flex-1 text-xl font-medium text-ink"
                   value={doc.recipientName}
                   onChange={v => updateField('recipientName', v)}
                   placeholder="仕入先名"
                 />
                 <EditableInput
-                  className="w-16 text-base font-medium text-[#173c2a]"
+                  className="w-16 text-base font-medium text-ink"
                   value={doc.recipientHonorific}
                   onChange={v => updateField('recipientHonorific', v)}
                 />
@@ -204,20 +204,20 @@ export default function PurchaseOrderDocumentPage() {
                 value={doc.recipientAddress}
                 onChange={e => updateField('recipientAddress', e.target.value)}
                 placeholder="〒住所"
-                className="mt-3 w-full resize-none bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
+                className="mt-3 w-full resize-none bg-transparent border-0 outline-none focus:bg-bone text-xs text-mist"
               />
               <input
                 type="text"
                 value={doc.recipientContact}
                 onChange={e => updateField('recipientContact', e.target.value)}
                 placeholder="ご担当 / TEL / Email"
-                className="w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-xs text-[#68756c]"
+                className="w-full bg-transparent border-0 outline-none focus:bg-bone text-xs text-mist"
               />
               <p className="mt-6 text-sm">下記の通り発注いたします。</p>
             </div>
             <div className="text-sm space-y-1">
               <div className="flex gap-2 justify-end">
-                <span className="text-[#68756c]">発行日：</span>
+                <span className="text-mist">発行日：</span>
                 <EditableInput
                   type="date"
                   className="text-right"
@@ -226,12 +226,12 @@ export default function PurchaseOrderDocumentPage() {
                 />
               </div>
               <div className="mt-3 text-right">
-                <p className="font-medium text-[#173c2a]">{issuerInfo.company}</p>
-                <p className="text-xs text-[#68756c]">{issuerInfo.postalCode}</p>
-                <p className="text-xs text-[#68756c]">{issuerInfo.address}</p>
-                <p className="text-xs text-[#68756c]">TEL：{issuerInfo.tel}</p>
-                <p className="text-xs text-[#68756c]">E-Mail：{issuerInfo.email}</p>
-                <p className="text-xs text-[#68756c]">登録番号：{issuerInfo.registrationNumber}</p>
+                <p className="font-medium text-ink">{issuerInfo.company}</p>
+                <p className="text-xs text-mist">{issuerInfo.postalCode}</p>
+                <p className="text-xs text-mist">{issuerInfo.address}</p>
+                <p className="text-xs text-mist">TEL：{issuerInfo.tel}</p>
+                <p className="text-xs text-mist">E-Mail：{issuerInfo.email}</p>
+                <p className="text-xs text-mist">登録番号：{issuerInfo.registrationNumber}</p>
               </div>
             </div>
           </div>
@@ -243,23 +243,23 @@ export default function PurchaseOrderDocumentPage() {
             <MetaRow label="支払条件" value={doc.paymentTerms} onChange={v => updateField('paymentTerms', v)} />
           </div>
 
-          <div className="mt-6 grid grid-cols-[140px_1fr_80px] items-center gap-2 border-y-2 border-double border-[#173c2a] py-3">
-            <span className="text-sm font-medium text-[#173c2a]">発注金額合計</span>
-            <span className="text-right text-3xl font-semibold text-[#173c2a]">¥ {formatYen(totals)}</span>
-            <span className="text-xs text-[#68756c]">（税抜）</span>
+          <div className="mt-6 grid grid-cols-[140px_1fr_80px] items-center gap-2 border-y-2 border-double border-ink py-3">
+            <span className="text-sm font-medium text-ink">発注金額合計</span>
+            <span className="text-right text-3xl font-semibold text-ink">¥ {formatYen(totals)}</span>
+            <span className="text-xs text-mist">（税抜）</span>
           </div>
 
-          <div className="mt-6 overflow-hidden rounded border border-gray-300">
+          <div className="mt-6 overflow-hidden rounded border border-line">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-[#f7f5ee] text-[#173c2a]">
-                  <th className="border-b border-r border-gray-300 px-2 py-2 text-left">明細</th>
-                  <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-right">数量</th>
-                  <th className="w-14 border-b border-r border-gray-300 px-2 py-2 text-center">単位</th>
-                  <th className="w-24 border-b border-r border-gray-300 px-2 py-2 text-right">単価</th>
-                  <th className="w-16 border-b border-r border-gray-300 px-2 py-2 text-center">税率</th>
-                  <th className="w-28 border-b border-gray-300 px-2 py-2 text-right">金額</th>
-                  <th className="w-8 border-b border-gray-300 px-1 py-2 no-print"></th>
+                <tr className="bg-bone text-ink">
+                  <th className="border-b border-r border-line px-2 py-2 text-left">明細</th>
+                  <th className="w-16 border-b border-r border-line px-2 py-2 text-right">数量</th>
+                  <th className="w-14 border-b border-r border-line px-2 py-2 text-center">単位</th>
+                  <th className="w-24 border-b border-r border-line px-2 py-2 text-right">単価</th>
+                  <th className="w-16 border-b border-r border-line px-2 py-2 text-center">税率</th>
+                  <th className="w-28 border-b border-line px-2 py-2 text-right">金額</th>
+                  <th className="w-8 border-b border-line px-1 py-2 no-print"></th>
                 </tr>
               </thead>
               <tbody>
@@ -267,10 +267,10 @@ export default function PurchaseOrderDocumentPage() {
                   const amount = (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)
                   return (
                     <tr key={line.id}>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
+                      <td className="border-r border-b border-line px-2 py-1">
                         <EditableInput value={line.description} onChange={v => updateLine(line.id, { description: v })} className="w-full" />
                       </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
+                      <td className="border-r border-b border-line px-2 py-1">
                         <EditableInput
                           type="number"
                           value={String(line.quantity)}
@@ -278,10 +278,10 @@ export default function PurchaseOrderDocumentPage() {
                           className="w-full text-right"
                         />
                       </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
+                      <td className="border-r border-b border-line px-2 py-1">
                         <EditableInput value={line.unit} onChange={v => updateLine(line.id, { unit: v })} className="w-full text-center" />
                       </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1">
+                      <td className="border-r border-b border-line px-2 py-1">
                         <EditableInput
                           type="number"
                           value={String(line.unitPrice)}
@@ -289,7 +289,7 @@ export default function PurchaseOrderDocumentPage() {
                           className="w-full text-right"
                         />
                       </td>
-                      <td className="border-r border-b border-gray-200 px-2 py-1 text-center">
+                      <td className="border-r border-b border-line px-2 py-1 text-center">
                         <select
                           value={line.isReducedRate ? 8 : 10}
                           onChange={e => updateLine(line.id, { isReducedRate: Number(e.target.value) === 8 })}
@@ -299,13 +299,13 @@ export default function PurchaseOrderDocumentPage() {
                           <option value={10}>10%</option>
                         </select>
                       </td>
-                      <td className="border-b border-gray-200 px-2 py-1 text-right">¥{formatYen(amount)}</td>
-                      <td className="border-b border-gray-200 px-1 py-1 no-print">
+                      <td className="border-b border-line px-2 py-1 text-right">¥{formatYen(amount)}</td>
+                      <td className="border-b border-line px-1 py-1 no-print">
                         <button
                           type="button"
                           onClick={() => removeLine(line.id)}
                           aria-label="行を削除"
-                          className="rounded p-1 text-red-500 hover:bg-red-50"
+                          className="rounded p-1 text-alert hover:bg-alert/5"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -315,11 +315,11 @@ export default function PurchaseOrderDocumentPage() {
                 })}
               </tbody>
             </table>
-            <div className="border-t border-gray-300 bg-[#faf8f1] px-2 py-2 no-print">
+            <div className="border-t border-line bg-bone px-2 py-2 no-print">
               <button
                 type="button"
                 onClick={addLine}
-                className="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-[#174c33] hover:bg-[#ece8db]"
+                className="inline-flex items-center gap-1 rounded-md border border-line bg-white px-2 py-1 text-xs text-matchaDeep hover:bg-[#ece8db]"
               >
                 <Plus size={12} />
                 行を追加
@@ -328,28 +328,28 @@ export default function PurchaseOrderDocumentPage() {
           </div>
 
           {taxTotals && (
-            <div className="mt-4 ml-auto w-full max-w-sm rounded border border-gray-300 text-sm">
-              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
-                <span className="text-[#68756c]">10%対象 小計</span>
+            <div className="mt-4 ml-auto w-full max-w-sm rounded border border-line text-sm">
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-mist">10%対象 小計</span>
                 <span>¥{formatYen(taxTotals.standardSubtotal)}</span>
               </div>
-              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
-                <span className="text-[#68756c]">10% 消費税</span>
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-mist">10% 消費税</span>
                 <span>¥{formatYen(taxTotals.standardTax)}</span>
               </div>
-              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
-                <span className="text-[#68756c]">8%対象 小計</span>
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-mist">8%対象 小計</span>
                 <span>¥{formatYen(taxTotals.reducedSubtotal)}</span>
               </div>
-              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
-                <span className="text-[#68756c]">8% 消費税</span>
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-mist">8% 消費税</span>
                 <span>¥{formatYen(taxTotals.reducedTax)}</span>
               </div>
-              <div className="flex items-center justify-between border-b border-gray-200 px-3 py-1.5">
-                <span className="text-[#68756c]">税抜合計</span>
+              <div className="flex items-center justify-between border-b border-line px-3 py-1.5">
+                <span className="text-mist">税抜合計</span>
                 <span>¥{formatYen(taxTotals.subtotal)}</span>
               </div>
-              <div className="flex items-center justify-between bg-[#f7f5ee] px-3 py-2 font-semibold text-[#173c2a]">
+              <div className="flex items-center justify-between bg-bone px-3 py-2 font-semibold text-ink">
                 <span>税込合計</span>
                 <span>¥{formatYen(taxTotals.total)}</span>
               </div>
@@ -357,16 +357,16 @@ export default function PurchaseOrderDocumentPage() {
           )}
 
           <div className="mt-6">
-            <p className="mb-1 text-xs font-medium text-[#68756c]">備考</p>
+            <p className="mb-1 text-xs font-medium text-mist">備考</p>
             <textarea
               rows={3}
               value={doc.notes}
               onChange={e => updateField('notes', e.target.value)}
-              className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 print:border-0 print:ring-0"
+              className="w-full rounded border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-matcha print:border-0 print:ring-0"
             />
           </div>
 
-          <p className="mt-10 text-center text-xs text-[#68756c]">※PDF を原本とする</p>
+          <p className="mt-10 text-center text-xs text-mist">※PDF を原本とする</p>
         </div>
       </main>
 
@@ -393,7 +393,7 @@ export default function PurchaseOrderDocumentPage() {
             color: inherit !important;
           }
           input:focus, textarea:focus { background: transparent !important; }
-          .bg-yellow-50, .focus\\:bg-yellow-50 { background: transparent !important; }
+          .bg-bone, .focus\\:bg-bone { background: transparent !important; }
           table .no-print { display: none !important; }
           .shadow, .shadow-sm, .shadow-2xl { box-shadow: none !important; }
           tr, td, th { page-break-inside: avoid !important; }
@@ -425,7 +425,7 @@ function EditableInput({
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      className={`bg-transparent border-0 outline-none focus:bg-yellow-50 focus:ring-0 ${className}`}
+      className={`bg-transparent border-0 outline-none focus:bg-bone focus:ring-0 ${className}`}
     />
   )
 }
@@ -447,21 +447,21 @@ function MetaRow({
 }) {
   return (
     <>
-      <div className="flex items-center justify-center bg-[#f7f5ee] px-2 py-1 text-center text-xs font-medium text-[#173c2a]">{label}</div>
-      <div className="border-b border-gray-200 px-2 py-1">
+      <div className="flex items-center justify-center bg-bone px-2 py-1 text-center text-xs font-medium text-ink">{label}</div>
+      <div className="border-b border-line px-2 py-1">
         {multiline ? (
           <textarea
             rows={rows}
             value={value}
             onChange={e => onChange(e.target.value)}
-            className="w-full resize-none bg-transparent border-0 outline-none focus:bg-yellow-50 text-sm"
+            className="w-full resize-none bg-transparent border-0 outline-none focus:bg-bone text-sm"
           />
         ) : (
           <input
             type={type ?? 'text'}
             value={value}
             onChange={e => onChange(e.target.value)}
-            className="w-full bg-transparent border-0 outline-none focus:bg-yellow-50 text-sm"
+            className="w-full bg-transparent border-0 outline-none focus:bg-bone text-sm"
           />
         )}
       </div>

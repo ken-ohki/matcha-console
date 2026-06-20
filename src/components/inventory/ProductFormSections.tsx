@@ -213,13 +213,13 @@ export function ImageUploader({
   }
 
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-3">
+    <div className="rounded-xl border border-dashed border-line bg-white p-3">
       {imageUrl ? (
         <div className="flex items-start gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imageUrl} alt="商品画像" loading="lazy" decoding="async" className="h-28 w-28 rounded-lg object-cover" />
           <div className="flex flex-col gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-graphite transition hover:bg-bone">
               <ImagePlus size={12} />
               {uploading ? 'アップロード中…' : '画像を差し替え'}
               <input
@@ -237,7 +237,7 @@ export function ImageUploader({
             <button
               type="button"
               onClick={() => onChange('')}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-alert hover:bg-alert/5"
             >
               <Trash2 size={12} />
               削除
@@ -245,7 +245,7 @@ export function ImageUploader({
           </div>
         </div>
       ) : (
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-[#faf8f1] px-6 py-8 text-sm text-[#68756c] transition hover:bg-[#f1ede0]">
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-bone px-6 py-8 text-sm text-mist transition hover:bg-[#f1ede0]">
           <ImagePlus size={20} />
           <span>{uploading ? 'アップロード中…' : '画像を選択 / ドロップ'}</span>
           <input
@@ -261,7 +261,7 @@ export function ImageUploader({
           />
         </label>
       )}
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-alert">{error}</p>}
     </div>
   )
 }
@@ -290,8 +290,8 @@ export function MultiSelectChecklist({
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      {hint && <p className="mb-2 text-xs text-[#68756c]">{hint}</p>}
+      <label className="mb-1 block text-sm font-medium text-graphite">{label}</label>
+      {hint && <p className="mb-2 text-xs text-mist">{hint}</p>}
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map(option => {
           const checked = value.includes(option.value)
@@ -302,8 +302,8 @@ export function MultiSelectChecklist({
               onClick={() => toggle(option.value)}
               className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
                 checked
-                  ? 'border-[#174c33] bg-[#eef3eb] text-[#174c33]'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'border-[#174c33] bg-[#eef3eb] text-matchaDeep'
+                  : 'border-line bg-white text-graphite hover:bg-bone'
               }`}
             >
               {option.label}
@@ -313,7 +313,7 @@ export function MultiSelectChecklist({
         })}
       </div>
       {orphanValues.length > 0 && (
-        <p className="mt-2 text-[11px] text-amber-700">
+        <p className="mt-2 text-[11px] text-[#a87b1e]">
           マスター未登録: {orphanValues.join(', ')}（設定画面で追加できます）
         </p>
       )}
@@ -329,7 +329,7 @@ type FormProps = {
 }
 
 const fieldCls =
-  'w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  'w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha'
 
 export function ProductStockSection({
   form,
@@ -353,11 +353,11 @@ export function ProductStockSection({
   const pendingAdjustmentKg = pendingCounted == null ? 0 : pendingCounted - simulatedCurrentStockKg
 
   return (
-    <div className="rounded-2xl border border-[#d9d1be] bg-[#f7f5ee] p-4">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#68756c]">運用管理項目</p>
+    <div className="rounded-2xl border border-line bg-bone p-4">
+      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-mist">運用管理項目</p>
       <div className="grid gap-4 md:grid-cols-3">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">SKU</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">SKU</label>
           <input
             type="text"
             required
@@ -367,13 +367,13 @@ export function ProductStockSection({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">入荷累計 (kg)</label>
-          <div className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm font-medium text-[#173c2a]">
+          <label className="mb-1 block text-sm font-medium text-graphite">入荷累計 (kg)</label>
+          <div className="rounded-xl border border-line bg-bone px-3 py-2.5 text-sm font-medium text-ink">
             {totalArrivalKg.toFixed(1)} kg
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">在庫グループ</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">在庫グループ</label>
           <select
             value={form.inventoryGroupId}
             onChange={event => setForm(prev => ({ ...prev, inventoryGroupId: event.target.value }))}
@@ -389,16 +389,16 @@ export function ProductStockSection({
       <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-white p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-medium text-gray-700">入荷記録</p>
-            <p className="text-xs text-[#68756c]">入荷は「発注管理」で発注を「入荷済」にすると自動で追加されます。</p>
+            <p className="text-sm font-medium text-graphite">入荷記録</p>
+            <p className="text-xs text-mist">入荷は「発注管理」で発注を「入荷済」にすると自動で追加されます。</p>
           </div>
-          <div className="rounded-xl bg-[#f7f5ee] px-3 py-2 text-xs text-[#68756c]">
-            累計 <span className="font-semibold text-[#173c2a]">{totalArrivalKg.toFixed(1)} kg</span>
+          <div className="rounded-xl bg-bone px-3 py-2 text-xs text-mist">
+            累計 <span className="font-semibold text-ink">{totalArrivalKg.toFixed(1)} kg</span>
           </div>
         </div>
         <div className="space-y-2">
           {form.arrivalRecords.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-[#68756c]">
+            <div className="rounded-xl border border-dashed border-line px-4 py-5 text-sm text-mist">
               まだ入荷記録がありません。
             </div>
           ) : (
@@ -406,13 +406,13 @@ export function ProductStockSection({
               .slice()
               .sort((a, b) => b.arrivalDate.localeCompare(a.arrivalDate))
               .map(record => (
-                <div key={record.id} className="flex items-center justify-between gap-3 rounded-xl border border-[#ece5d7] bg-[#faf8f2] px-3 py-2 text-sm">
-                  <span className="text-[#173c2a]">{toIsoDateInput(record.arrivalDate) || '日付未設定'}</span>
+                <div key={record.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-bone px-3 py-2 text-sm">
+                  <span className="text-ink">{toIsoDateInput(record.arrivalDate) || '日付未設定'}</span>
                   <span className="flex items-center gap-3">
                     {record.unitPrice != null && record.unitPrice > 0 && (
-                      <span className="text-xs text-[#68756c]">@{new Intl.NumberFormat('ja-JP').format(Math.round(record.unitPrice))} 円/kg</span>
+                      <span className="text-xs text-mist">@{new Intl.NumberFormat('ja-JP').format(Math.round(record.unitPrice))} 円/kg</span>
                     )}
-                    <span className="font-medium text-[#173c2a]">{record.quantityKg.toFixed(1)} kg</span>
+                    <span className="font-medium text-ink">{record.quantityKg.toFixed(1)} kg</span>
                   </span>
                 </div>
               ))
@@ -423,23 +423,23 @@ export function ProductStockSection({
       <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-white p-4">
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-700">棚卸</p>
-            <p className="text-xs text-[#68756c]">現状在庫は編集せず表示し、フォームの変更内容を保存後シミュレーションへ反映します。</p>
+            <p className="text-sm font-medium text-graphite">棚卸</p>
+            <p className="text-xs text-mist">現状在庫は編集せず表示し、フォームの変更内容を保存後シミュレーションへ反映します。</p>
           </div>
-          <div className="rounded-xl bg-[#f7f5ee] px-3 py-2 text-xs text-[#68756c]">
-            現状の在庫数: <span className="font-semibold text-[#173c2a]">{formatKg(stock.currentStockKg)}</span>
+          <div className="rounded-xl bg-bone px-3 py-2 text-xs text-mist">
+            現状の在庫数: <span className="font-semibold text-ink">{formatKg(stock.currentStockKg)}</span>
           </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-[180px_1fr_180px]">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">現状の在庫数 (編集不可)</label>
-            <div className="rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm font-medium text-[#173c2a]">
+            <label className="mb-1 block text-xs font-medium text-mist">現状の在庫数 (編集不可)</label>
+            <div className="rounded-xl border border-line bg-bone px-3 py-2.5 text-sm font-medium text-ink">
               {formatKg(stock.currentStockKg)}
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">確認日</label>
+            <label className="mb-1 block text-xs font-medium text-mist">確認日</label>
             <input
               type="date"
               value={pending.checkedDate}
@@ -448,7 +448,7 @@ export function ProductStockSection({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">在庫数量 (kg)</label>
+            <label className="mb-1 block text-xs font-medium text-mist">在庫数量 (kg)</label>
             <input
               type="number"
               min="0"
@@ -462,35 +462,35 @@ export function ProductStockSection({
         </div>
 
         <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
-            <p className="text-xs text-[#68756c]">保存後の見込み在庫</p>
-            <p className="mt-1 text-sm font-semibold text-[#173c2a]">{formatKg(simulatedCurrentStockKg)}</p>
-            <p className="mt-1 text-[11px] text-[#68756c]">入荷・棚卸履歴の変更を反映</p>
+          <div className="rounded-xl border border-line bg-bone p-3">
+            <p className="text-xs text-mist">保存後の見込み在庫</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{formatKg(simulatedCurrentStockKg)}</p>
+            <p className="mt-1 text-[11px] text-mist">入荷・棚卸履歴の変更を反映</p>
           </div>
-          <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
-            <p className="text-xs text-[#68756c]">今回の棚卸差分</p>
+          <div className="rounded-xl border border-line bg-bone p-3">
+            <p className="text-xs text-mist">今回の棚卸差分</p>
             <p className={`mt-1 text-sm font-semibold ${
               pendingCounted == null
-                ? 'text-[#68756c]'
+                ? 'text-mist'
                 : pendingAdjustmentKg < 0
-                  ? 'text-red-700'
+                  ? 'text-alert'
                   : pendingAdjustmentKg > 0
-                    ? 'text-emerald-700'
-                    : 'text-[#173c2a]'
+                    ? 'text-matcha'
+                    : 'text-ink'
             }`}>
               {pendingCounted == null ? '入力待ち' : formatSignedKg(pendingAdjustmentKg)}
             </p>
           </div>
-          <div className="rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3">
-            <p className="text-xs text-[#68756c]">棚卸反映後の在庫</p>
-            <p className="mt-1 text-sm font-semibold text-[#173c2a]">{formatKg(simulatedAfterCheckKg)}</p>
-            <p className="mt-1 text-[11px] text-[#68756c]">棚卸を入力しなければ上の見込み在庫と同じです</p>
+          <div className="rounded-xl border border-line bg-bone p-3">
+            <p className="text-xs text-mist">棚卸反映後の在庫</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{formatKg(simulatedAfterCheckKg)}</p>
+            <p className="mt-1 text-[11px] text-mist">棚卸を入力しなければ上の見込み在庫と同じです</p>
           </div>
         </div>
 
         <div className="mt-4 space-y-3">
           {form.inventoryChecks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-300 px-4 py-5 text-sm text-[#68756c]">
+            <div className="rounded-xl border border-dashed border-line px-4 py-5 text-sm text-mist">
               まだ棚卸記録がありません。必要なタイミングで追加してください。
             </div>
           )}
@@ -498,23 +498,23 @@ export function ProductStockSection({
             .slice()
             .sort((left, right) => right.checkedDate.localeCompare(left.checkedDate))
             .map(record => (
-              <div key={record.id} className="grid gap-3 rounded-xl border border-[#ece5d7] bg-[#faf8f2] p-3 md:grid-cols-[1fr_140px_140px_140px_auto]">
+              <div key={record.id} className="grid gap-3 rounded-xl border border-line bg-bone p-3 md:grid-cols-[1fr_140px_140px_140px_auto]">
                 <div>
-                  <p className="text-xs font-medium text-gray-600">確認日</p>
-                  <p className="mt-1 text-sm text-[#173c2a]">{record.checkedDate || '-'}</p>
+                  <p className="text-xs font-medium text-mist">確認日</p>
+                  <p className="mt-1 text-sm text-ink">{record.checkedDate || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-600">実棚数量</p>
-                  <p className="mt-1 text-sm text-[#173c2a]">{formatKg(record.countedQuantityKg)}</p>
+                  <p className="text-xs font-medium text-mist">実棚数量</p>
+                  <p className="mt-1 text-sm text-ink">{formatKg(record.countedQuantityKg)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-600">理論在庫</p>
-                  <p className="mt-1 text-sm text-[#173c2a]">{formatKg(record.expectedQuantityKg)}</p>
+                  <p className="text-xs font-medium text-mist">理論在庫</p>
+                  <p className="mt-1 text-sm text-ink">{formatKg(record.expectedQuantityKg)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-600">反映差分</p>
+                  <p className="text-xs font-medium text-mist">反映差分</p>
                   <p className={`mt-1 text-sm font-semibold ${
-                    record.adjustmentKg < 0 ? 'text-red-700' : record.adjustmentKg > 0 ? 'text-emerald-700' : 'text-[#173c2a]'
+                    record.adjustmentKg < 0 ? 'text-alert' : record.adjustmentKg > 0 ? 'text-matcha' : 'text-ink'
                   }`}>
                     {formatSignedKg(record.adjustmentKg)}
                   </p>
@@ -526,7 +526,7 @@ export function ProductStockSection({
                       ...prev,
                       inventoryChecks: prev.inventoryChecks.filter(item => item.id !== record.id),
                     }))}
-                    className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                    className="rounded-lg p-2 text-alert transition hover:bg-alert/5 hover:text-alert"
                     aria-label={`${record.checkedDate || '棚卸'} を削除`}
                   >
                     <Trash2 size={16} />
@@ -557,11 +557,11 @@ export function ProductMasterSection({
 
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#68756c]">商品マスター</p>
+      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-mist">商品マスター</p>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">商品名</label>
-          <p className="mb-2 text-xs text-[#68756c]">販売用の商品名</p>
+          <label className="mb-1 block text-sm font-medium text-graphite">商品名</label>
+          <p className="mb-2 text-xs text-mist">販売用の商品名</p>
           <input
             type="text"
             required
@@ -571,8 +571,8 @@ export function ProductMasterSection({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">仕入商品名</label>
-          <p className="mb-2 text-xs text-[#68756c]">仕入れ元の商品名（発注用）</p>
+          <label className="mb-1 block text-sm font-medium text-graphite">仕入商品名</label>
+          <p className="mb-2 text-xs text-mist">仕入れ元の商品名（発注用）</p>
           <input
             type="text"
             value={form.purchaseProductName ?? ''}
@@ -581,7 +581,7 @@ export function ProductMasterSection({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">仕入先</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">仕入先</label>
           <input
             type="text"
             value={form.supplier ?? ''}
@@ -590,7 +590,7 @@ export function ProductMasterSection({
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">茶種</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">茶種</label>
           <select
             value={form.teaType ?? ''}
             onChange={event => setForm(prev => ({ ...prev, teaType: event.target.value }))}
@@ -606,7 +606,7 @@ export function ProductMasterSection({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">グレード</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">グレード</label>
           <select
             value={form.grade ?? ''}
             onChange={event => setForm(prev => ({ ...prev, grade: event.target.value }))}
@@ -633,7 +633,7 @@ export function ProductMasterSection({
       </div>
 
       <div className="mt-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">フレーバーノート</label>
+        <label className="mb-1 block text-sm font-medium text-graphite">フレーバーノート</label>
         <textarea
           rows={3}
           value={form.flavorNotes ?? ''}
@@ -641,12 +641,12 @@ export function ProductMasterSection({
           className={fieldCls}
           placeholder="例: 上品な甘み、栗のような香ばしさ、ミルキーな余韻"
         />
-        <p className="mt-1 text-[11px] text-[#68756c]">カタログの商品詳細に表示されます</p>
+        <p className="mt-1 text-[11px] text-mist">カタログの商品詳細に表示されます</p>
       </div>
 
       <div className="mt-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">商品画像</label>
-        <p className="mb-2 text-xs text-[#68756c]">JPG / PNG 推奨。カタログのカード・詳細に表示されます。</p>
+        <label className="mb-1 block text-sm font-medium text-graphite">商品画像</label>
+        <p className="mb-2 text-xs text-mist">JPG / PNG 推奨。カタログのカード・詳細に表示されます。</p>
         <ImageUploader
           imageUrl={form.imageUrl ?? ''}
           productKey={productKey}
@@ -697,10 +697,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
 
   return (
     <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#68756c]">価格・販売設定</p>
+      <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-mist">価格・販売設定</p>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">仕入単価</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">仕入単価</label>
           <input
             type="number"
             min="0"
@@ -711,7 +711,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">標準卸売単価</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">標準卸売単価</label>
           <input
             type="number"
             min="0"
@@ -722,7 +722,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">EC即時購入可能数量</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">EC即時購入可能数量</label>
           <input
             type="number"
             min="0"
@@ -732,10 +732,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             className={fieldCls}
             placeholder="未設定なら在庫全量"
           />
-          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトでセルフ決済に開放する数量 (kg)。空欄は在庫全量。セルフ決済しきい値は全商品共通で「設定 → 卸売設定」で指定します。</p>
+          <p className="mt-1 text-[11px] text-mist">卸売サイトでセルフ決済に開放する数量 (kg)。空欄は在庫全量。セルフ決済しきい値は全商品共通で「設定 → 卸売設定」で指定します。</p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">標準包装単位 (kg)</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">標準包装単位 (kg)</label>
           <input
             type="number"
             min="1"
@@ -748,10 +748,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             className={fieldCls}
             placeholder="未設定なら1kg"
           />
-          <p className="mt-1 text-[11px] text-[#68756c]">標準の包装形態 (kg・整数)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
+          <p className="mt-1 text-[11px] text-mist">標準の包装形態 (kg・整数)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">サンプル価格（1個 / 10g）</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">サンプル価格（1個 / 10g）</label>
           <input
             type="number"
             min="0"
@@ -761,10 +761,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             className={fieldCls}
             placeholder="例: 500"
           />
-          <p className="mt-1 text-[11px] text-[#68756c]">卸売サイトのサンプル1個(10g)あたりの価格。サンプルは1商品2個(20g)まで注文可。</p>
+          <p className="mt-1 text-[11px] text-mist">卸売サイトのサンプル1個(10g)あたりの価格。サンプルは1商品2個(20g)まで注文可。</p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">備考（管理用）</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">備考（管理用）</label>
           <textarea
             rows={4}
             value={form.adminNote ?? ''}
@@ -773,7 +773,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">備考（販売用）</label>
+          <label className="mb-1 block text-sm font-medium text-graphite">備考（販売用）</label>
           <textarea
             rows={4}
             value={form.salesNote ?? ''}
@@ -784,10 +784,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-gray-700">カタログに表示</p>
-          <p className="text-xs text-gray-500">オフにすると公開カタログから除外されます</p>
+          <p className="text-sm font-medium text-graphite">カタログに表示</p>
+          <p className="text-xs text-mist">オフにすると公開カタログから除外されます</p>
         </div>
         <button
           type="button"
@@ -795,7 +795,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           aria-checked={form.showInCatalog ?? true}
           onClick={() => setForm(prev => ({ ...prev, showInCatalog: !(prev.showInCatalog ?? true) }))}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            (form.showInCatalog ?? true) ? 'bg-[#174c33]' : 'bg-gray-300'
+            (form.showInCatalog ?? true) ? 'bg-ink' : 'bg-gray-300'
           }`}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
@@ -804,10 +804,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         </button>
       </div>
 
-      <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-gray-700">問い合わせを有効化</p>
-          <p className="text-xs text-gray-500">入荷予定品・受注生産品に使用。カタログで在庫が「ASK」と表示されます</p>
+          <p className="text-sm font-medium text-graphite">問い合わせを有効化</p>
+          <p className="text-xs text-mist">入荷予定品・受注生産品に使用。カタログで在庫が「ASK」と表示されます</p>
         </div>
         <button
           type="button"
@@ -815,7 +815,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           aria-checked={form.inquireToOrder ?? false}
           onClick={() => setForm(prev => ({ ...prev, inquireToOrder: !(prev.inquireToOrder ?? false) }))}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            (form.inquireToOrder ?? false) ? 'bg-amber-500' : 'bg-gray-300'
+            (form.inquireToOrder ?? false) ? 'bg-[#a87b1e]' : 'bg-gray-300'
           }`}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
@@ -824,10 +824,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         </button>
       </div>
 
-      <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-gray-700">サンプル販売を有効化</p>
-          <p className="text-xs text-gray-500">卸売サイトで1商品2個(20g)までサンプル注文可。上の「サンプル価格」を設定してください</p>
+          <p className="text-sm font-medium text-graphite">サンプル販売を有効化</p>
+          <p className="text-xs text-mist">卸売サイトで1商品2個(20g)までサンプル注文可。上の「サンプル価格」を設定してください</p>
         </div>
         <button
           type="button"
@@ -835,7 +835,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           aria-checked={form.sampleAvailable ?? false}
           onClick={() => setForm(prev => ({ ...prev, sampleAvailable: !(prev.sampleAvailable ?? false) }))}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            (form.sampleAvailable ?? false) ? 'bg-[#174c33]' : 'bg-gray-300'
+            (form.sampleAvailable ?? false) ? 'bg-ink' : 'bg-gray-300'
           }`}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
@@ -844,10 +844,10 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
         </button>
       </div>
 
-      <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+      <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-gray-700">おすすめ商品（未ログイン公開）</p>
-          <p className="text-xs text-gray-500">卸売サイトでログインしていない訪問者にも表示されます。注文には会員ログインが必要です</p>
+          <p className="text-sm font-medium text-graphite">おすすめ商品（未ログイン公開）</p>
+          <p className="text-xs text-mist">卸売サイトでログインしていない訪問者にも表示されます。注文には会員ログインが必要です</p>
         </div>
         <button
           type="button"
@@ -855,7 +855,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           aria-checked={form.featured ?? false}
           onClick={() => setForm(prev => ({ ...prev, featured: !(prev.featured ?? false) }))}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            (form.featured ?? false) ? 'bg-[#174c33]' : 'bg-gray-300'
+            (form.featured ?? false) ? 'bg-ink' : 'bg-gray-300'
           }`}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
@@ -866,23 +866,23 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
 
       {/* 注文オプション（小分けサービス等）— 商品ごとに有効化・許可サイズ選択 */}
       {masterOptions.length > 0 && (
-        <div className="mt-4 border-t border-[#f0ece0] pt-4">
-          <p className="mb-2 text-sm font-medium text-gray-700">注文オプション</p>
-          <p className="mb-3 text-[11px] text-[#68756c]">この商品で利用できる注文オプションと、許可する小分けサイズを選びます（マスタは「設定 → 卸売設定」で編集）。</p>
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="mb-2 text-sm font-medium text-graphite">注文オプション</p>
+          <p className="mb-3 text-[11px] text-mist">この商品で利用できる注文オプションと、許可する小分けサイズを選びます（マスタは「設定 → 卸売設定」で編集）。</p>
           <div className="space-y-3">
             {masterOptions.map(opt => {
               const cfg = configFor(opt.id)
               const on = !!cfg
               return (
-                <div key={opt.id} className="rounded-xl border border-[#e7e1d2] p-3">
-                  <label className="flex items-center gap-2 text-sm font-medium text-[#173c2a]">
+                <div key={opt.id} className="rounded-xl border border-line p-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-ink">
                     <input type="checkbox" checked={on} onChange={e => toggleOption(opt, e.target.checked)} className="h-4 w-4 accent-[#174c33]" />
                     {opt.name}
                   </label>
                   {on && opt.tiers.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-3 pl-6">
                       {opt.tiers.map(t => (
-                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-[#68756c]">
+                        <label key={t.id} className="flex items-center gap-1.5 text-xs text-mist">
                           <input
                             type="checkbox"
                             checked={cfg!.tierIds.length === 0 || cfg!.tierIds.includes(t.id)}

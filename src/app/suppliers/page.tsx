@@ -96,25 +96,25 @@ export default function SuppliersPage() {
         <PageTabs tabs={PURCHASING_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-graphite">
               <Truck size={15} />
               仕入先マスター
             </div>
-            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">登録済みの仕入先一覧</h1>
-            <p className="mt-2 text-sm text-[#68756c]">行をクリックすると詳細情報と過去の発注が確認できます。</p>
+            <h1 className="mt-3 text-3xl font-bold text-ink">登録済みの仕入先一覧</h1>
+            <p className="mt-2 text-sm text-mist">行をクリックすると詳細情報と過去の発注が確認できます。</p>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-semibold text-[#173c2a]">仕入先一覧</h2>
+            <h2 className="text-lg font-semibold text-ink">仕入先一覧</h2>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="仕入先・県・担当者で検索"
-                className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-64"
+                className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha sm:w-64"
               />
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function SuppliersPage() {
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                <tr className="border-b border-[#e6dfcf] text-left text-mist">
                   <th className="px-3 py-3 font-medium">仕入先</th>
                   <th className="px-3 py-3 font-medium">担当者</th>
                   <th className="px-3 py-3 font-medium">県</th>
@@ -133,7 +133,7 @@ export default function SuppliersPage() {
               <tbody>
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={5} className="px-3 py-10 text-center text-sm text-mist">
                       登録済みの仕入先はありません。
                     </td>
                   </tr>
@@ -142,7 +142,7 @@ export default function SuppliersPage() {
                   <tr
                     key={s.id}
                     onClick={() => setSelectedId(s.id)}
-                    className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
+                    className="cursor-pointer border-b border-[#f0ebdf] text-ink transition hover:bg-bone"
                   >
                     <td className="px-3 py-4 font-medium">{s.name}</td>
                     <td className="px-3 py-4">{s.contactPersonName || '-'}</td>
@@ -228,7 +228,7 @@ function SupplierDetailModal({
     }
   }
 
-  const inputClass = 'w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600'
+  const inputClass = 'w-full rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha'
 
   return (
     <div
@@ -245,27 +245,27 @@ function SupplierDetailModal({
           type="button"
           onClick={onClose}
           aria-label="閉じる"
-          className="absolute right-3 top-3 rounded-full p-1.5 text-[#68756c] transition hover:bg-[#f4f2ea] hover:text-[#173c2a]"
+          className="absolute right-3 top-3 rounded-full p-1.5 text-mist transition hover:bg-bone hover:text-ink"
         >
           <X size={18} />
         </button>
         <div className="border-b border-[#ece8db] px-6 pb-4 pt-6">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-2.5 py-0.5 text-xs font-medium text-[#5e44a8]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-2.5 py-0.5 text-xs font-medium text-graphite">
             <Truck size={12} />
             仕入先
           </div>
-          <h2 className="mt-2 text-xl font-semibold text-[#173c2a]">{supplier.name}</h2>
-          <div className="mt-2 grid grid-cols-3 gap-3 text-xs text-[#68756c]">
-            <div>発注回数 <span className="font-semibold text-[#173c2a]">{supplier.orderCount}</span> 件</div>
-            <div>累計数量 <span className="font-semibold text-[#173c2a]">{totalQuantity.toFixed(1)} kg</span></div>
-            <div>累計金額 <span className="font-semibold text-[#173c2a]">{formatCurrency(totalAmount)}</span></div>
+          <h2 className="mt-2 text-xl font-semibold text-ink">{supplier.name}</h2>
+          <div className="mt-2 grid grid-cols-3 gap-3 text-xs text-mist">
+            <div>発注回数 <span className="font-semibold text-ink">{supplier.orderCount}</span> 件</div>
+            <div>累計数量 <span className="font-semibold text-ink">{totalQuantity.toFixed(1)} kg</span></div>
+            <div>累計金額 <span className="font-semibold text-ink">{formatCurrency(totalAmount)}</span></div>
           </div>
         </div>
 
         <div className="max-h-[calc(92vh-160px)] overflow-y-auto px-6 py-5">
           <form onSubmit={handleSubmit} className="space-y-5">
             <section>
-              <h3 className="mb-3 text-sm font-semibold text-[#173c2a]">仕入先詳細</h3>
+              <h3 className="mb-3 text-sm font-semibold text-ink">仕入先詳細</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field icon={<User2 size={14} />} label="担当者名">
                   <input
@@ -364,25 +364,25 @@ function SupplierDetailModal({
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-[#68756c]">料金表など添付ファイル（PDF）</p>
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-mist">料金表など添付ファイル（PDF）</p>
                   <div className="space-y-2">
                     {(form.attachments ?? []).length === 0 && (
-                      <p className="text-xs text-[#a59f8c]">添付ファイルなし</p>
+                      <p className="text-xs text-mist">添付ファイルなし</p>
                     )}
                     {(form.attachments ?? []).map(att => (
                       <div key={att.id} className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-white px-3 py-2 text-sm">
-                        <FileText size={14} className="shrink-0 text-[#174c33]" />
+                        <FileText size={14} className="shrink-0 text-matchaDeep" />
                         <a
                           href={att.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 truncate text-[#173c2a] hover:underline"
+                          className="flex-1 truncate text-ink hover:underline"
                           title={att.name}
                         >
                           {att.name}
                         </a>
                         {att.uploadedAt && (
-                          <span className="text-[10px] text-[#a59f8c]">{att.uploadedAt}</span>
+                          <span className="text-[10px] text-mist">{att.uploadedAt}</span>
                         )}
                         {canEdit && (
                           <button
@@ -395,7 +395,7 @@ function SupplierDetailModal({
                                 attachments: (prev.attachments ?? []).filter(a => a.id !== att.id),
                               }))
                             }}
-                            className="rounded-lg p-1 text-red-500 hover:bg-red-50"
+                            className="rounded-lg p-1 text-alert hover:bg-alert/5"
                             aria-label="削除"
                           >
                             <Trash2 size={14} />
@@ -406,7 +406,7 @@ function SupplierDetailModal({
                   </div>
                   {canEdit && (
                     <div className="mt-3">
-                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d9d1be] bg-white px-3 py-2 text-xs font-medium text-[#174c33] transition hover:bg-[#eef3eb]">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line bg-white px-3 py-2 text-xs font-medium text-matchaDeep transition hover:bg-[#eef3eb]">
                         <Upload size={12} />
                         {uploading ? 'アップロード中…' : 'PDFを添付（複数可）'}
                         <input
@@ -448,14 +448,14 @@ function SupplierDetailModal({
                           }}
                         />
                       </label>
-                      {uploadError && <p className="mt-2 text-xs text-red-600">{uploadError}</p>}
-                      <p className="mt-1 text-[10px] text-[#a59f8c]">アップロード後は「保存」を押して確定してください。1ファイル最大 30MB。</p>
+                      {uploadError && <p className="mt-2 text-xs text-alert">{uploadError}</p>}
+                      <p className="mt-1 text-[10px] text-mist">アップロード後は「保存」を押して確定してください。1ファイル最大 30MB。</p>
                     </div>
                   )}
                 </div>
               </div>
               {feedback && (
-                <p className={`mt-3 text-sm ${feedback.tone === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
+                <p className={`mt-3 text-sm ${feedback.tone === 'success' ? 'text-matcha' : 'text-alert'}`}>
                   {feedback.message}
                 </p>
               )}
@@ -464,7 +464,7 @@ function SupplierDetailModal({
                   <button
                     type="submit"
                     disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[#174c33] px-4 py-2 text-sm font-medium text-white shadow transition hover:bg-[#205f43] disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper shadow transition hover:bg-[#205f43] disabled:opacity-60"
                   >
                     <Save size={14} />
                     {saving ? '保存中…' : '仕入先情報を保存'}
@@ -474,15 +474,15 @@ function SupplierDetailModal({
             </section>
 
             <section className="border-t border-[#ece8db] pt-5">
-              <h3 className="mb-3 text-sm font-semibold text-[#173c2a]">過去の発注 ({orders.length}件)</h3>
+              <h3 className="mb-3 text-sm font-semibold text-ink">過去の発注 ({orders.length}件)</h3>
               {orders.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[#d9d1be] py-6 text-center text-sm text-[#68756c]">
+                <div className="rounded-xl border border-dashed border-line py-6 text-center text-sm text-mist">
                   発注履歴はまだありません。
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-xl border border-[#ece8db]">
                   <table className="min-w-full text-sm">
-                    <thead className="bg-[#faf8f1] text-left text-[11px] uppercase tracking-wider text-[#68756c]">
+                    <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
                       <tr>
                         <th className="px-3 py-2 font-medium">発注日</th>
                         <th className="px-3 py-2 font-medium">商品</th>
@@ -493,11 +493,11 @@ function SupplierDetailModal({
                     </thead>
                     <tbody>
                       {orders.flatMap(order => order.items.map((item, idx) => (
-                        <tr key={`${order.id}-${idx}`} className="border-t border-[#ece8db] text-[#173c2a]">
-                          <td className="px-3 py-2 text-[#68756c]">{idx === 0 ? order.orderDate : ''}</td>
+                        <tr key={`${order.id}-${idx}`} className="border-t border-[#ece8db] text-ink">
+                          <td className="px-3 py-2 text-mist">{idx === 0 ? order.orderDate : ''}</td>
                           <td className="px-3 py-2">
                             <div className="font-medium">{item.productName}</div>
-                            <div className="text-[11px] text-[#68756c]">{item.productSku}</div>
+                            <div className="text-[11px] text-mist">{item.productSku}</div>
                           </td>
                           <td className="px-3 py-2 text-right">{item.quantityKg.toFixed(1)} kg</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
@@ -527,7 +527,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-[#68756c]">
+      <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-mist">
         {icon}
         {label}
       </span>

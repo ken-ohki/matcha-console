@@ -64,9 +64,9 @@ const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   paid: '支払済',
 }
 const PAYMENT_COLORS: Record<PaymentStatus, string> = {
-  uninvoiced: 'bg-gray-100 text-gray-700',
-  invoiced: 'bg-amber-100 text-amber-800',
-  paid: 'bg-emerald-100 text-emerald-800',
+  uninvoiced: 'bg-bone text-graphite',
+  invoiced: 'bg-bone text-[#a87b1e]',
+  paid: 'bg-bone text-matcha',
 }
 const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   ordering: '発注中',
@@ -75,10 +75,10 @@ const SHIPPING_LABELS: Record<ShippingStatus, string> = {
   shipped: '発送完了',
 }
 const SHIPPING_COLORS: Record<ShippingStatus, string> = {
-  ordering: 'bg-slate-100 text-slate-700',
-  producing: 'bg-blue-100 text-blue-800',
-  ready_to_ship: 'bg-amber-100 text-amber-800',
-  shipped: 'bg-emerald-100 text-emerald-800',
+  ordering: 'bg-bone text-graphite',
+  producing: 'bg-bone text-graphite',
+  ready_to_ship: 'bg-bone text-[#a87b1e]',
+  shipped: 'bg-bone text-matcha',
 }
 
 function PaymentBadge({ status }: { status: PaymentStatus }) {
@@ -119,7 +119,7 @@ function SortTh({ label, col, sortKey, sortDir, onSort }: {
       <button
         type="button"
         onClick={() => onSort(col)}
-        className={`inline-flex items-center gap-1 ${active ? 'text-[#173c2a]' : 'hover:text-[#173c2a]'}`}
+        className={`inline-flex items-center gap-1 ${active ? 'text-ink' : 'hover:text-ink'}`}
       >
         {label}
         <span className="text-[10px]">{active ? (sortDir === 'asc' ? '▲' : '▼') : '↕'}</span>
@@ -416,14 +416,17 @@ export default function SalesPage() {
     <AppLayout>
       <div className="space-y-6">
         <PageTabs tabs={SALES_TABS} />
+        <div className="rounded-xl border border-[#a87b1e]/40 bg-bone px-4 py-3 text-sm text-graphite">
+          卸売の注文は <Link href="/wholesale/orders/new" className="font-semibold text-matchaDeep underline">卸売注文 &gt; 新規注文</Link> に一元化しました（在庫・税・請求が共通）。この「直販」は既存履歴の閲覧用です。
+        </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">販売管理</h1>
+            <h1 className="mt-3 text-3xl font-bold text-ink">販売管理</h1>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <button
               onClick={() => setModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
+              className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep"
             >
               <Plus size={16} />
               新規作成
@@ -432,7 +435,7 @@ export default function SalesPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">
             {message}
           </div>
         )}
@@ -448,8 +451,8 @@ export default function SalesPage() {
               onClick={() => setMainTab(k)}
               className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
                 mainTab === k
-                  ? 'border-[#174c33] text-[#173c2a]'
-                  : 'border-transparent text-[#68756c] hover:text-[#173c2a]'
+                  ? 'border-[#174c33] text-ink'
+                  : 'border-transparent text-mist hover:text-ink'
               }`}
             >
               {label}
@@ -483,17 +486,17 @@ export default function SalesPage() {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-          <section className="rounded-3xl border border-[#d9d1be] bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#173c2a]">購入者別売上高・粗利（{scopeLabel}）</h2>
+          <section className="rounded-3xl border border-line bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-ink">購入者別売上高・粗利（{scopeLabel}）</h2>
             <div className="mt-6 space-y-4">
               {buyerSummary.length === 0 && (
-                <p className="text-sm text-[#68756c]">対象の案件がありません。</p>
+                <p className="text-sm text-mist">対象の案件がありません。</p>
               )}
               {buyerSummary.map(item => (
                 <div key={item.buyerName} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-[#173c2a]">{item.buyerName}</span>
-                    <span className="text-[#68756c]">{formatCurrency(item.revenue)}</span>
+                    <span className="font-medium text-ink">{item.buyerName}</span>
+                    <span className="text-mist">{formatCurrency(item.revenue)}</span>
                   </div>
                   <div className="grid gap-2 md:grid-cols-2">
                     <div className="rounded-full bg-[#eef3eb]">
@@ -503,7 +506,7 @@ export default function SalesPage() {
                       <div className="h-4 rounded-full bg-[#7dbb57]" style={{ width: `${Math.max((item.profit / maxBuyerRevenue) * 100, 3)}%` }} />
                     </div>
                   </div>
-                  <div className="flex gap-5 text-xs text-[#68756c]">
+                  <div className="flex gap-5 text-xs text-mist">
                     <span>売上高 {formatCurrency(item.revenue)}</span>
                     <span>粗利 {formatCurrency(item.profit)}</span>
                   </div>
@@ -512,8 +515,8 @@ export default function SalesPage() {
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[#d9d1be] bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-[#173c2a]">ステータス分布</h2>
+          <section className="rounded-3xl border border-line bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-ink">ステータス分布</h2>
             <div className="mt-8 flex flex-col items-center gap-6 lg:flex-row lg:justify-center">
               <div className="relative h-48 w-48 rounded-full" style={{ background: donut }}>
                 <div className="absolute inset-[32px] rounded-full bg-white" />
@@ -523,7 +526,7 @@ export default function SalesPage() {
                   <div key={status} className="flex items-center gap-3">
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: statusColor(status) }} />
                     <span>{getStatusLabel(status)}</span>
-                    <span className="font-semibold text-[#173c2a]">
+                    <span className="font-semibold text-ink">
                       {status === 'negotiating' ? statusCounts.negotiating : status === 'confirmed' ? statusCounts.confirmed : statusCounts.cancelled}
                     </span>
                   </div>
@@ -534,7 +537,7 @@ export default function SalesPage() {
         </div>
         </>)}
 
-        <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
           {mainTab === 'dashboard' && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             {([
@@ -549,8 +552,8 @@ export default function SalesPage() {
                 onClick={() => setViewMode(tab.mode)}
                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                   viewMode === tab.mode
-                    ? 'bg-[#174c33] text-white'
-                    : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                    ? 'bg-ink text-paper'
+                    : 'border border-line bg-white text-ink hover:bg-[#ece8db]'
                 }`}
               >
                 {tab.label}
@@ -558,14 +561,14 @@ export default function SalesPage() {
             ))}
             {(viewMode === 'by-month' || viewMode === 'by-fiscal') && (
               <div className="ml-auto flex items-center gap-1">
-                <span className="text-[11px] text-[#68756c]">集計基準</span>
-                <div className="flex overflow-hidden rounded-full border border-[#d9d1be]">
+                <span className="text-[11px] text-mist">集計基準</span>
+                <div className="flex overflow-hidden rounded-full border border-line">
                   {([['order', '発注日'], ['delivery', '納品日']] as const).map(([key, label]) => (
                     <button
                       key={key}
                       type="button"
                       onClick={() => setDashboardBasis(key)}
-                      className={`px-2.5 py-1 text-[11px] transition ${dashboardBasis === key ? 'bg-[#174c33] text-white' : 'bg-white text-[#173c2a] hover:bg-[#ece8db]'}`}
+                      className={`px-2.5 py-1 text-[11px] transition ${dashboardBasis === key ? 'bg-ink text-paper' : 'bg-white text-ink hover:bg-[#ece8db]'}`}
                     >
                       {label}
                     </button>
@@ -576,13 +579,13 @@ export default function SalesPage() {
           </div>
           )}
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-semibold text-[#173c2a]">
+            <h2 className="text-lg font-semibold text-ink">
               {mainTab === 'records' ? '販売案件一覧'
                 : viewMode === 'by-month' ? '月別集計'
                 : viewMode === 'by-fiscal' ? '年度別集計（4月〜3月）'
                 : viewMode === 'by-country' ? '国別集計'
                 : '商品別集計'}
-              <span className="ml-2 text-sm font-normal text-[#68756c]">({mainTab === 'records' ? sortedSales.length : filteredSales.length}件)</span>
+              <span className="ml-2 text-sm font-normal text-mist">({mainTab === 'records' ? sortedSales.length : filteredSales.length}件)</span>
             </h2>
             <div className="flex flex-wrap gap-3">
               <div className="relative">
@@ -591,17 +594,17 @@ export default function SalesPage() {
                   value={search}
                   onChange={event => setSearch(event.target.value)}
                   placeholder="商品名・購入者・国で検索"
-                  className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-56"
+                  className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha sm:w-56"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => setFiltersOpen(prev => !prev)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-graphite transition hover:bg-bone"
               >
                 詳細フィルタ
                 {activeFilterCount > 0 && (
-                  <span className="rounded-full bg-[#174c33] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="rounded-full bg-ink px-1.5 py-0.5 text-[10px] font-semibold text-paper">
                     {activeFilterCount}
                   </span>
                 )}
@@ -610,7 +613,7 @@ export default function SalesPage() {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="rounded-xl px-3 py-2 text-sm text-[#68756c] underline-offset-2 hover:underline"
+                  className="rounded-xl px-3 py-2 text-sm text-mist underline-offset-2 hover:underline"
                 >
                   リセット
                 </button>
@@ -621,14 +624,14 @@ export default function SalesPage() {
                   onClick={() => setShowCompleted(prev => !prev)}
                   className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                     showCompleted
-                      ? 'border-[#174c33] bg-[#174c33] text-white'
-                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'border-[#174c33] bg-ink text-paper'
+                      : 'border-line bg-white text-graphite hover:bg-bone'
                   }`}
                   title="入金済み かつ 発送完了の案件"
                 >
                   {showCompleted ? '完了案件も表示中' : '完了案件を表示'}
                   {completedCount > 0 && (
-                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${showCompleted ? 'bg-white/25 text-white' : 'bg-[#ece8db] text-[#173c2a]'}`}>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${showCompleted ? 'bg-white/25 text-paper' : 'bg-[#ece8db] text-ink'}`}>
                       {completedCount}
                     </span>
                   )}
@@ -647,36 +650,36 @@ export default function SalesPage() {
                   onClick={() => toggleSetItem(setStatusFilters, statusFilters, status)}
                   className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                     active
-                      ? 'bg-[#174c33] text-white'
-                      : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                      ? 'bg-ink text-paper'
+                      : 'border border-line bg-white text-ink hover:bg-[#ece8db]'
                   }`}
                 >
                   {getStatusLabel(status)}
                 </button>
               )
             })}
-            <span className="self-center text-[11px] text-[#68756c]">
+            <span className="self-center text-[11px] text-mist">
               {statusFilters.size === 0 ? '全ステータス表示中' : `${statusFilters.size} ステータス選択中`}
             </span>
           </div>
 
           {filtersOpen && (
-            <div className="mt-3 grid gap-4 rounded-2xl border border-[#e6dfcf] bg-[#faf8f1] p-4 lg:grid-cols-2">
+            <div className="mt-3 grid gap-4 rounded-2xl border border-[#e6dfcf] bg-bone p-4 lg:grid-cols-2">
               <div>
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[#68756c]">期間（作成日）</p>
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-mist">期間（作成日）</p>
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={e => setDateFrom(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full rounded-lg border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                   />
-                  <span className="text-xs text-[#68756c]">〜</span>
+                  <span className="text-xs text-mist">〜</span>
                   <input
                     type="date"
                     value={dateTo}
                     onChange={e => setDateTo(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    className="w-full rounded-lg border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
                   />
                 </div>
               </div>
@@ -725,7 +728,7 @@ export default function SalesPage() {
 
           <div className={`mt-5 space-y-3 ${mainTab === 'records' ? 'md:hidden' : 'hidden'}`}>
             {!loading && sortedSales.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+              <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-mist">
                 条件に合う販売案件はありません。
               </div>
             )}
@@ -733,12 +736,12 @@ export default function SalesPage() {
               <div
                 key={record.id}
                 onClick={() => openDetail(record.id)}
-                className="cursor-pointer rounded-2xl border border-[#ece5d7] bg-[#faf8f2] p-4 transition hover:border-[#bcb39a]"
+                className="cursor-pointer rounded-2xl border border-line bg-bone p-4 transition hover:border-[#bcb39a]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-medium text-[#173c2a]">{record.buyerName}</div>
-                    <div className="mt-1 text-xs text-[#68756c]">{record.country} / 納期 {record.dueDate || '-'}</div>
+                    <div className="font-medium text-ink">{record.buyerName}</div>
+                    <div className="mt-1 text-xs text-mist">{record.country} / 納期 {record.dueDate || '-'}</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <SalesStatusBadge status={record.status} />
@@ -747,26 +750,26 @@ export default function SalesPage() {
                   </div>
                 </div>
                 <div className="mt-3 rounded-xl bg-white p-3">
-                  <div className="text-sm text-[#173c2a]">
+                  <div className="text-sm text-ink">
                     {record.items[0]?.productName ?? record.productName}
                     {record.items.length > 1 && (
-                      <span className="text-xs text-[#68756c]"> +他{record.items.length - 1}件</span>
+                      <span className="text-xs text-mist"> +他{record.items.length - 1}件</span>
                     )}
                   </div>
-                  <div className="mt-1 text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
+                  <div className="mt-1 text-xs text-mist">{record.items[0]?.productSku ?? record.productSku}</div>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                  <div className="rounded-xl bg-white p-3 text-xs text-mist">
                     <div>数量 {formatKg(record.quantityKg)}</div>
-                    <div className="mt-1 font-semibold text-[#173c2a]">請求額(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
+                    <div className="mt-1 font-semibold text-ink">請求額(税込) {formatCurrency(computeSaleTaxIncluded(record))}</div>
                     <div className="mt-1">
                       （税抜 {formatCurrency(record.invoiceAmount || record.revenue)}
                       {((record.shippingFee || 0) > 0 || (record.fees ?? []).length > 0) && <> ＝商品 {formatCurrency(record.revenue)}{(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}{(record.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(record.fees))}</>}</>}）
                     </div>
                     <div className="mt-1">原価 {formatCurrency(record.costAmount)}</div>
-                    <div className="mt-1 font-semibold text-emerald-700">粗利 {formatCurrency(record.grossProfit)}</div>
+                    <div className="mt-1 font-semibold text-matcha">粗利 {formatCurrency(record.grossProfit)}</div>
                   </div>
-                  <div className="rounded-xl bg-white p-3 text-xs text-[#68756c]">
+                  <div className="rounded-xl bg-white p-3 text-xs text-mist">
                     <div>メモ {record.notes || '-'}</div>
                   </div>
                 </div>
@@ -774,13 +777,13 @@ export default function SalesPage() {
                   <button
                     onClick={() => handleDuplicate(record)}
                     aria-label="複製"
-                    className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                    className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                   >
                     <Copy size={16} />
                   </button>
                   <button
                     onClick={() => handleDelete(record)}
-                    className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                    className="rounded-lg p-2 text-alert transition hover:bg-alert/5 hover:text-alert"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -792,7 +795,7 @@ export default function SalesPage() {
           <div className={`mt-5 -mx-5 overflow-x-auto ${mainTab === 'records' ? 'hidden md:block' : 'hidden'}`}>
             <table className="min-w-[1280px] text-sm">
               <thead>
-                <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                <tr className="border-b border-[#e6dfcf] text-left text-mist">
                   <SortTh label="ステータス" col="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortTh label="購入者" col="buyerName" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                   <SortTh label="発注日" col="orderDate" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -812,7 +815,7 @@ export default function SalesPage() {
               <tbody>
                 {!loading && sortedSales.length === 0 && (
                   <tr>
-                    <td colSpan={14} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={14} className="px-3 py-10 text-center text-sm text-mist">
                       条件に合う販売案件はありません。
                     </td>
                   </tr>
@@ -821,7 +824,7 @@ export default function SalesPage() {
                   <tr
                     key={record.id}
                     onClick={() => openDetail(record.id)}
-                    className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
+                    className="cursor-pointer border-b border-[#f0ebdf] text-ink transition hover:bg-bone"
                   >
                     <td className="whitespace-nowrap px-3 py-4">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -831,23 +834,23 @@ export default function SalesPage() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 font-medium">{record.buyerName}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{record.orderDate || '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-[#68756c]">{formatDateOnly(record.createdAt)}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-mist">{record.orderDate || '-'}</td>
+                    <td className="whitespace-nowrap px-3 py-4 text-mist">{formatDateOnly(record.createdAt)}</td>
                     <td className="px-3 py-4 align-top">
                       <div className="line-clamp-2 max-w-[260px]">
                         {record.items[0]?.productName ?? record.productName}
                         {record.items.length > 1 && (
-                          <span className="text-xs text-[#68756c]"> +他{record.items.length - 1}件</span>
+                          <span className="text-xs text-mist"> +他{record.items.length - 1}件</span>
                         )}
                       </div>
-                      <div className="truncate max-w-[260px] text-xs text-[#68756c]">{record.items[0]?.productSku ?? record.productSku}</div>
+                      <div className="truncate max-w-[260px] text-xs text-mist">{record.items[0]?.productSku ?? record.productSku}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4">{formatKg(record.quantityKg)}</td>
                     <td className="whitespace-nowrap px-3 py-4 align-top">
-                      <div className="font-semibold text-[#173c2a]">{formatCurrency(computeSaleTaxIncluded(record))}</div>
-                      <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
+                      <div className="font-semibold text-ink">{formatCurrency(computeSaleTaxIncluded(record))}</div>
+                      <div className="text-[10px] text-mist">税抜 {formatCurrency(record.invoiceAmount || record.revenue)}</div>
                       {((record.shippingFee || 0) > 0 || (record.fees ?? []).length > 0) && (
-                        <div className="truncate max-w-[220px] text-[10px] text-[#68756c]">
+                        <div className="truncate max-w-[220px] text-[10px] text-mist">
                           商品 {formatCurrency(record.revenue)}
                           {(record.shippingFee || 0) > 0 && <> ＋送料 {formatCurrency(record.shippingFee)}</>}
                           {(record.fees ?? []).length > 0 && <> ＋諸費用 {formatCurrency(sumSaleFees(record.fees))}</>}
@@ -855,7 +858,7 @@ export default function SalesPage() {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4">{formatCurrency(record.costAmount)}</td>
-                    <td className="whitespace-nowrap px-3 py-4 font-medium text-emerald-700">{formatCurrency(record.grossProfit)}</td>
+                    <td className="whitespace-nowrap px-3 py-4 font-medium text-matcha">{formatCurrency(record.grossProfit)}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.country}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.dueDate || '-'}</td>
                     <td className="whitespace-nowrap px-3 py-4">{record.paymentMethod || '-'}</td>
@@ -865,13 +868,13 @@ export default function SalesPage() {
                         <button
                           onClick={() => handleDuplicate(record)}
                           aria-label="複製"
-                          className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                          className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                         >
                           <Copy size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(record)}
-                          className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 hover:text-red-700"
+                          className="rounded-lg p-2 text-alert transition hover:bg-alert/5 hover:text-alert"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -917,22 +920,22 @@ function FilterMultiSelect({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-[#68756c]">
-          {label} <span className="ml-1 text-[10px] text-[#a59f8c]">({selected.size === 0 ? '全' : selected.size}/{options.length})</span>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-mist">
+          {label} <span className="ml-1 text-[10px] text-mist">({selected.size === 0 ? '全' : selected.size}/{options.length})</span>
         </p>
         {selected.size > 0 && (
           <button
             type="button"
             onClick={onClear}
-            className="text-[11px] text-[#174c33] underline-offset-2 hover:underline"
+            className="text-[11px] text-matchaDeep underline-offset-2 hover:underline"
           >
             クリア
           </button>
         )}
       </div>
-      <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2">
+      <div className="max-h-32 overflow-y-auto rounded-lg border border-line bg-white p-2">
         {options.length === 0 ? (
-          <p className="px-1 py-2 text-xs text-[#a59f8c]">選択肢がありません</p>
+          <p className="px-1 py-2 text-xs text-mist">選択肢がありません</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {options.map(opt => {
@@ -944,8 +947,8 @@ function FilterMultiSelect({
                   onClick={() => onToggle(opt.value)}
                   className={`rounded-full px-2.5 py-0.5 text-xs transition ${
                     active
-                      ? 'bg-[#174c33] text-white'
-                      : 'border border-[#d9d1be] bg-white text-[#173c2a] hover:bg-[#ece8db]'
+                      ? 'bg-ink text-paper'
+                      : 'border border-line bg-white text-ink hover:bg-[#ece8db]'
                   }`}
                   title={opt.label}
                 >
@@ -974,7 +977,7 @@ function AggregateTable({ rows, groupLabel }: { rows: AggregateRow[]; groupLabel
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-[#d9d1be] px-4 py-10 text-center text-sm text-[#68756c]">
+      <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-mist">
         集計対象の販売案件がありません。
       </div>
     )
@@ -983,7 +986,7 @@ function AggregateTable({ rows, groupLabel }: { rows: AggregateRow[]; groupLabel
   return (
     <table className="min-w-full text-sm">
       <thead>
-        <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+        <tr className="border-b border-[#e6dfcf] text-left text-mist">
           <th className="px-3 py-3 font-medium">{groupLabel}</th>
           <th className="px-3 py-3 text-right font-medium">件数</th>
           <th className="px-3 py-3 text-right font-medium">数量</th>
@@ -997,24 +1000,24 @@ function AggregateTable({ rows, groupLabel }: { rows: AggregateRow[]; groupLabel
         {rows.map(row => {
           const margin = row.revenue > 0 ? (row.grossProfit / row.revenue) * 100 : 0
           return (
-            <tr key={row.key} className="border-b border-[#f0ebdf] text-[#173c2a]">
+            <tr key={row.key} className="border-b border-[#f0ebdf] text-ink">
               <td className="px-3 py-3 font-medium">{row.label}</td>
               <td className="px-3 py-3 text-right">{row.count}</td>
               <td className="px-3 py-3 text-right">{formatKg(row.quantityKg)}</td>
               <td className="px-3 py-3 text-right">{formatCurrency(row.revenue)}</td>
-              <td className="px-3 py-3 text-right text-[#68756c]">{formatCurrency(row.costAmount)}</td>
-              <td className="px-3 py-3 text-right font-semibold text-emerald-700">{formatCurrency(row.grossProfit)}</td>
+              <td className="px-3 py-3 text-right text-mist">{formatCurrency(row.costAmount)}</td>
+              <td className="px-3 py-3 text-right font-semibold text-matcha">{formatCurrency(row.grossProfit)}</td>
               <td className="px-3 py-3 text-right">{margin.toFixed(1)}%</td>
             </tr>
           )
         })}
-        <tr className="bg-[#faf8f1] text-[#173c2a]">
+        <tr className="bg-bone text-ink">
           <td className="px-3 py-3 font-semibold">合計</td>
           <td className="px-3 py-3 text-right font-semibold">{totals.count}</td>
           <td className="px-3 py-3 text-right font-semibold">{formatKg(totals.quantityKg)}</td>
           <td className="px-3 py-3 text-right font-semibold">{formatCurrency(totals.revenue)}</td>
           <td className="px-3 py-3 text-right font-semibold">{formatCurrency(totals.costAmount)}</td>
-          <td className="px-3 py-3 text-right font-semibold text-emerald-700">{formatCurrency(totals.grossProfit)}</td>
+          <td className="px-3 py-3 text-right font-semibold text-matcha">{formatCurrency(totals.grossProfit)}</td>
           <td className="px-3 py-3 text-right font-semibold">{totalMargin.toFixed(1)}%</td>
         </tr>
       </tbody>

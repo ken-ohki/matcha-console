@@ -86,16 +86,16 @@ function PurchaseOrderModal({
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-[#173c2a]">{initial ? '発注を編集' : '発注を登録'}</h2>
-            <p className="mt-1 text-sm text-[#68756c]">入荷の反映は「入荷管理」で行います。在庫未登録の商品も発注できます。</p>
+            <h2 className="text-xl font-semibold text-ink">{initial ? '発注を編集' : '発注を登録'}</h2>
+            <p className="mt-1 text-sm text-mist">入荷の反映は「入荷管理」で行います。在庫未登録の商品も発注できます。</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 transition hover:bg-bone hover:text-mist">
             <X size={18} />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="mb-4 rounded-xl border border-alert/40 bg-alert/5 px-4 py-3 text-sm text-alert">{error}</div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -111,14 +111,14 @@ function PurchaseOrderModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
+              className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm text-graphite transition hover:bg-bone"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723] disabled:bg-[#4f7c65]"
+              className="flex-1 rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep disabled:bg-[#4f7c65]"
             >
               {saving ? '保存中...' : '保存'}
             </button>
@@ -202,18 +202,18 @@ export default function PurchaseOrdersPage() {
         <PageTabs tabs={PURCHASING_TABS} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-[#5e44a8]">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#ece8ff] px-3 py-1 text-sm font-medium text-graphite">
               <ClipboardList size={15} />
               発注管理
             </div>
-            <h1 className="mt-3 text-3xl font-bold text-[#173c2a]">仕入れ発注の一覧</h1>
-            <p className="mt-2 text-sm text-[#68756c]">行をクリックすると詳細ページで編集・支払い・入荷を管理できます。</p>
+            <h1 className="mt-3 text-3xl font-bold text-ink">仕入れ発注の一覧</h1>
+            <p className="mt-2 text-sm text-mist">行をクリックすると詳細ページで編集・支払い・入荷を管理できます。</p>
           </div>
           {canEdit && (
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="inline-flex items-center gap-2 self-start rounded-xl bg-[#174c33] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#123723]"
+              className="inline-flex items-center gap-2 self-start rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-paper transition hover:bg-matchaDeep"
             >
               <Plus size={16} />
               新規発注
@@ -222,19 +222,19 @@ export default function PurchaseOrdersPage() {
         </div>
 
         {message && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="rounded-xl border border-matcha/40 bg-bone px-4 py-3 text-sm text-matcha">
             {message}
           </div>
         )}
 
-        <div className="rounded-3xl border border-[#d9d1be] bg-white p-5 shadow-sm">
+        <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-semibold text-[#173c2a]">発注一覧</h2>
+            <h2 className="text-lg font-semibold text-ink">発注一覧</h2>
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value as PurchaseOrderStatus | '')}
-                className="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                className="rounded-xl border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               >
                 <option value="">すべてのステータス</option>
                 <option value="placed">発注済</option>
@@ -248,7 +248,7 @@ export default function PurchaseOrdersPage() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="発注先・商品で検索"
-                  className="w-full rounded-xl border border-gray-300 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 sm:w-64"
+                  className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha sm:w-64"
                 />
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function PurchaseOrdersPage() {
           <div className="mt-5 -mx-4 overflow-x-auto md:-mx-6">
             <table className="min-w-[1100px] text-sm">
               <thead>
-                <tr className="border-b border-[#e6dfcf] text-left text-[#68756c]">
+                <tr className="border-b border-[#e6dfcf] text-left text-mist">
                   <th className="whitespace-nowrap px-3 py-3 font-medium">状態</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">発注先</th>
                   <th className="whitespace-nowrap px-3 py-3 font-medium">商品</th>
@@ -274,7 +274,7 @@ export default function PurchaseOrdersPage() {
               <tbody>
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-3 py-10 text-center text-sm text-[#68756c]">
+                    <td colSpan={11} className="px-3 py-10 text-center text-sm text-mist">
                       発注はまだ登録されていません。
                     </td>
                   </tr>
@@ -312,7 +312,7 @@ function PoListRow({ order, onOpen }: { order: PurchaseOrder; onOpen: () => void
   return (
     <tr
       onClick={onOpen}
-      className="cursor-pointer border-b border-[#f0ebdf] text-[#173c2a] transition hover:bg-[#faf8f2]"
+      className="cursor-pointer border-b border-[#f0ebdf] text-ink transition hover:bg-bone"
     >
       <td className="whitespace-nowrap px-3 py-3"><StatusBadge status={order.status} /></td>
       <td className={`whitespace-nowrap px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>
@@ -320,19 +320,19 @@ function PoListRow({ order, onOpen }: { order: PurchaseOrder; onOpen: () => void
       </td>
       <td className="whitespace-nowrap px-3 py-3">
         <div className="font-medium">{first?.productName ?? '-'}</div>
-        <div className="text-[11px] text-[#68756c]">{first?.productSku}{rest}</div>
+        <div className="text-[11px] text-mist">{first?.productSku}{rest}</div>
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-right">{formatKg(order.totalQuantityKg)}</td>
       <td className="whitespace-nowrap px-3 py-3 text-right">
         <div className="font-semibold">{formatCurrency(computePoTaxIncluded(order))}</div>
-        <div className="text-[10px] text-[#68756c]">税抜 {formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))}</div>
+        <div className="text-[10px] text-mist">税抜 {formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))}</div>
       </td>
-      <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.orderDate)}</td>
-      <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.expectedDeliveryDate)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-mist">{formatDate(order.orderDate)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-mist">{formatDate(order.expectedDeliveryDate)}</td>
       <td className="whitespace-nowrap px-3 py-3">
         <PaymentStatusBadge status={order.paymentStatus} hasInvoice={!!order.invoice} />
       </td>
-      <td className="whitespace-nowrap px-3 py-3 text-[#68756c]">{formatDate(order.paymentDueDate)}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-mist">{formatDate(order.paymentDueDate)}</td>
       <td className="whitespace-nowrap px-3 py-3">
         {order.invoice ? (
           <a
@@ -340,13 +340,13 @@ function PoListRow({ order, onOpen }: { order: PurchaseOrder; onOpen: () => void
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
-            className="inline-flex items-center gap-1 rounded-lg bg-[#f7f5ee] px-2 py-1 text-[11px] text-[#174c33] hover:bg-[#eef3eb]"
+            className="inline-flex items-center gap-1 rounded-lg bg-bone px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
             title={order.invoice.name}
           >
             <FileText size={12} /> PDF
           </a>
         ) : (
-          <span className="text-[11px] text-[#a59f8c]">未添付</span>
+          <span className="text-[11px] text-mist">未添付</span>
         )}
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-right text-gray-400">
