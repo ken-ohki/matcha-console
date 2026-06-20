@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 import { Check, X, Ban, RefreshCw, Search } from 'lucide-react'
 
 interface Member {
@@ -16,6 +17,7 @@ interface Member {
   country?: string
   website?: string
   businessType?: string
+  businessTypes?: string[]
   socialMedia?: string
   businessStage?: string
   annualVolumeEstimate?: string
@@ -183,7 +185,7 @@ export default function WholesaleMembersPage() {
                       <td className="px-4 py-3 text-gray-700">{m.contactName ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-700">{m.email ?? '—'}</td>
                       <td className="px-4 py-3 text-gray-700">{m.country ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-700">{m.businessType ?? '—'}</td>
+                      <td className="px-4 py-3 text-gray-700">{businessTypeText(m.businessTypes, m.businessType)}</td>
                       <td className="px-4 py-3 text-gray-700">{m.annualVolumeEstimate ? VOLUME_LABEL[m.annualVolumeEstimate] ?? m.annualVolumeEstimate : '—'}</td>
                       <td className="px-4 py-3 capitalize text-gray-700">{m.rank ?? 'standard'}</td>
                       <td className="px-4 py-3 text-gray-700">{fmtDate(m.createdAtMs)}</td>

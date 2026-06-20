@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Check, X, Ban, RefreshCw } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 
 interface Member {
   uid: string
@@ -18,10 +19,12 @@ interface Member {
   address?: string
   website?: string
   businessType?: string
+  businessTypes?: string[]
   socialMedia?: string
   businessStage?: string
   annualVolumeEstimate?: string
   taxId?: string
+  featureConsent?: boolean
   rank?: string
   buyerId?: string
   createdAtMs?: number
@@ -214,12 +217,13 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                 <Field label="国 / 地域" value={member.country} />
                 <Field label="郵便番号" value={member.postalCode} />
                 <Field label="住所" value={member.address} />
-                <Field label="業種" value={member.businessType} />
+                <Field label="業種" value={businessTypeText(member.businessTypes, member.businessType)} />
                 <Field label="ウェブサイト" value={member.website} />
                 <Field label="SNS" value={member.socialMedia} />
                 <Field label="開業状況" value={member.businessStage ? BUSINESS_STAGE_LABEL[member.businessStage] ?? member.businessStage : undefined} />
                 <Field label="年間購入見込" value={member.annualVolumeEstimate ? VOLUME_LABEL[member.annualVolumeEstimate] ?? member.annualVolumeEstimate : undefined} />
                 <Field label="税番号 / 登録番号" value={member.taxId} />
+                <Field label="ビジネス紹介の許可" value={member.featureConsent ? '許可' : '不可'} />
               </dl>
             </section>
 
