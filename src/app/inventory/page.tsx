@@ -38,6 +38,14 @@ function formatKg(value: number): string {
   return `${value.toFixed(1)} kg`
 }
 
+/** Color-code a stock quantity by tier: マイナス / 0 / 10kg未満 / 10kg以上. */
+function stockColorClass(kg: number): string {
+  if (kg < 0) return 'text-alert font-bold'   // マイナス（在庫割れ）
+  if (kg === 0) return 'text-[#c2410c]'        // 0（在庫切れ）
+  if (kg < 10) return 'text-[#a87b1e]'         // 10kg未満（残少）
+  return 'text-matchaDeep'                      // 10kg以上（十分）
+}
+
 function InventoryFilterBar({
   groupProducts,
   masters,
@@ -875,7 +883,7 @@ export default function InventoryPage() {
 
               <div className="mt-4 rounded-xl bg-bone p-3">
                 <p className="text-xs text-mist">残在庫</p>
-                <p className={`mt-1 text-lg font-semibold ${product.currentStockKg < 0 ? 'text-alert' : 'text-ink'}`}>{formatKg(product.currentStockKg)}</p>
+                <p className={`mt-1 text-lg font-semibold ${stockColorClass(product.currentStockKg)}`}>{formatKg(product.currentStockKg)}</p>
               </div>
 
               {user?.role === 'admin' && (
@@ -982,7 +990,7 @@ export default function InventoryPage() {
                     <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'origin', product.origins))}</td>
                     <td className="px-3 py-3 text-graphite">{compactText(product.supplier)}</td>
                     <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'certification', product.certifications))}</td>
-                    <td className={`px-3 py-3 text-right font-semibold ${product.currentStockKg < 0 ? 'text-alert' : 'text-ink'}`}>{product.currentStockKg.toFixed(1)} kg</td>
+                    <td className={`px-3 py-3 text-right font-semibold ${stockColorClass(product.currentStockKg)}`}>{product.currentStockKg.toFixed(1)} kg</td>
                     <td className="px-3 py-3 text-right font-semibold text-ink">{formatCurrency(wholesale)}</td>
                     <td className="px-3 py-3 text-right text-graphite">{formatCurrency(cost)}</td>
                     <td className={`px-3 py-3 text-right ${margin == null ? 'text-mist' : margin < 0 ? 'text-alert' : 'text-matcha'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>

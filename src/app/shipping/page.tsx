@@ -7,33 +7,42 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
-import type { MasterEntry, SaleRecord, ShippingStatus } from '@/types'
+import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import type { MasterEntry, SaleRecord } from '@/types'
 import { translateValue } from '@/lib/masters'
-import { Box, ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
+import { ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
 
-const SHIPPING_LABELS: Record<ShippingStatus, string> = {
-  ordering: '発注中',
-  producing: '製造中',
-  ready_to_ship: '発送準備中',
+// Action state drives the shipping workflow: an order can only be shipped once it
+// is paid. We separate "要発送" (paid, not yet shipped — the staff to-do) from
+// "入金待ち" (can't ship yet) and "発送完了".
+type ActionState = 'to_ship' | 'awaiting_payment' | 'shipped'
+
+function actionState(s: SaleRecord): ActionState {
+  if (s.shippingStatus === 'shipped') return 'shipped'
+  return s.paymentStatus === 'paid' ? 'to_ship' : 'awaiting_payment'
+}
+
+const ACTION_LABELS: Record<ActionState, string> = {
+  to_ship: '要発送',
+  awaiting_payment: '入金待ち',
   shipped: '発送完了',
 }
-const SHIPPING_COLORS: Record<ShippingStatus, string> = {
-  ordering: 'bg-bone text-graphite',
-  producing: 'bg-bone text-graphite',
-  ready_to_ship: 'bg-bone text-[#a87b1e]',
+const ACTION_COLORS: Record<ActionState, string> = {
+  to_ship: 'bg-[#fff3df] text-[#a87b1e]',
+  awaiting_payment: 'bg-bone text-graphite',
   shipped: 'bg-bone text-matcha',
 }
 
-function ShippingBadge({ status }: { status: ShippingStatus }) {
+function ActionBadge({ state }: { state: ActionState }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${SHIPPING_COLORS[status]}`}>
-      {SHIPPING_LABELS[status]}
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${ACTION_COLORS[state]}`}>
+      {ACTION_LABELS[state]}
     </span>
   )
 }
 
-type FilterChip = 'all' | 'ordering' | 'producing' | 'ready_to_ship' | 'shipped' | 'overdue'
+type FilterChip = 'all' | 'to_ship' | 'awaiting_payment' | 'shipped' | 'overdue'
 type View = 'list' | 'history' | 'slips'
 
 export default function ShippingPage() {
@@ -42,8 +51,9 @@ export default function ShippingPage() {
   const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterChip, setFilterChip] = useState<FilterChip>('all')
+  const [filterChip, setFilterChip] = useState<FilterChip>('to_ship')
   const [view, setView] = useState<View>('list')
+  const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
 
   const load = async () => {
     setLoading(true)
@@ -75,15 +85,30 @@ export default function ShippingPage() {
   const openDetail = (id: string) => router.push(`/wholesale/orders/${id}`)
   const methodLabel = (value?: string) => value ? translateValue(masters, 'shipping_method', value) : '（未設定）'
 
+  // Issue the delivery note (納品書) PDF to enclose with the shipment.
+  const openDeliveryNote = async (id: string) => {
+    const current = getFirebaseAuthInstance().currentUser
+    if (!current) { window.alert('未ログインです。'); return }
+    const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
+      headers: { Authorization: `Bearer ${await current.getIdToken()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      window.alert(`納品書の発行に失敗しました。${d.detail || d.error || ''}`)
+      return
+    }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
   // Only confirmed sales need shipping
   const targetSales = useMemo(() => sales.filter(s => s.status === 'confirmed'), [sales])
 
   const kpis = useMemo(() => {
-    const byStatus: Record<ShippingStatus, number> = { ordering: 0, producing: 0, ready_to_ship: 0, shipped: 0 }
-    targetSales.forEach(s => { byStatus[s.shippingStatus] = (byStatus[s.shippingStatus] ?? 0) + 1 })
+    const byState: Record<ActionState, number> = { to_ship: 0, awaiting_payment: 0, shipped: 0 }
+    targetSales.forEach(s => { byState[actionState(s)] += 1 })
     const today = todayIso()
     const overdue = targetSales.filter(s => s.shippingStatus !== 'shipped' && s.dueDate && s.dueDate < today).length
-    return { ...byStatus, overdue }
+    return { ...byState, overdue }
   }, [targetSales])
 
   const matchesSearch = (s: SaleRecord) => {
@@ -104,15 +129,16 @@ export default function ShippingPage() {
     if (filterChip === 'overdue') {
       list = list.filter(s => s.shippingStatus !== 'shipped' && s.dueDate && s.dueDate < today)
     } else if (filterChip !== 'all') {
-      list = list.filter(s => s.shippingStatus === filterChip)
+      list = list.filter(s => actionState(s) === filterChip)
     }
     list = list.filter(matchesSearch)
+    // Action priority: 要発送 → 入金待ち → 発送完了; within the unshipped, soonest due first.
+    const rank: Record<ActionState, number> = { to_ship: 0, awaiting_payment: 1, shipped: 2 }
     return [...list].sort((a, b) => {
-      const aShipped = a.shippingStatus === 'shipped'
-      const bShipped = b.shippingStatus === 'shipped'
-      if (aShipped !== bShipped) return aShipped ? 1 : -1
-      if (!aShipped) return (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31')
-      return (b.shippingDate ?? '').localeCompare(a.shippingDate ?? '')
+      const ra = rank[actionState(a)], rb = rank[actionState(b)]
+      if (ra !== rb) return ra - rb
+      if (ra === 2) return (b.shippingDate ?? '').localeCompare(a.shippingDate ?? '')
+      return (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31')
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetSales, filterChip, search, masters])
@@ -159,10 +185,9 @@ export default function ShippingPage() {
           </p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-5">
-          <KPICard title="発注中" value={`${kpis.ordering} 件`} icon={<Package size={16} />} />
-          <KPICard title="製造中" value={`${kpis.producing} 件`} icon={<Box size={16} />} />
-          <KPICard title="発送準備中" value={`${kpis.ready_to_ship} 件`} icon={<Send size={16} />} color="amber" />
+        <div className="grid gap-3 md:grid-cols-4">
+          <KPICard title="要発送（入金済・未発送）" value={`${kpis.to_ship} 件`} icon={<Send size={16} />} color={kpis.to_ship > 0 ? 'amber' : 'default'} />
+          <KPICard title="入金待ち" value={`${kpis.awaiting_payment} 件`} icon={<Package size={16} />} />
           <KPICard title="発送完了" value={`${kpis.shipped} 件`} icon={<PackageCheck size={16} />} color="green" />
           <KPICard title="期限超過" value={`${kpis.overdue} 件`} color={kpis.overdue > 0 ? 'red' : 'default'} />
         </div>
@@ -188,12 +213,11 @@ export default function ShippingPage() {
             {view === 'list' && (
               <div className="flex flex-wrap gap-1.5">
                 {([
-                  ['all', `すべて (${targetSales.length})`],
-                  ['ordering', `発注中 (${kpis.ordering})`],
-                  ['producing', `製造中 (${kpis.producing})`],
-                  ['ready_to_ship', `発送準備中 (${kpis.ready_to_ship})`],
+                  ['to_ship', `要発送 (${kpis.to_ship})`],
+                  ['awaiting_payment', `入金待ち (${kpis.awaiting_payment})`],
                   ['shipped', `発送完了 (${kpis.shipped})`],
                   ['overdue', `期限超過 (${kpis.overdue})`],
+                  ['all', `すべて (${targetSales.length})`],
                 ] as const).map(([key, label]) => (
                   <button
                     key={key}
@@ -210,7 +234,14 @@ export default function ShippingPage() {
                 ))}
               </div>
             )}
-            <div className="relative ml-auto w-full sm:w-64">
+            <div className="ml-auto flex items-center gap-1 text-[11px] text-mist">
+              <span>納品書:</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-line">
+                <button type="button" onClick={() => setDocLang('ja')} className={`px-2 py-1 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
+                <button type="button" onClick={() => setDocLang('en')} className={`px-2 py-1 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>EN</button>
+              </div>
+            </div>
+            <div className="relative w-full sm:w-64">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
@@ -227,7 +258,7 @@ export default function ShippingPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#e6dfcf] text-left text-mist">
-                    <th className="px-3 py-3 font-medium">ステータス</th>
+                    <th className="px-3 py-3 font-medium">対応</th>
                     <th className="px-3 py-3 font-medium">販売先 / 国</th>
                     <th className="px-3 py-3 font-medium">商品</th>
                     <th className="px-3 py-3 font-medium">メモ</th>
@@ -235,24 +266,26 @@ export default function ShippingPage() {
                     <th className="px-3 py-3 font-medium">発送方法</th>
                     <th className="px-3 py-3 font-medium">発送日</th>
                     <th className="px-3 py-3 font-medium">追跡番号</th>
+                    <th className="px-3 py-3 font-medium">納品書</th>
                     <th className="px-3 py-3 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {!loading && filtered.length === 0 && (
-                    <tr><td colSpan={9} className="px-3 py-10 text-center text-sm text-mist">該当する販売案件がありません。</td></tr>
+                    <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-mist">該当する販売案件がありません。</td></tr>
                   )}
                   {filtered.map(sale => {
                     const first = sale.items[0]
                     const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
+                    const state = actionState(sale)
                     const overdue = sale.shippingStatus !== 'shipped' && sale.dueDate && sale.dueDate < todayIso()
                     return (
                       <tr
                         key={sale.id}
                         onClick={() => openDetail(sale.id)}
-                        className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-alert/5/50 hover:bg-alert/5' : 'hover:bg-bone'}`}
+                        className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-alert/5/50 hover:bg-alert/5' : state === 'to_ship' ? 'bg-[#fffaf0] hover:bg-[#fff3df]' : 'hover:bg-bone'}`}
                       >
-                        <td className="whitespace-nowrap px-3 py-3"><ShippingBadge status={sale.shippingStatus} /></td>
+                        <td className="whitespace-nowrap px-3 py-3"><ActionBadge state={state} /></td>
                         <td className="px-3 py-3">
                           <div className="font-medium text-ink">{sale.buyerName}</div>
                           <div className="text-[11px] text-mist">{sale.country || '-'}</div>
@@ -270,6 +303,16 @@ export default function ShippingPage() {
                         <td className="whitespace-nowrap px-3 py-3">{sale.shippingMethod ? methodLabel(sale.shippingMethod) : <span className="text-mist">-</span>}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.shippingDate || '-'}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.trackingNumber || '-'}</td>
+                        <td className="px-3 py-3">
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); void openDeliveryNote(sale.id) }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-bone px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
+                            title="納品書を発行（同封用）"
+                          >
+                            <FileText size={12} /> 発行
+                          </button>
+                        </td>
                         <td className="px-3 py-3 text-right text-gray-400"><ChevronRight size={16} className="inline" /></td>
                       </tr>
                     )

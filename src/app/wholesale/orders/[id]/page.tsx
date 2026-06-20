@@ -21,6 +21,7 @@ interface Order {
   id: string
   orderNumber: string
   memberCompanyName?: string
+  memberEmail?: string
   contactName?: string
   phone?: string
   items?: OrderItem[]
@@ -100,6 +101,7 @@ export default function WholesaleOrderDetailPage() {
   const [carrierLabel, setCarrierLabel] = useState('')
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
+  const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -230,15 +232,31 @@ export default function WholesaleOrderDetailPage() {
 
   const downloadReceipt = async () => {
     if (!order) return
-    const atena = window.prompt('宛名（領収書）', `${order.memberCompanyName ?? ''} 御中`)
+    const en = docLang === 'en'
+    const atena = window.prompt(en ? 'Bill to (receipt)' : '宛名（領収書）', en ? (order.memberCompanyName ?? '') : `${order.memberCompanyName ?? ''} 御中`)
     if (atena === null) return
-    const proviso = window.prompt('但し書き', '抹茶代として')
+    const proviso = window.prompt(en ? 'For (description)' : '但し書き', en ? 'matcha products' : '抹茶代として')
     if (proviso === null) return
-    const res = await fetch(`/api/wholesale/orders/${id}/receipt?atena=${encodeURIComponent(atena)}&proviso=${encodeURIComponent(proviso)}`, {
+    const res = await fetch(`/api/wholesale/orders/${id}/receipt?atena=${encodeURIComponent(atena)}&proviso=${encodeURIComponent(proviso)}&lang=${docLang}`, {
       headers: { Authorization: `Bearer ${await token()}` },
     })
     if (!res.ok) {
-      window.alert('領収書の発行に失敗しました。')
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      window.alert(`領収書の発行に失敗しました。${d.detail || d.error || ''}`)
+      return
+    }
+    const blob = await res.blob()
+    window.open(URL.createObjectURL(blob), '_blank')
+  }
+
+  const downloadDeliveryNote = async () => {
+    if (!order) return
+    const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      window.alert(`納品書の発行に失敗しました。${d.detail || d.error || ''}`)
       return
     }
     const blob = await res.blob()
@@ -412,12 +430,19 @@ export default function WholesaleOrderDetailPage() {
               </dl>
             </Section>
 
-            {/* Delivery address */}
+            {/* Delivery address — one field per line for legibility */}
             <Section title="お届け先">
-              <p className="text-sm text-ink">
-                {[o.contactName, o.shippingPostalCode, o.shippingCountry, o.shippingAddress].filter(Boolean).join(' / ') || '—'}
-              </p>
-              {o.phone && <p className="mt-1 text-sm text-mist">TEL: {o.phone}</p>}
+              {[o.shippingAddress, o.shippingPostalCode, o.shippingCountry, o.contactName, o.phone, o.memberEmail].some(Boolean) ? (
+                <dl className="space-y-1 text-sm">
+                  <Field label="住所" value={[o.shippingAddress, o.shippingCountry].filter(Boolean).join(' / ')} />
+                  <Field label="名前" value={o.contactName} />
+                  <Field label="郵便番号" value={o.shippingPostalCode} />
+                  <Field label="電話番号" value={o.phone} />
+                  <Field label="メールアドレス" value={o.memberEmail} />
+                </dl>
+              ) : (
+                <p className="text-sm text-mist">—</p>
+              )}
               {o.buyerTaxId && <p className="mt-1 text-xs text-mist">税番号: {o.buyerTaxId}</p>}
               {o.notes && <p className="mt-2 text-sm text-mist">備考: {o.notes}</p>}
             </Section>
@@ -470,7 +495,16 @@ export default function WholesaleOrderDetailPage() {
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}
               {(o.status === 'paid' || o.status === 'shipped') && (
+                <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
+                  <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
+                  <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
+                </div>
+              )}
+              {(o.status === 'paid' || o.status === 'shipped') && (
                 <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>
+              )}
+              {(o.status === 'paid' || o.status === 'shipped') && (
+                <button onClick={downloadDeliveryNote} disabled={busy} className="btn-ghost">納品書を発行</button>
               )}
               {o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
@@ -488,6 +522,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="panel p-5">
       <h2 className="mb-bl-2 text-xs font-medium text-graphite">{title}</h2>
       {children}
+    </div>
+  )
+}
+
+function Field({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="flex gap-2">
+      <dt className="w-24 shrink-0 text-mist">{label}</dt>
+      <dd className="text-ink">{value || '—'}</dd>
     </div>
   )
 }

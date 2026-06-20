@@ -62,6 +62,8 @@ export default function WholesaleMembersPage() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('all')
+  const [countryFilter, setCountryFilter] = useState('all')
+  const [rankFilter, setRankFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
@@ -104,16 +106,28 @@ export default function WholesaleMembersPage() {
 
   const pendingCount = members.filter(m => m.status === 'pending').length
 
+  // Filter dropdown options derived from the data (countries) + known ranks.
+  const countryOptions = useMemo(
+    () => [...new Set(members.map(m => (m.country ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja')),
+    [members],
+  )
+  const rankOptions = useMemo(
+    () => [...new Set(['standard', 'premium', 'exclusive', ...members.map(m => (m.rank ?? '').trim()).filter(Boolean)])],
+    [members],
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return members
       .filter(m => (filter === 'all' ? true : m.status === filter))
+      .filter(m => (countryFilter === 'all' ? true : (m.country ?? '').trim() === countryFilter))
+      .filter(m => (rankFilter === 'all' ? true : (m.rank ?? 'standard').trim() === rankFilter))
       .filter(m => {
         if (!q) return true
         return [m.companyName, m.contactName, m.email, m.country].filter(Boolean).join(' ').toLowerCase().includes(q)
       })
       .sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0))
-  }, [members, filter, search])
+  }, [members, filter, countryFilter, rankFilter, search])
 
   return (
     <AppLayout>
@@ -143,6 +157,26 @@ export default function WholesaleMembersPage() {
                 {f.key === 'pending' && pendingCount > 0 && <span className="ml-1 text-xs">({pendingCount})</span>}
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={countryFilter}
+              onChange={e => setCountryFilter(e.target.value)}
+              className="rounded-lg border border-line bg-paper py-2 pl-3 pr-7 text-sm text-ink outline-none focus:border-ink"
+              aria-label="国で絞り込み"
+            >
+              <option value="all">国: すべて</option>
+              {countryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              value={rankFilter}
+              onChange={e => setRankFilter(e.target.value)}
+              className="rounded-lg border border-line bg-paper py-2 pl-3 pr-7 text-sm capitalize text-ink outline-none focus:border-ink"
+              aria-label="ランクで絞り込み"
+            >
+              <option value="all">ランク: すべて</option>
+              {rankOptions.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
           </div>
           <div className="relative ml-auto min-w-[220px] flex-1">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-mist" />
