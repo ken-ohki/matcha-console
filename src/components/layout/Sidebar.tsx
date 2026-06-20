@@ -34,7 +34,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
       { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
-      { href: '/wholesale/inquiries', label: '問い合わせ', icon: MessageSquare },
       { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
       { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
     ],

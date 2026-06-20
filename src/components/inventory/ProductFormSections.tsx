@@ -92,6 +92,7 @@ export function buildProductForm(
     showInCatalog: initial?.showInCatalog ?? true,
     featured: initial?.featured ?? false,
     inquireToOrder: initial?.inquireToOrder ?? false,
+    madeToOrder: initial?.madeToOrder ?? false,
     wholesaleAvailableKg: initial?.wholesaleAvailableKg,
     standardPackageKg: initial?.standardPackageKg,
     wholesaleOptions: initial?.wholesaleOptions,
@@ -169,6 +170,7 @@ export function finalizeProductInput(
     showInCatalog: form.showInCatalog,
     featured: form.featured,
     inquireToOrder: form.inquireToOrder,
+    madeToOrder: form.madeToOrder,
     wholesaleAvailableKg: form.wholesaleAvailableKg,
     standardPackageKg: form.standardPackageKg,
     wholesaleOptions: form.wholesaleOptions,
@@ -806,20 +808,20 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
 
       <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
-          <p className="text-sm font-medium text-graphite">問い合わせを有効化</p>
-          <p className="text-xs text-mist">入荷予定品・受注生産品に使用。カタログで在庫が「ASK」と表示されます</p>
+          <p className="text-sm font-medium text-graphite">受注生産品</p>
+          <p className="text-xs text-mist">在庫を持たず受注生産。在庫切れでも通常購入と同じ手順で注文でき、注文は承認制（承認後に支払い案内）</p>
         </div>
         <button
           type="button"
           role="switch"
-          aria-checked={form.inquireToOrder ?? false}
-          onClick={() => setForm(prev => ({ ...prev, inquireToOrder: !(prev.inquireToOrder ?? false) }))}
+          aria-checked={form.madeToOrder ?? false}
+          onClick={() => setForm(prev => ({ ...prev, madeToOrder: !(prev.madeToOrder ?? false) }))}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-            (form.inquireToOrder ?? false) ? 'bg-[#a87b1e]' : 'bg-gray-300'
+            (form.madeToOrder ?? false) ? 'bg-matcha' : 'bg-gray-300'
           }`}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-            (form.inquireToOrder ?? false) ? 'translate-x-5' : 'translate-x-0.5'
+            (form.madeToOrder ?? false) ? 'translate-x-5' : 'translate-x-0.5'
           }`} />
         </button>
       </div>

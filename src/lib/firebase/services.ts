@@ -223,6 +223,7 @@ function buildProductPayload(input: ProductInput) {
     imageUrl: input.imageUrl?.trim() || undefined,
     showInCatalog: input.showInCatalog ?? true,
     inquireToOrder: input.inquireToOrder ?? false,
+    madeToOrder: input.madeToOrder ?? false,
   })
 }
 
@@ -310,6 +311,7 @@ function mapProduct(id: string, data: DocumentData): Product {
     archived: data.archived === true,
     showInCatalog: data.showInCatalog !== false,
     inquireToOrder: data.inquireToOrder === true,
+    madeToOrder: data.madeToOrder === true,
     wholesaleAvailableKg: data.wholesaleAvailableKg != null ? Number(data.wholesaleAvailableKg) : undefined,
     standardPackageKg: data.standardPackageKg != null ? Number(data.standardPackageKg) : undefined,
     wholesaleOptions: Array.isArray(data.wholesaleOptions)
@@ -1411,6 +1413,7 @@ export function createFirebaseServices(): IServices {
         imageUrl: input.imageUrl ?? current.imageUrl,
         showInCatalog: input.showInCatalog ?? current.showInCatalog,
         inquireToOrder: input.inquireToOrder ?? current.inquireToOrder,
+        madeToOrder: input.madeToOrder ?? current.madeToOrder,
         wholesaleAvailableKg: input.wholesaleAvailableKg ?? current.wholesaleAvailableKg,
         standardPackageKg: input.standardPackageKg ?? current.standardPackageKg,
         wholesaleOptions: input.wholesaleOptions ?? current.wholesaleOptions,

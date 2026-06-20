@@ -81,7 +81,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -188,6 +188,22 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Made-to-order approval: delegate to the wholesale app (Stripe link / bank email).
+  if (body.action === 'approve') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify({ orderId: body.orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+    }
+  }
+
   const database = db()
   const ref = database.collection('wholesale_orders').doc(body.orderId)
 
@@ -288,7 +304,8 @@ export async function PATCH(request: Request) {
     const snap = await ref.get()
     const cur = snap.data() as Record<string, unknown> | undefined
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    if (cur.origin !== 'direct') return NextResponse.json({ error: 'ec_order_not_editable' }, { status: 400 })
+    // Editable: staff-entered/migrated (直販) orders, or any order awaiting approval (受注生産).
+    if (cur.origin !== 'direct' && cur.status !== 'pending_approval') return NextResponse.json({ error: 'ec_order_not_editable' }, { status: 400 })
     if (!Array.isArray(body.items) || body.items.length === 0) return NextResponse.json({ error: 'no_items' }, { status: 400 })
 
     const prodSnap = await database.collection('products').get()
@@ -309,6 +326,7 @@ export async function PATCH(request: Request) {
         lineTotalJpy: qty * unit,
         _taxRate: taxRate,
         _costPerKg: Number(p?.purchaseUnitPrice ?? 0),
+        _madeToOrder: p?.madeToOrder === true,
       }
     })
     const subtotalJpy = items.reduce((s, i) => s + i.lineTotalJpy, 0)
@@ -329,6 +347,7 @@ export async function PATCH(request: Request) {
     if (cur.status !== 'cancelled') {
       items.forEach((it, i) => {
         if (!it.productId) return
+        if (it._madeToOrder) return // made-to-order lines don't reserve stock
         const ecId = `${body.orderId}:e${i}`
         ecSaleIds.push(ecId)
         batch.set(database.collection('ec_sales').doc(ecId), {
@@ -340,7 +359,7 @@ export async function PATCH(request: Request) {
       })
     }
     batch.set(ref, {
-      items: items.map(({ _taxRate, _costPerKg, ...rest }) => { void _taxRate; void _costPerKg; return rest }),
+      items: items.map(({ _taxRate, _costPerKg, _madeToOrder, ...rest }) => { void _taxRate; void _costPerKg; void _madeToOrder; return rest }),
       subtotalJpy, taxBreakdown, taxJpy, totalJpy, displayTotal: totalJpy,
       shippingFeeJpy, paymentFeeJpy, costAmountJpy, grossProfitJpy,
       isDomestic: domestic,

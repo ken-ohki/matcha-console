@@ -74,6 +74,7 @@ async function token(): Promise<string> {
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  pending_approval: '承認待ち',
   pending_quote: '見積待ち',
   quoted: '支払い待ち（見積済）',
   pending_payment: '支払い待ち',
@@ -131,8 +132,9 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve', extra: Record<string, unknown> = {}) => {
     if (action === 'cancel' && !window.confirm('この注文を取消し、在庫予約を解放しますか？')) return
+    if (action === 'approve' && !window.confirm('この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？')) return
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -144,6 +146,10 @@ export default function WholesaleOrderDetailPage() {
       if (action === 'notify_shipped') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
         window.alert(d.ok ? '発送通知メールを送信しました。' : `送信に失敗しました（${d.error ?? 'error'}）`)
+      }
+      if (action === 'approve') {
+        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+        window.alert(d.ok ? '承認し、お客様へ支払い案内を送信しました。' : `承認に失敗しました（${d.error ?? 'error'}）`)
       }
       await load()
     } finally {
@@ -253,7 +259,7 @@ export default function WholesaleOrderDetailPage() {
             <ArrowLeft size={15} /> 卸売注文一覧へ
           </Link>
           <div className="flex items-center gap-2">
-            {o?.origin === 'direct' && !editing && o.status !== 'cancelled' && (
+            {(o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && (
               <button onClick={startEdit} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">内容を編集</button>
             )}
             <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
@@ -388,6 +394,7 @@ export default function WholesaleOrderDetailPage() {
                   label="支払い状況"
                   value={
                     o.status === 'cancelled' ? '取消'
+                      : o.status === 'pending_approval' ? '承認待ち'
                       : o.status === 'pending_quote' ? '見積待ち'
                       : o.status === 'quoted' ? '支払い待ち（見積済）'
                       : (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') ? '支払い済み'
@@ -451,6 +458,9 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
+              {o.status === 'pending_approval' && !editing && (
+                <button onClick={() => act('approve')} disabled={busy} className="btn-primary">承認して支払い案内を送る</button>
+              )}
               {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}

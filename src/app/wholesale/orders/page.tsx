@@ -37,6 +37,7 @@ async function token(): Promise<string> {
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  pending_approval: '承認待ち',
   pending_quote: '見積待ち',
   quoted: '支払い待ち（見積済）',
   pending_payment: '支払い待ち',
@@ -46,6 +47,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const STATUS_TONE: Record<string, string> = {
+  pending_approval: 'border-[#a87b1e] text-[#a87b1e]',
   pending_quote: 'border-[#a87b1e] text-[#a87b1e]',
   quoted: 'border-[#a87b1e] text-[#a87b1e]',
   pending_payment: 'border-[#a87b1e] text-[#a87b1e]',
@@ -74,6 +76,7 @@ function paymentMethodLabel(o: Order): string {
 // Payment vs shipping are separate concerns; `status` mixes them, so derive each.
 function paymentStateLabel(o: Order): { label: string; tone: string } {
   if (o.status === 'cancelled') return { label: '取消', tone: 'border-line text-mist' }
+  if (o.status === 'pending_approval') return { label: '承認待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'pending_quote') return { label: '見積待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'quoted') return { label: '支払い待ち（見積済）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') return { label: '支払い済み', tone: 'border-matcha text-matcha' }

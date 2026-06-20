@@ -20,6 +20,7 @@ interface WOrder {
 }
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
+  pending_approval: '承認待ち',
   pending_quote: '見積待ち',
   quoted: '支払い待ち(見積済)',
   pending_payment: '支払い待ち',
@@ -27,7 +28,7 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   shipped: '出荷済み',
   cancelled: '取消',
 }
-const ATTENTION_STATUSES = ['pending_quote', 'quoted', 'pending_payment']
+const ATTENTION_STATUSES = ['pending_approval', 'pending_quote', 'quoted', 'pending_payment']
 
 async function token(): Promise<string> {
   const current = getFirebaseAuthInstance().currentUser
@@ -52,7 +53,6 @@ export default function DashboardPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [orders, setOrders] = useState<WOrder[]>([])
   const [pendingMembers, setPendingMembers] = useState(0)
-  const [openInquiries, setOpenInquiries] = useState(0)
   const [lowStock, setLowStock] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -66,10 +66,9 @@ export default function DashboardPage() {
       for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
 
       const auth = `Bearer ${await token()}`
-      const [oRes, mRes, iRes] = await Promise.all([
+      const [oRes, mRes] = await Promise.all([
         fetch('/api/wholesale/orders', { headers: { Authorization: auth }, cache: 'no-store' }),
         fetch('/api/wholesale/members?status=pending', { headers: { Authorization: auth }, cache: 'no-store' }),
-        fetch('/api/wholesale/inquiries', { headers: { Authorization: auth }, cache: 'no-store' }),
       ])
       const oData = (await oRes.json().catch(() => ({}))) as { orders?: WholesaleOrderRow[] }
       const wOrders = oData.orders ?? []
@@ -78,8 +77,6 @@ export default function DashboardPage() {
       setSales(wOrders.map(o => orderToSale(o, costMap)))
       const mData = (await mRes.json().catch(() => ({}))) as { members?: unknown[] }
       setPendingMembers((mData.members ?? []).length)
-      const iData = (await iRes.json().catch(() => ({}))) as { inquiries?: { status?: string }[] }
-      setOpenInquiries((iData.inquiries ?? []).filter(x => x.status !== 'closed' && x.status !== 'resolved' && x.status !== 'done').length)
     } finally {
       setLoading(false)
     }
@@ -130,7 +127,6 @@ export default function DashboardPage() {
           <AttentionCard icon={<UserCheck size={18} />} label="承認待ち会員" value={pendingMembers} href="/wholesale/members" tone={pendingMembers > 0 ? 'alert' : 'calm'} />
           <AttentionCard icon={<CreditCard size={18} />} label="入金確認待ち(振込)" value={bankConfirmWaiting} href="/wholesale/orders" tone={bankConfirmWaiting > 0 ? 'alert' : 'calm'} />
           <AttentionCard icon={<FileText size={18} />} label="見積待ち(海外)" value={quoteWaiting} href="/wholesale/orders" tone={quoteWaiting > 0 ? 'alert' : 'calm'} />
-          <AttentionCard icon={<MessageSquare size={18} />} label="未対応の問い合わせ" value={openInquiries} href="/wholesale/inquiries" tone={openInquiries > 0 ? 'alert' : 'calm'} />
           <AttentionCard icon={<PackageMinus size={18} />} label="低在庫の商品" value={lowStock} href="/inventory" tone={lowStock > 0 ? 'alert' : 'calm'} />
         </div>
 

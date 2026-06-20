@@ -59,6 +59,7 @@ export interface Product {
   archived?: boolean              // アーカイブ（今後使わない商品）。一覧/カタログ/受注から除外。
   showInCatalog: boolean
   inquireToOrder: boolean
+  madeToOrder?: boolean           // 受注生産品。在庫を持たず注文可（在庫切れでも可）、注文は承認制。
   // 卸売サイト(wholesale.sabo-matcha.jp)向け設定
   wholesaleAvailableKg?: number   // EC即時購入可能数量(kg)。未設定なら在庫全量。
   standardPackageKg?: number      // 標準包装単位(kg)。注文はこの倍数のみ。未設定なら1kg。
@@ -273,6 +274,7 @@ export interface ProductInput {
   imageUrl?: string
   showInCatalog?: boolean
   inquireToOrder?: boolean
+  madeToOrder?: boolean
   wholesaleAvailableKg?: number
   standardPackageKg?: number
   wholesaleOptions?: ProductOptionConfig[]

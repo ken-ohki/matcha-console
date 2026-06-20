@@ -106,7 +106,7 @@ export default function SettingsWholesalePage() {
           </div>
           <h1 className="mt-3 text-3xl font-bold text-ink">卸売設定</h1>
           <p className="mt-2 text-sm text-mist">
-            卸売サイト(wholesale.sabo-matcha.jp)のセルフ決済しきい値を全商品共通で設定します。この数量以上の注文はセルフ決済せず、問い合わせに誘導されます。
+            卸売サイト(wholesale.sabo-matcha.jp)の各種設定（サンプル手数料・顧客ランク割引など）を行います。
           </p>
         </div>
 
@@ -134,19 +134,6 @@ export default function SettingsWholesalePage() {
         ) : (
           <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="grid gap-5 sm:grid-cols-2">
-              <div className="max-w-xs">
-                <label className="mb-1 block text-sm font-medium text-ink">セルフ決済しきい値 (kg)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={threshold}
-                  onChange={e => setThreshold(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
-                  placeholder={String(DEFAULT_THRESHOLD)}
-                />
-                <p className="mt-1 text-[11px] text-mist">全商品共通。1注文あたりの数量がこの値以上のとき問い合わせに誘導します（初期値 {DEFAULT_THRESHOLD}kg）。</p>
-              </div>
               <div className="max-w-xs">
                 <label className="mb-1 block text-sm font-medium text-ink">サンプル手数料 (円・税抜)</label>
                 <input
