@@ -43,7 +43,8 @@ export default function NewWholesaleOrderPage() {
   const [ship, setShip] = useState({ country: 'JP', postalCode: '', address: '', contactName: '', phone: '', overseasCarrier: 'ems' })
   const [shippingFeeJpy, setShippingFeeJpy] = useState('')
   const [markPaid, setMarkPaid] = useState(true)
-  const [suppressEmail, setSuppressEmail] = useState(false)
+  // Direct (staff-entered) orders default to NOT emailing the customer.
+  const [suppressEmail, setSuppressEmail] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -155,7 +156,7 @@ export default function NewWholesaleOrderPage() {
           shippingAddress: ship.address || undefined,
           contactName: ship.contactName || undefined,
           phone: ship.phone || undefined,
-          overseasCarrier: ship.overseasCarrier,
+          overseasCarrier: ship.country !== 'JP' ? ship.overseasCarrier : undefined,
           shippingFeeJpy: shippingFeeJpy !== '' ? Number(shippingFeeJpy) : undefined,
           markPaid,
           suppressEmail,
@@ -241,7 +242,9 @@ export default function NewWholesaleOrderPage() {
               <L label="住所（任意）" className="sm:col-span-2"><input className="field-input" value={ship.address} onChange={e => setShip({ ...ship, address: e.target.value })} /></L>
               <L label="お届け先名（任意）"><input className="field-input" value={ship.contactName} onChange={e => setShip({ ...ship, contactName: e.target.value })} /></L>
               <L label="電話（任意）"><input className="field-input" value={ship.phone} onChange={e => setShip({ ...ship, phone: e.target.value })} /></L>
-              <L label="海外発送業者"><select className="field-input" value={ship.overseasCarrier} onChange={e => setShip({ ...ship, overseasCarrier: e.target.value })}><option value="ems">EMS</option><option value="dhl">DHL</option><option value="designated">御社指定業者</option></select></L>
+              {ship.country !== 'JP' && (
+                <L label="海外発送業者"><select className="field-input" value={ship.overseasCarrier} onChange={e => setShip({ ...ship, overseasCarrier: e.target.value })}><option value="ems">EMS</option><option value="dhl">DHL</option><option value="designated">御社指定業者</option></select></L>
+              )}
               <L label="送料(¥・税抜) 空欄=自動/0"><input type="number" min="0" step="1" className="field-input" value={shippingFeeJpy} onChange={e => setShippingFeeJpy(e.target.value)} /></L>
             </div>
             <div className="mt-3 flex flex-wrap gap-4 text-sm text-graphite">

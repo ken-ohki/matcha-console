@@ -5,12 +5,15 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { getServices } from '@/lib/services'
+import { ArrowLeft, RefreshCw, Plus, Trash2 } from 'lucide-react'
 
 interface OrderItem {
+  productId?: string
   productName: string
   quantityKg: number
   sampleUnits?: number
+  unitPriceJpy?: number
   lineTotalJpy?: number
   option?: { optionName?: string; tierLabel?: string; bags?: number; feeJpy?: number }
 }
@@ -22,6 +25,7 @@ interface Order {
   phone?: string
   items?: OrderItem[]
   subtotalJpy?: number
+  optionFeesJpy?: number
   taxJpy?: number
   totalJpy?: number
   paymentMethod?: string
@@ -41,6 +45,26 @@ interface Order {
   shippingCarrierLabel?: string
   shippedAt?: string
   shipmentEmailedAt?: string
+  // Staff-only accounting (console API only; stripped from the member API).
+  costAmountJpy?: number
+  grossProfitJpy?: number
+  paymentFeeJpy?: number
+  dueDate?: string
+  paidAtMs?: number
+  origin?: string
+}
+
+interface EditState {
+  items: { productId: string; quantityKg: string; unitPriceJpy: string; taxRate: number }[]
+  shippingCountry: string
+  shippingPostalCode: string
+  shippingAddress: string
+  contactName: string
+  phone: string
+  notes: string
+  dueDate: string
+  shippingFeeJpy: string
+  paymentFeeJpy: string
 }
 
 async function token(): Promise<string> {
@@ -67,21 +91,37 @@ export default function WholesaleOrderDetailPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const [order, setOrder] = useState<Order | null>(null)
+  const [costByProduct, setCostByProduct] = useState<Record<string, number>>({})
+  const [productList, setProductList] = useState<{ id: string; name: string; sku?: string; price: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [edit, setEdit] = useState<EditState | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/wholesale/orders', { headers: { Authorization: `Bearer ${await token()}` }, cache: 'no-store' })
+      const [res, services] = await Promise.all([
+        fetch('/api/wholesale/orders', { headers: { Authorization: `Bearer ${await token()}` }, cache: 'no-store' }),
+        getServices(),
+      ])
       const data = (await res.json()) as { orders?: Order[] }
       // Order ids can contain ':' (e.g. migrated:<saleId>), which may arrive
       // percent-encoded in the route param — match against the decoded form too.
       let wanted = id
       try { wanted = decodeURIComponent(id) } catch { /* keep raw */ }
-      setOrder(data.orders?.find(o => o.id === id || o.id === wanted) ?? null)
+      const found = data.orders?.find(o => o.id === id || o.id === wanted) ?? null
+      setOrder(found)
+      setTracking(found?.trackingNumber ?? '')
+      setCarrierLabel(found?.shippingCarrierLabel ?? '')
+      // Purchase prices for live cost/gross-profit on orders without a snapshot.
+      const products = await services.inventory.getProductsWithInventory()
+      const costMap: Record<string, number> = {}
+      for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
+      setCostByProduct(costMap)
+      setProductList(products.map(p => ({ id: p.id, name: p.name, sku: p.sku, price: p.standardWholesalePrice ?? 0 })))
     } finally {
       setLoading(false)
     }
@@ -91,14 +131,15 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment', extra: Record<string, unknown> = {}) => {
     if (action === 'cancel' && !window.confirm('この注文を取消し、在庫予約を解放しますか？')) return
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-        body: JSON.stringify({ orderId: id, action, ...extra }),
+        // Use the order's real id (the route param may be percent-encoded for ':').
+        body: JSON.stringify({ orderId: order?.id ?? id, action, ...extra }),
       })
       if (action === 'notify_shipped') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
@@ -109,6 +150,49 @@ export default function WholesaleOrderDetailPage() {
       setBusy(false)
     }
   }
+
+  const startEdit = () => {
+    if (!order) return
+    setEdit({
+      items: (order.items ?? []).map(i => ({ productId: i.productId ?? '', quantityKg: String(i.quantityKg ?? ''), unitPriceJpy: String(i.unitPriceJpy ?? ''), taxRate: 8 })),
+      shippingCountry: order.shippingCountry ?? 'JP',
+      shippingPostalCode: order.shippingPostalCode ?? '',
+      shippingAddress: order.shippingAddress ?? '',
+      contactName: order.contactName ?? '',
+      phone: order.phone ?? '',
+      notes: order.notes ?? '',
+      dueDate: order.dueDate ?? '',
+      shippingFeeJpy: order.shippingFeeJpy != null ? String(order.shippingFeeJpy) : '',
+      paymentFeeJpy: order.paymentFeeJpy != null ? String(order.paymentFeeJpy) : '',
+    })
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    if (!edit || !order) return
+    const items = edit.items.filter(i => i.productId).map(i => ({ productId: i.productId, quantityKg: Number(i.quantityKg) || 0, unitPriceJpy: Number(i.unitPriceJpy) || 0, taxRate: i.taxRate }))
+    if (items.length === 0) { window.alert('商品を1つ以上指定してください'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({
+          orderId: order.id, action: 'update_direct_order', items,
+          shippingCountry: edit.shippingCountry, shippingPostalCode: edit.shippingPostalCode, shippingAddress: edit.shippingAddress,
+          contactName: edit.contactName, phone: edit.phone, notes: edit.notes, dueDate: edit.dueDate,
+          shippingFeeJpy: edit.shippingFeeJpy !== '' ? Number(edit.shippingFeeJpy) : undefined,
+          paymentFeeJpy: edit.paymentFeeJpy !== '' ? Number(edit.paymentFeeJpy) : undefined,
+        }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) { window.alert(`保存に失敗しました（${d.error ?? 'error'}）`); return }
+      setEditing(false); setEdit(null)
+      await load()
+    } finally { setBusy(false) }
+  }
+  const setEditItem = (idx: number, patch: Partial<EditState['items'][number]>) =>
+    setEdit(e => e ? { ...e, items: e.items.map((it, i) => i === idx ? { ...it, ...patch } : it) } : e)
 
   const quote = async (shippingFeeJpy: number, overseasCarrier: string) => {
     setBusy(true)
@@ -152,6 +236,15 @@ export default function WholesaleOrderDetailPage() {
 
   const o = order
 
+  // Cost / gross profit (staff only). Use the stored snapshot for migrated orders,
+  // otherwise compute live from each product's purchase price.
+  const itemCost = (i: OrderItem) => (costByProduct[i.productId ?? ''] ?? 0) * (i.quantityKg ?? 0)
+  const revenueExTax = o?.subtotalJpy ?? 0
+  const totalCost = o?.costAmountJpy ?? (o?.items ?? []).reduce((s, i) => s + itemCost(i), 0)
+  const paymentFee = o?.paymentFeeJpy ?? 0
+  const grossProfit = o?.grossProfitJpy ?? revenueExTax - totalCost - paymentFee
+  const marginRate = revenueExTax > 0 ? (grossProfit / revenueExTax) * 100 : null
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl">
@@ -159,9 +252,14 @@ export default function WholesaleOrderDetailPage() {
           <Link href="/wholesale/orders" className="flex items-center gap-1 text-sm text-mist hover:text-ink">
             <ArrowLeft size={15} /> 卸売注文一覧へ
           </Link>
-          <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
-            <RefreshCw size={15} /> 更新
-          </button>
+          <div className="flex items-center gap-2">
+            {o?.origin === 'direct' && !editing && o.status !== 'cancelled' && (
+              <button onClick={startEdit} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">内容を編集</button>
+            )}
+            <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
+              <RefreshCw size={15} /> 更新
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -187,6 +285,51 @@ export default function WholesaleOrderDetailPage() {
               </div>
             </div>
 
+            {/* Edit panel — 直販 orders only */}
+            {editing && edit && (
+              <Section title="内容を編集（直販）">
+                <div className="space-y-2">
+                  {edit.items.map((it, idx) => (
+                    <div key={idx} className="flex flex-wrap items-end gap-2">
+                      <label className="min-w-[200px] flex-1 text-[11px] text-mist">商品
+                        <select className="field-input mt-1" value={it.productId} onChange={e => { const p = productList.find(x => x.id === e.target.value); setEditItem(idx, { productId: e.target.value, unitPriceJpy: it.unitPriceJpy || String(p?.price ?? '') }) }}>
+                          <option value="">— 選択 —</option>
+                          {productList.map(p => <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>)}
+                        </select>
+                      </label>
+                      <label className="w-24 text-[11px] text-mist">数量(kg)<input type="number" min="0" step="0.1" className="field-input mt-1" value={it.quantityKg} onChange={e => setEditItem(idx, { quantityKg: e.target.value })} /></label>
+                      <label className="w-32 text-[11px] text-mist">単価(¥/kg)<input type="number" min="0" step="1" className="field-input mt-1" value={it.unitPriceJpy} onChange={e => setEditItem(idx, { unitPriceJpy: e.target.value })} /></label>
+                      <label className="w-24 text-[11px] text-mist">税率
+                        <select className="field-input mt-1" value={it.taxRate} onChange={e => setEditItem(idx, { taxRate: Number(e.target.value) })}>
+                          <option value={8}>8%</option>
+                          <option value={10}>10%</option>
+                          <option value={0}>免税</option>
+                        </select>
+                      </label>
+                      <button onClick={() => setEdit(e => e ? { ...e, items: e.items.filter((_, i) => i !== idx) } : e)} className="mb-1 p-2 text-mist hover:text-alert" aria-label="削除"><Trash2 size={16} /></button>
+                    </div>
+                  ))}
+                  <button onClick={() => setEdit(e => e ? { ...e, items: [...e.items, { productId: '', quantityKg: '', unitPriceJpy: '', taxRate: 8 }] } : e)} className="flex items-center gap-1 text-sm text-matchaDeep hover:underline"><Plus size={14} /> 行を追加</button>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="text-[11px] text-mist">国（JP=国内）<input className="field-input mt-1" value={edit.shippingCountry} onChange={e => setEdit({ ...edit, shippingCountry: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">郵便番号<input className="field-input mt-1" value={edit.shippingPostalCode} onChange={e => setEdit({ ...edit, shippingPostalCode: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist sm:col-span-2">住所<input className="field-input mt-1" value={edit.shippingAddress} onChange={e => setEdit({ ...edit, shippingAddress: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">お届け先名<input className="field-input mt-1" value={edit.contactName} onChange={e => setEdit({ ...edit, contactName: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">電話<input className="field-input mt-1" value={edit.phone} onChange={e => setEdit({ ...edit, phone: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">送料(¥税抜)<input type="number" min="0" step="1" className="field-input mt-1" value={edit.shippingFeeJpy} onChange={e => setEdit({ ...edit, shippingFeeJpy: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">支払手数料(¥)<input type="number" min="0" step="1" className="field-input mt-1" value={edit.paymentFeeJpy} onChange={e => setEdit({ ...edit, paymentFeeJpy: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist">支払期日<input type="date" className="field-input mt-1" value={edit.dueDate} onChange={e => setEdit({ ...edit, dueDate: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist sm:col-span-2">備考<input className="field-input mt-1" value={edit.notes} onChange={e => setEdit({ ...edit, notes: e.target.value })} /></label>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={saveEdit} disabled={busy} className="btn-primary">保存</button>
+                  <button onClick={() => { setEditing(false); setEdit(null) }} disabled={busy} className="btn-ghost">キャンセル</button>
+                </div>
+                <p className="mt-2 text-[11px] text-mist">※保存すると金額・消費税・原価・粗利を再計算し、在庫予約も更新します。</p>
+              </Section>
+            )}
+
             {/* Items */}
             <Section title="商品">
               <table className="w-full text-sm">
@@ -194,6 +337,8 @@ export default function WholesaleOrderDetailPage() {
                   <tr className="border-b border-line text-left text-xs text-mist">
                     <th className="py-2 font-medium">商品名</th>
                     <th className="py-2 text-right font-medium">購入数量</th>
+                    <th className="py-2 text-right font-medium">単価</th>
+                    <th className="py-2 text-right font-medium">原価</th>
                     <th className="py-2 text-right font-medium">金額（税抜）</th>
                   </tr>
                 </thead>
@@ -205,6 +350,8 @@ export default function WholesaleOrderDetailPage() {
                         {i.option ? <span className="text-mist"> ／ {i.option.optionName}: {i.option.tierLabel} ×{i.option.bags}</span> : null}
                       </td>
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.sampleUnits ? `サンプル ${i.sampleUnits}×10g` : `${i.quantityKg}kg`}</td>
+                      <td className="whitespace-nowrap py-2 text-right text-mist">{i.unitPriceJpy != null ? `¥${i.unitPriceJpy.toLocaleString()}` : '—'}</td>
+                      <td className="whitespace-nowrap py-2 text-right text-mist">{costByProduct[i.productId ?? ''] != null ? `¥${Math.round(itemCost(i)).toLocaleString()}` : '—'}</td>
                       <td className="whitespace-nowrap py-2 text-right text-ink">¥{((i.lineTotalJpy ?? 0) + (i.option?.feeJpy ?? 0)).toLocaleString()}</td>
                     </tr>
                   ))}
@@ -213,9 +360,21 @@ export default function WholesaleOrderDetailPage() {
               <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
                 <Row label="小計（税抜）" value={`¥${(o.subtotalJpy ?? 0).toLocaleString()}`} />
                 {typeof o.shippingFeeJpy === 'number' && o.shippingFeeJpy > 0 && <Row label="送料" value={`¥${o.shippingFeeJpy.toLocaleString()}`} />}
+                {typeof o.optionFeesJpy === 'number' && o.optionFeesJpy > 0 && <Row label="オプション料" value={`¥${o.optionFeesJpy.toLocaleString()}`} />}
                 <Row label="消費税" value={`¥${(o.taxJpy ?? 0).toLocaleString()}`} />
                 <Row label="合計（税込）" value={`¥${(o.totalJpy ?? 0).toLocaleString()}`} strong />
               </dl>
+            </Section>
+
+            {/* Cost / gross profit — staff only */}
+            <Section title="原価・粗利（社内）">
+              <dl className="space-y-1 text-sm">
+                <Row label="売上（税抜）" value={`¥${revenueExTax.toLocaleString()}`} />
+                <Row label="原価" value={`¥${Math.round(totalCost).toLocaleString()}`} />
+                {paymentFee > 0 && <Row label="支払手数料" value={`¥${paymentFee.toLocaleString()}`} />}
+                <Row label="粗利" value={`¥${Math.round(grossProfit).toLocaleString()}${marginRate != null ? `（${marginRate.toFixed(1)}%）` : ''}`} strong />
+              </dl>
+              <p className="mt-2 text-[11px] text-mist">{o.costAmountJpy != null ? '※移行時の原価スナップショット' : '※現在の仕入単価から自動計算'}</p>
             </Section>
 
             {/* Shipping & payment */}
@@ -225,7 +384,19 @@ export default function WholesaleOrderDetailPage() {
                 <Row label="発送方法" value={o.isDomestic === false ? (o.overseasCarrier ? CARRIER_LABEL[o.overseasCarrier] ?? o.overseasCarrier : '未定') : '国内配送（重量別）'} />
                 {typeof o.shippingWeightKg === 'number' && <Row label="重量" value={`${o.shippingWeightKg.toFixed(2)} kg`} />}
                 <Row label="支払い方法" value={o.paymentMethod === 'bank_transfer' ? '銀行振込' : o.paymentMethod === 'stripe' ? 'カード' : '—'} />
-                <Row label="支払い状況" value={STATUS_LABEL[o.status ?? ''] ?? o.status ?? '—'} />
+                <Row
+                  label="支払い状況"
+                  value={
+                    o.status === 'cancelled' ? '取消'
+                      : o.status === 'pending_quote' ? '見積待ち'
+                      : o.status === 'quoted' ? '支払い待ち（見積済）'
+                      : (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') ? '支払い済み'
+                      : '支払い待ち'
+                  }
+                />
+                <Row label="発送状況" value={o.status === 'cancelled' ? '—' : (o.status === 'shipped' || o.shippedAt) ? '出荷済み' : '未発送'} />
+                {o.dueDate && <Row label="支払期日" value={o.dueDate} />}
+                {o.paidAtMs && <Row label="入金日" value={new Date(o.paidAtMs).toLocaleDateString('ja-JP')} />}
               </dl>
             </Section>
 
@@ -255,22 +426,22 @@ export default function WholesaleOrderDetailPage() {
               <p className="rounded-lg border border-line bg-bone px-4 py-3 text-xs text-mist">銀行振込のご案内をメール送付済み。入金後に「入金確認」を押してください。</p>
             )}
 
-            {/* Fulfillment — tracking + shipment notification */}
+            {/* Fulfillment — tracking + shipping status (editable even after shipping) */}
             {(o.status === 'paid' || o.status === 'shipped') && (
               <Section title="出荷・発送通知">
-                {(o.trackingNumber || o.shippingCarrierLabel || o.shippedAt) && (
-                  <p className="mb-2 text-sm text-graphite">
-                    {o.shippingCarrierLabel ? `${o.shippingCarrierLabel} ` : ''}{o.trackingNumber ?? ''}
-                    {o.shippedAt ? `（${o.shippedAt.slice(0, 10)} 出荷）` : ''}
-                  </p>
-                )}
-                {o.status === 'paid' && (
-                  <div className="mb-3 flex flex-wrap items-end gap-2">
-                    <label className="text-xs text-mist">発送業者<input className="mt-1 block w-40 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="例: ヤマト / EMS" value={carrierLabel} onChange={e => setCarrierLabel(e.target.value)} /></label>
-                    <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
+                <div className="mb-3 flex flex-wrap items-end gap-2">
+                  <label className="text-xs text-mist">発送業者<input className="mt-1 block w-40 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="例: ヤマト / EMS" value={carrierLabel} onChange={e => setCarrierLabel(e.target.value)} /></label>
+                  <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
+                  {o.status === 'paid' ? (
                     <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
-                  </div>
-                )}
+                  ) : (
+                    <>
+                      <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷情報を更新</button>
+                      <button onClick={() => act('set_fulfillment', { shipped: false })} disabled={busy} className="btn-ghost">未出荷に戻す</button>
+                    </>
+                  )}
+                </div>
+                {o.shippedAt && <p className="mb-2 text-xs text-mist">出荷日: {o.shippedAt.slice(0, 10)}</p>}
                 <div className="flex flex-wrap items-center gap-3">
                   <button onClick={() => act('notify_shipped')} disabled={busy} className="btn-ghost">発送通知メールを送信</button>
                   {o.shipmentEmailedAt && <span className="text-xs text-mist">最終送信: {o.shipmentEmailedAt.slice(0, 16).replace('T', ' ')}</span>}
