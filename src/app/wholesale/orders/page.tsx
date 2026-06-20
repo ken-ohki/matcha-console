@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { formatCurrency } from '@/lib/format'
 import { RefreshCw } from 'lucide-react'
 
 interface OrderItem {
@@ -17,6 +18,7 @@ interface Order {
   memberCompanyName?: string
   contactName?: string
   items?: OrderItem[]
+  totalJpy?: number
   paymentMethod?: string
   status?: string
   isDomestic?: boolean
@@ -107,12 +109,14 @@ export default function WholesaleOrdersPage() {
           <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">注文はありません。</p>
         ) : (
           <div className="overflow-x-auto panel">
-            <table className="min-w-[920px] w-full text-sm">
+            <table className="min-w-[1160px] w-full text-sm">
               <thead>
                 <tr className="border-b border-line bg-bone text-left text-xs text-mist">
                   <th className="whitespace-nowrap px-4 py-3 font-medium">注文番号</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">注文者名</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">商品名</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right font-medium">購入数量</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-right font-medium">売上高</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">発送方法</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">支払い方法</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">支払い状況</th>
@@ -127,9 +131,25 @@ export default function WholesaleOrdersPage() {
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-ink">{o.orderNumber}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink">{o.memberCompanyName || o.contactName || '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-mist">
-                      {(o.items ?? []).map(i => `${i.productName} ${i.quantityKg}kg`).join(', ') || '—'}
+                    <td className="px-4 py-3 text-mist">
+                      {(() => {
+                        const items = o.items ?? []
+                        if (items.length === 0) return '—'
+                        const full = items.map(i => `${i.productName} ${i.quantityKg}kg`).join(', ')
+                        const head = items[0].productName
+                        const label = items.length > 1 ? `${head} 他${items.length - 1}件` : head
+                        return <span className="block max-w-[260px] truncate" title={full}>{label}</span>
+                      })()}
                     </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right text-ink">
+                      {(() => {
+                        const items = o.items ?? []
+                        if (items.length === 0) return '—'
+                        const totalKg = items.reduce((s, i) => s + (i.quantityKg ?? 0), 0)
+                        return `${totalKg % 1 === 0 ? totalKg : totalKg.toFixed(1)}kg`
+                      })()}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-ink">{o.totalJpy != null ? formatCurrency(o.totalJpy) : '—'}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{shippingMethod(o)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{paymentMethodLabel(o)}</td>
                     <td className="whitespace-nowrap px-4 py-3">

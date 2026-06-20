@@ -7,6 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { ProductWithInventory } from '@/types'
+import { COUNTRY_OPTIONS } from '@/lib/countries'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 
 interface Member {
@@ -45,6 +46,27 @@ export default function NewWholesaleOrderPage() {
   const [suppressEmail, setSuppressEmail] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const memberOptions = useMemo(
+    () => members.map(m => ({
+      value: m.uid,
+      label: `${m.companyName ?? '(社名未設定)'}${m.source === 'manual' ? '（手動）' : ''}`,
+      sublabel: [m.contactName, m.email].filter(Boolean).join(' · '),
+    })),
+    [members],
+  )
+  const productOptions = useMemo(
+    () => products.map(p => ({
+      value: p.id,
+      label: `${p.name}${p.sku ? ` (${p.sku})` : ''}`,
+      sublabel: `残 ${p.currentStockKg.toFixed(1)}kg`,
+    })),
+    [products],
+  )
+  const countryOptions = useMemo(
+    () => COUNTRY_OPTIONS.map(c => ({ value: c.code, label: c.name, sublabel: c.code })),
+    [],
+  )
 
   const load = useCallback(async () => {
     const svc = await getServices()
@@ -173,19 +195,14 @@ export default function NewWholesaleOrderPage() {
               <button onClick={() => setMode('new')} className={`rounded-lg border px-3 py-1.5 text-sm ${mode === 'new' ? 'border-ink bg-ink text-paper' : 'border-line text-graphite hover:bg-bone'}`}>新規取引先を作成</button>
             </div>
             {mode === 'existing' ? (
-              <select value={memberUid} onChange={e => setMemberUid(e.target.value)} className="field-input">
-                <option value="">— 会員を選択 —</option>
-                {members.map(m => (
-                  <option key={m.uid} value={m.uid}>{m.companyName ?? '(社名未設定)'}{m.source === 'manual' ? '（手動）' : ''}{m.email ? ` · ${m.email}` : ''}</option>
-                ))}
-              </select>
+              <Combobox options={memberOptions} value={memberUid} onChange={setMemberUid} placeholder="販売先を検索（社名・担当者・メール）" emptyText="該当する販売先がありません" />
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <L label="会社名 / 屋号"><input className="field-input" value={newMember.companyName} onChange={e => setNewMember({ ...newMember, companyName: e.target.value })} /></L>
                 <L label="メール（任意）"><input className="field-input" value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} /></L>
                 <L label="ご担当者（任意）"><input className="field-input" value={newMember.contactName} onChange={e => setNewMember({ ...newMember, contactName: e.target.value })} /></L>
                 <L label="電話（任意）"><input className="field-input" value={newMember.phone} onChange={e => setNewMember({ ...newMember, phone: e.target.value })} /></L>
-                <L label="国（ISO/JP）"><input className="field-input" value={newMember.country} onChange={e => setNewMember({ ...newMember, country: e.target.value })} /></L>
+                <L label="国"><Combobox options={countryOptions} value={newMember.country} onChange={v => setNewMember({ ...newMember, country: v })} placeholder="国を検索（JP=国内）" /></L>
                 <L label="ランク">
                   <select className="field-input" value={newMember.rank} onChange={e => setNewMember({ ...newMember, rank: e.target.value })}>
                     <option value="standard">standard</option>
@@ -203,13 +220,8 @@ export default function NewWholesaleOrderPage() {
             <div className="space-y-2">
               {lines.map((l, i) => (
                 <div key={i} className="flex flex-wrap items-end gap-2">
-                  <L label="商品" className="min-w-[200px] flex-1">
-                    <select className="field-input" value={l.productId} onChange={e => setLine(i, { productId: e.target.value })}>
-                      <option value="">— 選択 —</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''} · 残{p.currentStockKg.toFixed(1)}kg</option>
-                      ))}
-                    </select>
+                  <L label="商品" className="min-w-[220px] flex-1">
+                    <Combobox options={productOptions} value={l.productId} onChange={v => setLine(i, { productId: v })} placeholder="商品を検索（商品名・SKU）" emptyText="該当する商品がありません" />
                   </L>
                   <L label="数量(kg)" className="w-24"><input type="number" min="0" step="1" className="field-input" value={l.quantityKg} onChange={e => setLine(i, { quantityKg: e.target.value })} /></L>
                   <L label={`単価(¥/kg) 既定${l.productId ? yen(priceOf(l.productId)) : '—'}`} className="w-40"><input type="number" min="0" step="1" placeholder={l.productId ? String(priceOf(l.productId)) : ''} className="field-input" value={l.unitPriceOverrideJpy} onChange={e => setLine(i, { unitPriceOverrideJpy: e.target.value })} /></L>
@@ -224,7 +236,7 @@ export default function NewWholesaleOrderPage() {
           <section className="panel p-5">
             <h2 className="mb-bl-2 text-xs font-medium text-graphite">発送・支払い</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <L label="国（JP=国内）"><input className="field-input" value={ship.country} onChange={e => setShip({ ...ship, country: e.target.value })} /></L>
+              <L label="国（JP=国内）"><Combobox options={countryOptions} value={ship.country} onChange={v => setShip({ ...ship, country: v })} placeholder="国を検索（JP=国内）" /></L>
               <L label="郵便番号（任意）"><input className="field-input" value={ship.postalCode} onChange={e => setShip({ ...ship, postalCode: e.target.value })} /></L>
               <L label="住所（任意）" className="sm:col-span-2"><input className="field-input" value={ship.address} onChange={e => setShip({ ...ship, address: e.target.value })} /></L>
               <L label="お届け先名（任意）"><input className="field-input" value={ship.contactName} onChange={e => setShip({ ...ship, contactName: e.target.value })} /></L>
@@ -254,5 +266,63 @@ function L({ label, children, className }: { label: string; children: React.Reac
       <span className="mb-1 block text-[11px] text-mist">{label}</span>
       {children}
     </label>
+  )
+}
+
+interface ComboOption { value: string; label: string; sublabel?: string }
+
+/** Searchable single-select with type-ahead filtering. Shows the selected label
+ *  when closed and the live query when open. */
+function Combobox({ options, value, onChange, placeholder, emptyText = '該当なし' }: {
+  options: ComboOption[]
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  emptyText?: string
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const selected = options.find(o => o.value === value) ?? null
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return options
+    return options.filter(o => o.label.toLowerCase().includes(q) || (o.sublabel ?? '').toLowerCase().includes(q))
+  }, [options, query])
+
+  return (
+    <div className="relative">
+      <input
+        className="field-input"
+        placeholder={placeholder}
+        value={open ? query : (selected?.label ?? '')}
+        onChange={e => { setQuery(e.target.value); setOpen(true); if (value) onChange('') }}
+        onFocus={() => { setQuery(''); setOpen(true) }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+      />
+      {open && (
+        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-line bg-paper shadow-lg">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-mist">{emptyText}</li>
+          ) : (
+            filtered.slice(0, 80).map(o => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-bone ${o.value === value ? 'bg-bone' : ''}`}
+                >
+                  <span className="text-ink">{o.label}</span>
+                  {o.sublabel ? <span className="block text-[11px] text-mist">{o.sublabel}</span> : null}
+                </button>
+              </li>
+            ))
+          )}
+          {filtered.length > 80 && (
+            <li className="px-3 py-1.5 text-[11px] text-mist">上位80件を表示中。さらに絞り込んでください。</li>
+          )}
+        </ul>
+      )}
+    </div>
   )
 }

@@ -32,7 +32,9 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: '営業',
     items: [
-      { href: '/ec-sales', label: 'Shopify', icon: Leaf, match: ['/ec-sales'] },
+      { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
+      { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
+      { href: '/wholesale/inquiries', label: '問い合わせ', icon: MessageSquare },
       { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
       { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
     ],
@@ -43,14 +45,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/financials', label: '収支管理', icon: Calculator },
       { href: '/receivables', label: '入金管理', icon: ArrowDownCircle },
       { href: '/payables', label: '支払管理', icon: ArrowUpCircle },
-    ],
-  },
-  {
-    label: 'SABO WHOLESALE（卸売）',
-    items: [
-      { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
-      { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
-      { href: '/wholesale/inquiries', label: '問い合わせ', icon: MessageSquare },
     ],
   },
   {

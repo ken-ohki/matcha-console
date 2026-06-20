@@ -251,9 +251,14 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                           <td className="py-2.5 pr-3 font-mono text-ink">{o.orderNumber ?? o.id}</td>
                           <td className="py-2.5 pr-3 text-mist">{fmtDate(o.createdAtMs)}</td>
                           <td className="py-2.5 pr-3 text-mist">
-                            {(o.items ?? [])
-                              .map(i => `${i.productName ?? ''}${i.kind === 'sample' ? `(試供${(i.sampleUnits ?? 0) * 10}g)` : ` ×${i.quantityKg ?? 0}kg`}`)
-                              .join(' / ') || '—'}
+                            {(() => {
+                              const items = o.items ?? []
+                              if (items.length === 0) return '—'
+                              const fmt = (i: OrderItem) => `${i.productName ?? ''}${i.kind === 'sample' ? `(試供${(i.sampleUnits ?? 0) * 10}g)` : ` ×${i.quantityKg ?? 0}kg`}`
+                              const full = items.map(fmt).join(' / ')
+                              const label = items.length > 1 ? `${fmt(items[0])} 他${items.length - 1}件` : fmt(items[0])
+                              return <span className="block max-w-[280px] truncate" title={full}>{label}</span>
+                            })()}
                           </td>
                           <td className="py-2.5 pr-3">
                             <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-ink">{ORDER_STATUS_LABEL[o.status ?? ''] ?? o.status}</span>

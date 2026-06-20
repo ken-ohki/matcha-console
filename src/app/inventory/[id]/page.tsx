@@ -179,6 +179,9 @@ export default function ProductDetailPage() {
 
     for (const ec of ecSales) {
       if (ec.productId !== pid) continue
+      // Wholesale-channel ec_sales are the stock ledger for wholesale orders, which
+      // are already shown as 'sale' rows above — skip to avoid duplicate rows.
+      if (ec.channel === 'Wholesale' || ec.channel === 'WholesaleSample') continue
       rows.push({
         key: `ec-${ec.id}`,
         date: ec.soldOn,

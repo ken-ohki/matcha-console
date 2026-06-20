@@ -77,7 +77,11 @@ export default function WholesaleOrderDetailPage() {
     try {
       const res = await fetch('/api/wholesale/orders', { headers: { Authorization: `Bearer ${await token()}` }, cache: 'no-store' })
       const data = (await res.json()) as { orders?: Order[] }
-      setOrder(data.orders?.find(o => o.id === id) ?? null)
+      // Order ids can contain ':' (e.g. migrated:<saleId>), which may arrive
+      // percent-encoded in the route param — match against the decoded form too.
+      let wanted = id
+      try { wanted = decodeURIComponent(id) } catch { /* keep raw */ }
+      setOrder(data.orders?.find(o => o.id === id || o.id === wanted) ?? null)
     } finally {
       setLoading(false)
     }
@@ -185,17 +189,27 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Items */}
             <Section title="商品">
-              <ul className="divide-y divide-line">
-                {(o.items ?? []).map((i, idx) => (
-                  <li key={idx} className="flex items-start justify-between gap-3 py-2 text-sm">
-                    <span className="text-ink">
-                      {i.productName} {i.sampleUnits ? `（サンプル ${i.sampleUnits}×10g）` : `${i.quantityKg}kg`}
-                      {i.option ? <span className="text-mist"> ／ {i.option.optionName}: {i.option.tierLabel} ×{i.option.bags}</span> : null}
-                    </span>
-                    <span className="whitespace-nowrap text-mist">¥{((i.lineTotalJpy ?? 0) + (i.option?.feeJpy ?? 0)).toLocaleString()}</span>
-                  </li>
-                ))}
-              </ul>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-line text-left text-xs text-mist">
+                    <th className="py-2 font-medium">商品名</th>
+                    <th className="py-2 text-right font-medium">購入数量</th>
+                    <th className="py-2 text-right font-medium">金額（税抜）</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(o.items ?? []).map((i, idx) => (
+                    <tr key={idx} className="border-b border-line last:border-0">
+                      <td className="py-2 text-ink">
+                        {i.productName}
+                        {i.option ? <span className="text-mist"> ／ {i.option.optionName}: {i.option.tierLabel} ×{i.option.bags}</span> : null}
+                      </td>
+                      <td className="whitespace-nowrap py-2 text-right text-mist">{i.sampleUnits ? `サンプル ${i.sampleUnits}×10g` : `${i.quantityKg}kg`}</td>
+                      <td className="whitespace-nowrap py-2 text-right text-ink">¥{((i.lineTotalJpy ?? 0) + (i.option?.feeJpy ?? 0)).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
                 <Row label="小計（税抜）" value={`¥${(o.subtotalJpy ?? 0).toLocaleString()}`} />
                 {typeof o.shippingFeeJpy === 'number' && o.shippingFeeJpy > 0 && <Row label="送料" value={`¥${o.shippingFeeJpy.toLocaleString()}`} />}
