@@ -14,7 +14,7 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (user) router.replace('/sales')
+    if (user) router.replace('/dashboard')
   }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,7 +23,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      router.replace('/sales')
+      router.replace('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ログインに失敗しました')
     } finally {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await loginWithGoogle()
-      router.replace('/sales')
+      router.replace('/dashboard')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Google ログインに失敗しました'
       setError(message.includes('popup-closed') ? 'ログイン画面が閉じられました' : message)

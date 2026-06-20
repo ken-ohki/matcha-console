@@ -15,7 +15,7 @@ import type {
   ProductInput,
   ProductWithInventory,
 } from '@/types'
-import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Download, GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, ArrowUpDown, Copy, Download, GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
   ProductModal,
@@ -213,6 +213,7 @@ function SortableTh({
   dir,
   onSort,
   align = 'left',
+  className = '',
 }: {
   label: string
   sortKey: Exclude<InventorySortKey, 'manual'>
@@ -220,11 +221,12 @@ function SortableTh({
   dir: 'asc' | 'desc'
   onSort: (key: InventorySortKey) => void
   align?: 'left' | 'right'
+  className?: string
 }) {
   const active = current === sortKey
   const Icon = active ? (dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
   return (
-    <th className={`px-4 py-3 font-medium text-mist ${align === 'right' ? 'text-right' : 'text-left'}`}>
+    <th className={`px-4 py-3 font-medium text-mist ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
@@ -340,6 +342,7 @@ export default function InventoryPage() {
   const [statusFilters, setStatusFilters] = useState<Set<'out' | 'low' | 'normal'>>(new Set())
   const [catalogFilter, setCatalogFilter] = useState<'all' | 'visible' | 'hidden'>('all')
   const [askFilter, setAskFilter] = useState<'all' | 'ask' | 'normal'>('all')
+  const [showArchived, setShowArchived] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [prefillProduct, setPrefillProduct] = useState<Partial<ProductWithInventory> | null>(null)
 
@@ -435,6 +438,8 @@ export default function InventoryPage() {
 
   const filtered = useMemo(() => {
     const searched = groupProducts.filter(product => {
+      // Archived products are hidden unless the toggle is on.
+      if (!showArchived && product.archived) return false
       if (search) {
         const searchText = [
           product.sku,
@@ -479,7 +484,7 @@ export default function InventoryPage() {
       }
     })
     return sorted
-  }, [groupProducts, search, sortKey, sortDir, gradeFilters, originFilters, statusFilters, catalogFilter, askFilter])
+  }, [groupProducts, search, sortKey, sortDir, gradeFilters, originFilters, statusFilters, catalogFilter, askFilter, showArchived])
 
   const handleSort = (key: typeof sortKey) => {
     if (sortKey === key) {
@@ -598,6 +603,21 @@ export default function InventoryPage() {
     } catch (err) {
       setFeedbackTone('error')
       setFeedbackMessage(err instanceof Error ? err.message : '商品の削除に失敗しました')
+    }
+  }
+
+  const handleArchiveProduct = async (product: ProductWithInventory) => {
+    const next = !product.archived
+    if (next && !confirm(`${product.name} をアーカイブしますか？（一覧・カタログ・受注から除外します。在庫履歴は保持）`)) return
+    try {
+      const services = await getServices()
+      await services.inventory.setProductArchived(product.id, next)
+      setFeedbackTone('success')
+      setFeedbackMessage(next ? '商品をアーカイブしました' : 'アーカイブを解除しました')
+      await load()
+    } catch (err) {
+      setFeedbackTone('error')
+      setFeedbackMessage(err instanceof Error ? err.message : 'アーカイブ操作に失敗しました')
     }
   }
 
@@ -809,6 +829,10 @@ export default function InventoryPage() {
               placeholder="SKU / 商品名 / 仕入商品名 / 仕入先 / 品種で検索..."
               className="w-full rounded-xl border border-line py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-matcha md:w-[32rem]"
             />
+            <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-graphite">
+              <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />
+              アーカイブを表示
+            </label>
           </div>
           <InventoryFilterBar
             groupProducts={groupProducts}
@@ -840,6 +864,9 @@ export default function InventoryPage() {
                     {product.inquireToOrder && (
                       <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
                     )}
+                    {product.archived && (
+                      <span className="rounded-full border border-line px-2 py-0.5 text-[10px] font-medium text-mist">アーカイブ</span>
+                    )}
                   </div>
                   <div className="mt-1 font-mono text-xs text-mist">{product.sku}</div>
                 </div>
@@ -859,6 +886,14 @@ export default function InventoryPage() {
                     className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                   >
                     <Copy size={16} />
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleArchiveProduct(product) }}
+                    aria-label={product.archived ? 'アーカイブ解除' : 'アーカイブ'}
+                    title={product.archived ? 'アーカイブ解除' : 'アーカイブ'}
+                    className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
+                  >
+                    {product.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteProduct(product) }}
@@ -882,9 +917,9 @@ export default function InventoryPage() {
             <table className="w-max min-w-full text-sm">
               <thead className="bg-bone">
                 <tr className="whitespace-nowrap">
+                  <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} className="sticky left-0 z-20 bg-bone" />
                   {user?.role === 'admin' && <th className="w-10 px-3 py-3 text-left font-medium text-mist" />}
                   <SortableTh label="SKU" sortKey="sku" current={sortKey} dir={sortDir} onSort={handleSort} />
-                  <SortableTh label="商品名" sortKey="name" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <SortableTh label="茶種" sortKey="tea" current={sortKey} dir={sortDir} onSort={handleSort} />
                   <th className="px-3 py-3 text-left font-medium text-mist">グレード</th>
                   <th className="px-3 py-3 text-left font-medium text-mist">品種</th>
@@ -923,20 +958,23 @@ export default function InventoryPage() {
                     onDragLeave={() => setDragOverId(prev => (prev === product.id ? null : prev))}
                     onDrop={() => handleProductDrop(product.id)}
                     onClick={() => openDetail(product.id)}
-                    className={`cursor-pointer whitespace-nowrap border-t border-line hover:bg-bone ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
+                    className={`group cursor-pointer whitespace-nowrap border-t border-line hover:bg-bone ${dragOverId === product.id ? 'bg-[#eef3eb]' : ''}`}
                   >
+                    <td className={`sticky left-0 z-10 px-3 py-3 group-hover:bg-bone ${dragOverId === product.id ? 'bg-[#eef3eb]' : 'bg-paper'}`}>
+                      <span className="font-medium text-ink">{product.name}</span>
+                      {product.inquireToOrder && (
+                        <span className="ml-2 rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
+                      )}
+                      {product.archived && (
+                        <span className="ml-2 rounded-full border border-line px-2 py-0.5 text-[10px] font-medium text-mist">アーカイブ</span>
+                      )}
+                    </td>
                     {user?.role === 'admin' && (
                       <td className="px-3 py-3 text-gray-400" onClick={e => e.stopPropagation()}>
                         <GripVertical size={16} />
                       </td>
                     )}
                     <td className="px-3 py-3 font-mono text-graphite">{product.sku}</td>
-                    <td className="px-3 py-3">
-                      <span className="font-medium text-ink">{product.name}</span>
-                      {product.inquireToOrder && (
-                        <span className="ml-2 rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">ASK</span>
-                      )}
-                    </td>
                     <td className="px-3 py-3 text-graphite">{translateValues(masters, 'tea_type', product.teaType ? [product.teaType] : [])[0] ?? product.teaType ?? '-'}</td>
                     <td className="px-3 py-3 text-graphite">{translateValues(masters, 'grade', product.grade ? [product.grade] : [])[0] ?? product.grade ?? '-'}</td>
                     <td className="px-3 py-3 text-graphite">{formatCultivars(translateValues(masters, 'cultivar', product.cultivars))}</td>
@@ -974,6 +1012,14 @@ export default function InventoryPage() {
                             className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
                           >
                             <Copy size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleArchiveProduct(product)}
+                            aria-label={product.archived ? 'アーカイブ解除' : 'アーカイブ'}
+                            title={product.archived ? 'アーカイブ解除' : 'アーカイブ'}
+                            className="rounded-lg p-2 text-mist transition hover:bg-bone hover:text-graphite"
+                          >
+                            {product.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product)}

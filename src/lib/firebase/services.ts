@@ -307,6 +307,7 @@ function mapProduct(id: string, data: DocumentData): Product {
     imageUrl: data.imageUrl ? String(data.imageUrl) : undefined,
     sortOrder: Number(data.sortOrder ?? 0),
     isActive: data.isActive !== false,
+    archived: data.archived === true,
     showInCatalog: data.showInCatalog !== false,
     inquireToOrder: data.inquireToOrder === true,
     wholesaleAvailableKg: data.wholesaleAvailableKg != null ? Number(data.wholesaleAvailableKg) : undefined,
@@ -789,18 +790,22 @@ function isReservedSale(status: SaleRecord['status']): boolean {
   return status === 'negotiating' || status === 'confirmed'
 }
 
+// Wholesale orders (incl. migrated direct sales) reserve stock via ec_sales with a
+// 'Wholesale'/'WholesaleSample' channel; Shopify uses other channels.
+function isWholesaleChannel(channel?: string): boolean {
+  return channel === 'Wholesale' || channel === 'WholesaleSample'
+}
+
 function computeInventory(
   products: Product[],
-  sales: SaleRecord[],
   selfConsumptions: SelfConsumptionRecord[],
   ecSales: EcSaleRecord[],
   settings: Settings,
 ): ProductWithInventory[] {
-  const reservedByProduct = sales.reduce<Record<string, number>>((acc, sale) => {
-    if (!isReservedSale(sale.status)) return acc
-    for (const item of sale.items) {
-      acc[item.productId] = (acc[item.productId] ?? 0) + item.quantityKg
-    }
+  // Reservations now come from the ec_sales ledger (Wholesale channel), not `sales`.
+  const reservedByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
+    if (record.status === 'cancelled' || !isWholesaleChannel(record.channel)) return acc
+    acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
   const selfConsumedByProduct = selfConsumptions.reduce<Record<string, number>>((acc, record) => {
@@ -808,7 +813,7 @@ function computeInventory(
     return acc
   }, {})
   const ecSoldByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
-    if (record.status === 'cancelled') return acc
+    if (record.status === 'cancelled' || isWholesaleChannel(record.channel)) return acc
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
@@ -863,20 +868,15 @@ async function assertSufficientSelfConsumptionStock(
   input: SelfConsumptionRecordInput,
   options?: { excludeSelfConsumptionId?: string },
 ): Promise<Product> {
-  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
+  const [products, selfConsumptions, ecSales] = await Promise.all([
     getAllProducts(),
-    getAllSales(),
     getAllSelfConsumptions(),
     getAllEcSales(),
   ])
   const product = products.find(item => item.id === input.productId && item.isActive)
   if (!product) throw new Error('商品が見つかりません')
 
-  const reservedKg = sales
-    .filter(sale => isReservedSale(sale.status))
-    .reduce((sum, sale) => sum + sale.items
-      .filter(item => item.productId === input.productId)
-      .reduce((s, item) => s + item.quantityKg, 0), 0)
+  // Wholesale reservations live in ec_sales now, so ecSoldKg already covers them.
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
@@ -885,7 +885,6 @@ async function assertSufficientSelfConsumptionStock(
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - reservedKg
     - selfConsumedKg
     - ecSoldKg
 
@@ -900,20 +899,15 @@ async function assertSufficientEcSaleStock(
   input: EcSaleRecordInput,
   options?: { excludeEcSaleId?: string },
 ): Promise<Product> {
-  const [products, sales, selfConsumptions, ecSales] = await Promise.all([
+  const [products, selfConsumptions, ecSales] = await Promise.all([
     getAllProducts(),
-    getAllSales(),
     getAllSelfConsumptions(),
     getAllEcSales(),
   ])
   const product = products.find(item => item.id === input.productId && item.isActive)
   if (!product) throw new Error('商品が見つかりません')
 
-  const reservedKg = sales
-    .filter(sale => isReservedSale(sale.status))
-    .reduce((sum, sale) => sum + sale.items
-      .filter(item => item.productId === input.productId)
-      .reduce((s, item) => s + item.quantityKg, 0), 0)
+  // Wholesale reservations live in ec_sales now, so ecSoldKg already covers them.
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
@@ -922,7 +916,6 @@ async function assertSufficientEcSaleStock(
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - reservedKg
     - selfConsumedKg
     - ecSoldKg
 
@@ -1348,14 +1341,13 @@ export function createFirebaseServices(): IServices {
     },
 
     async getProductsWithInventory() {
-      const [products, sales, selfConsumptions, ecSales, settings] = await Promise.all([
+      const [products, selfConsumptions, ecSales, settings] = await Promise.all([
         getAllProducts(),
-        getAllSales(),
         getAllSelfConsumptions(),
         getAllEcSales(),
         getSettings(),
       ])
-      return computeInventory(products, sales, selfConsumptions, ecSales, settings)
+      return computeInventory(products, selfConsumptions, ecSales, settings)
     },
 
     async createProduct(input) {
@@ -1446,6 +1438,13 @@ export function createFirebaseServices(): IServices {
 
       await updateDoc(doc(db, COLLECTIONS.products, id), {
         isActive: false,
+        updatedAt: serverTimestamp(),
+      })
+    },
+
+    async setProductArchived(id: string, archived: boolean) {
+      await updateDoc(doc(db, COLLECTIONS.products, id), {
+        archived,
         updatedAt: serverTimestamp(),
       })
     },

@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { Buyer, MasterEntry, SaleRecord, ShippingStatus } from '@/types'
+import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
+import type { MasterEntry, SaleRecord, ShippingStatus } from '@/types'
 import { translateValue } from '@/lib/masters'
 import { Box, ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
@@ -38,7 +39,6 @@ type View = 'list' | 'history' | 'slips'
 export default function ShippingPage() {
   const router = useRouter()
   const [sales, setSales] = useState<SaleRecord[]>([])
-  const [buyers, setBuyers] = useState<Buyer[]>([])
   const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -48,13 +48,12 @@ export default function ShippingPage() {
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const [nextSales, nextBuyers, nextMasters] = await Promise.all([
-      services.sales.getSaleRecords(),
-      services.sales.getBuyers(),
+    const [wOrders, nextMasters] = await Promise.all([
+      fetchWholesaleOrders(),
       services.masters.listMasters(),
     ])
-    setSales(nextSales)
-    setBuyers(nextBuyers)
+    // Direct sales are now wholesale_orders. Shipping doesn't need cost, so pass {}.
+    setSales(wOrders.map(o => orderToSale(o, {})))
     setMasters(nextMasters)
     setLoading(false)
   }
@@ -73,7 +72,7 @@ export default function ShippingPage() {
     }
   }, [])
 
-  const openDetail = (id: string) => router.push(`/shipping/${id}`)
+  const openDetail = (id: string) => router.push(`/wholesale/orders/${id}`)
   const methodLabel = (value?: string) => value ? translateValue(masters, 'shipping_method', value) : '（未設定）'
 
   // Only confirmed sales need shipping

@@ -7,6 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { StockStatusBadge } from '@/components/ui/StatusBadge'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
+import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
 import type {
   EcSaleRecord,
   InventoryGroup,
@@ -105,11 +106,11 @@ export default function ProductDetailPage() {
     const load = async () => {
       setLoading(true)
       const services = await getServices()
-      const [products, nextGroups, nextMasters, nextSales, nextPos, nextEc, nextSelf] = await Promise.all([
+      const [products, nextGroups, nextMasters, nextOrders, nextPos, nextEc, nextSelf] = await Promise.all([
         services.inventory.getProductsWithInventory(),
         services.inventory.getInventoryGroups(),
         services.masters.listMasters(),
-        services.sales.getSaleRecords(),
+        fetchWholesaleOrders(),
         services.purchaseOrders.getPurchaseOrders(),
         services.ecSales.getEcSaleRecords(),
         services.selfConsumption.getSelfConsumptionRecords(),
@@ -119,7 +120,8 @@ export default function ProductDetailPage() {
       setProduct(found)
       setGroups(nextGroups)
       setMasters(nextMasters)
-      setSales(nextSales)
+      // Direct sales are now wholesale_orders; cost not needed for the tx history.
+      setSales(nextOrders.map(o => orderToSale(o, {})))
       setPurchaseOrders(nextPos)
       setEcSales(nextEc)
       setSelfRecords(nextSelf)
@@ -170,7 +172,7 @@ export default function ProductDetailPage() {
           unitPrice: item.unitPrice,
           amount: item.revenue,
           status: SALE_STATUS_LABELS[sale.status] ?? sale.status,
-          href: `/sales/${sale.id}`,
+          href: `/wholesale/orders/${sale.id}`,
         })
       })
     }

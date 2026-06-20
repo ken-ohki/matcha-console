@@ -30,6 +30,7 @@ export interface IInventoryService {
   createProduct(input: ProductInput): Promise<Product>
   updateProduct(id: string, input: Partial<ProductInput>): Promise<Product>
   deleteProduct(id: string): Promise<void>
+  setProductArchived(id: string, archived: boolean): Promise<void>
   updateProductsSortOrder(orderedIds: string[]): Promise<void>
   updateInventoryGroupsSortOrder(orderedIds: string[]): Promise<void>
   createInventoryGroup(input: InventoryGroupInput): Promise<InventoryGroup>

@@ -32,6 +32,7 @@ import {
   type MonthlyCashFlow,
 } from '@/lib/cashflow'
 import { endOfMonth, formatCurrency, monthKey, startOfMonth, todayIso } from '@/lib/format'
+import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
 
 type TabKey = 'overview' | 'monthly' | 'fiscal' | 'partner' | 'products' | 'cashflow'
 
@@ -115,18 +116,21 @@ export default function FinancialsPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [s, o, ec, products] = await Promise.all([
-        svc.sales.getSaleRecords(),
+      const [o, ec, products, wholesaleOrders] = await Promise.all([
         svc.purchaseOrders.getPurchaseOrders(),
         svc.ecSales.getEcSaleRecords(),
         svc.inventory.getProductsWithInventory(),
+        fetchWholesaleOrders(),
       ])
-      setSales(s)
-      setOrders(o)
-      setEcSales(ec)
       const costMap: Record<string, number> = {}
       for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
       setCostByProduct(costMap)
+      // Direct sales are now wholesale_orders; map them into the SaleRecord shape.
+      setSales(wholesaleOrders.map(wo => orderToSale(wo, costMap)))
+      setOrders(o)
+      // Exclude wholesale stock-ledger entries — those revenues are counted via the
+      // wholesale orders above; only Shopify ec_sales are EC revenue.
+      setEcSales(ec.filter(e => e.channel !== 'Wholesale' && e.channel !== 'WholesaleSample'))
     } finally {
       setLoading(false)
     }

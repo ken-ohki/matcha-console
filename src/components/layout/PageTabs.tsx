@@ -32,10 +32,11 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
   )
 }
 
+// Direct sales (直販) and the 販売先一覧 were retired and merged into the wholesale
+// system (卸売注文 / 会員管理). Shopify remains its own channel.
 export const SALES_TABS: PageTab[] = [
-  { href: '/sales', label: '直販' },
+  { href: '/wholesale/orders', label: '卸売注文' },
   { href: '/ec-sales', label: 'Shopify' },
-  { href: '/buyers', label: '販売先一覧' },
 ]
 
 export const PURCHASING_TABS: PageTab[] = [

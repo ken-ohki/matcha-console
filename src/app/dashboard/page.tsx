@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getServices } from '@/lib/services'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { orderToSale, type WholesaleOrderRow } from '@/lib/wholesaleAdapter'
 import type { SaleRecord } from '@/types'
 import { UserCheck, CreditCard, FileText, MessageSquare, RefreshCw, ArrowRight, PackageMinus } from 'lucide-react'
 
@@ -59,12 +60,10 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [saleRecords, products] = await Promise.all([
-        svc.sales.getSaleRecords(),
-        svc.inventory.getProductsWithInventory(),
-      ])
-      setSales(saleRecords)
+      const products = await svc.inventory.getProductsWithInventory()
       setLowStock(products.filter(p => p.isActive !== false && (p.stockStatus === 'low' || p.stockStatus === 'out')).length)
+      const costMap: Record<string, number> = {}
+      for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
 
       const auth = `Bearer ${await token()}`
       const [oRes, mRes, iRes] = await Promise.all([
@@ -72,8 +71,11 @@ export default function DashboardPage() {
         fetch('/api/wholesale/members?status=pending', { headers: { Authorization: auth }, cache: 'no-store' }),
         fetch('/api/wholesale/inquiries', { headers: { Authorization: auth }, cache: 'no-store' }),
       ])
-      const oData = (await oRes.json().catch(() => ({}))) as { orders?: WOrder[] }
-      setOrders(oData.orders ?? [])
+      const oData = (await oRes.json().catch(() => ({}))) as { orders?: WholesaleOrderRow[] }
+      const wOrders = oData.orders ?? []
+      setOrders(wOrders as WOrder[])
+      // Monthly revenue/gross now come from wholesale orders (direct sales were merged in).
+      setSales(wOrders.map(o => orderToSale(o, costMap)))
       const mData = (await mRes.json().catch(() => ({}))) as { members?: unknown[] }
       setPendingMembers((mData.members ?? []).length)
       const iData = (await iRes.json().catch(() => ({}))) as { inquiries?: { status?: string }[] }

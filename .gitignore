@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# migration data backups (contain real customer data — never commit)
+scripts/backups/
+
 # next.js build output
 .next/
 out/

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore'
+import { FieldValue, Timestamp, getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
 import { requireAdmin, AuthError } from '@/lib/firebase/admin-auth'
 
@@ -29,8 +29,11 @@ export async function GET(request: Request) {
   const orders = snap.docs
     .map(d => {
       const data = d.data() as Record<string, unknown>
-      const { createdAt: _c, updatedAt: _u, paidAt: _p, cancelledAt: _x, ...rest } = data
-      return { ...rest, id: d.id, createdAtMs: typeof data.createdAtMs === 'number' ? data.createdAtMs : 0 } as Record<string, unknown> & { id: string; createdAtMs: number }
+      const { createdAt: _c, updatedAt: _u, paidAt, cancelledAt: _x, ...rest } = data
+      const paidAtMs = paidAt && typeof (paidAt as { toMillis?: () => number }).toMillis === 'function'
+        ? (paidAt as { toMillis: () => number }).toMillis()
+        : undefined
+      return { ...rest, id: d.id, createdAtMs: typeof data.createdAtMs === 'number' ? data.createdAtMs : 0, paidAtMs } as Record<string, unknown> & { id: string; createdAtMs: number }
     })
     .filter(o => (status ? o.status === status : true))
     .sort((a, b) => (b.createdAtMs as number) - (a.createdAtMs as number))
@@ -78,11 +81,16 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'notify_shipped'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'notify_shipped' | 'set_billing'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
   shippingCarrierLabel?: string
+  // set_billing fields (入金管理 inline edits)
+  paymentStatus?: 'paid' | 'invoiced' | 'uninvoiced' | 'unpaid'
+  paymentDate?: string // YYYY-MM-DD
+  dueDate?: string // YYYY-MM-DD
+  paymentMethod?: string
 }
 
 // Base URL of the wholesale storefront app (owns Stripe + order/stock logic).
@@ -159,6 +167,54 @@ export async function PATCH(request: Request) {
   if (body.action === 'confirm_payment') {
     await confirmOrderPaid(database, body.orderId)
     return NextResponse.json({ ok: true, status: 'paid' })
+  }
+  if (body.action === 'unconfirm_payment') {
+    const snap = await ref.get()
+    const cur = snap.data() as { status?: string } | undefined
+    await ref.set(
+      {
+        paymentStatus: 'unpaid',
+        paidAt: FieldValue.delete(),
+        ...(cur?.status === 'paid' ? { status: 'pending_payment' } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+    return NextResponse.json({ ok: true })
+  }
+  // Inline billing edits from 入金管理 (due date / paid state / method).
+  if (body.action === 'set_billing') {
+    const snap = await ref.get()
+    const cur = snap.data() as { status?: string } | undefined
+    const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
+    if (body.dueDate !== undefined) patch.dueDate = body.dueDate || FieldValue.delete()
+    if (body.paymentMethod !== undefined) patch.paymentMethod = body.paymentMethod || FieldValue.delete()
+    if (body.paymentStatus !== undefined) {
+      const paid = body.paymentStatus === 'paid'
+      patch.paymentStatus = paid ? 'paid' : 'unpaid'
+      if (paid) {
+        const ms = body.paymentDate ? Date.parse(body.paymentDate) : NaN
+        patch.paidAt = Number.isFinite(ms) ? Timestamp.fromMillis(ms) : FieldValue.serverTimestamp()
+        if (cur?.status === 'pending_payment' || cur?.status === 'quoted') patch.status = 'paid'
+      } else {
+        patch.paidAt = FieldValue.delete()
+        if (cur?.status === 'paid') patch.status = 'pending_payment'
+      }
+    } else if (body.paymentDate !== undefined) {
+      // Date set without an explicit status change → couple it (date present = paid).
+      const ms = body.paymentDate ? Date.parse(body.paymentDate) : NaN
+      if (Number.isFinite(ms)) {
+        patch.paidAt = Timestamp.fromMillis(ms)
+        patch.paymentStatus = 'paid'
+        if (cur?.status === 'pending_payment' || cur?.status === 'quoted') patch.status = 'paid'
+      } else {
+        patch.paidAt = FieldValue.delete()
+        patch.paymentStatus = 'unpaid'
+        if (cur?.status === 'paid') patch.status = 'pending_payment'
+      }
+    }
+    await ref.set(patch, { merge: true })
+    return NextResponse.json({ ok: true })
   }
   if (body.action === 'mark_shipped') {
     const now = new Date().toISOString()

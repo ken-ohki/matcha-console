@@ -56,6 +56,7 @@ export interface Product {
   imageUrl?: string
   sortOrder: number
   isActive: boolean
+  archived?: boolean              // アーカイブ（今後使わない商品）。一覧/カタログ/受注から除外。
   showInCatalog: boolean
   inquireToOrder: boolean
   // 卸売サイト(wholesale.sabo-matcha.jp)向け設定

@@ -16,10 +16,6 @@ function handleAuthError(err: unknown) {
   return NextResponse.json({ error: 'internal', detail: err instanceof Error ? err.message : 'unknown' }, { status: 500 })
 }
 
-function normalizeName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ')
-}
-
 /** Escape member-supplied text before interpolating into email HTML. */
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
@@ -115,36 +111,13 @@ export async function POST(request: Request, context: { params: Promise<{ uid: s
   }
 
   if (body.action === 'approve') {
-    // Auto-create a buyers doc (販売先マスタ) and link it, if not already linked.
-    let buyerId = (member.buyerId as string | undefined) ?? undefined
-    if (!buyerId) {
-      const companyName = String(member.companyName ?? '').trim() || String(member.email ?? '')
-      const buyerRef = database.collection('buyers').doc()
-      await buyerRef.set({
-        name: companyName,
-        billingName: companyName,
-        normalizedName: normalizeName(companyName),
-        country: member.country ?? null,
-        email: member.email ?? null,
-        phone: member.phone ?? null,
-        contactPersonName: member.contactName ?? null,
-        website: member.website ?? null,
-        shippingAddress: member.address ?? null,
-        shippingPostalCode: member.postalCode ?? null,
-        notes: 'wholesale.sabo-matcha.jp 会員より自動作成',
-        saleCount: 0,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-      buyerId = buyerRef.id
-    }
-
+    // The legacy 販売先マスタ (buyers) has been retired; the member doc itself is
+    // now the single customer record. No buyer doc is created on approval.
     await memberRef.set(
       {
         status: 'approved',
         approvedAt: FieldValue.serverTimestamp(),
         approvedBy: staff.uid,
-        buyerId,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -161,7 +134,7 @@ export async function POST(request: Request, context: { params: Promise<{ uid: s
       })
     }
 
-    return NextResponse.json({ ok: true, status: 'approved', buyerId })
+    return NextResponse.json({ ok: true, status: 'approved' })
   }
 
   return NextResponse.json({ error: 'invalid_action' }, { status: 400 })

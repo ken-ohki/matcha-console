@@ -22,6 +22,7 @@ import { computeSaleTaxBuckets, saleFeesToTaxLines, sumSaleFees } from '@/lib/ta
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
+import { fetchWholesaleOrders, orderToSale, patchWholesaleOrder } from '@/lib/wholesaleAdapter'
 
 // Tax-inclusive billed amount (matches the invoice document and 支払管理).
 function saleIncome(sale: SaleRecord): number {
@@ -70,12 +71,17 @@ export default function ReceivablesPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [all, ec] = await Promise.all([
-        svc.sales.getSaleRecords(),
+      const [products, ec, wOrders] = await Promise.all([
+        svc.inventory.getProductsWithInventory(),
         svc.ecSales.getEcSaleRecords(),
+        fetchWholesaleOrders(),
       ])
-      setSales(all.filter(s => s.status === 'confirmed'))
-      setEcSales(ec.filter(e => e.status !== 'cancelled'))
+      const costMap: Record<string, number> = {}
+      for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
+      // Direct sales are now wholesale_orders; show billable (confirmed/paid/shipped).
+      setSales(wOrders.map(o => orderToSale(o, costMap)).filter(s => s.status === 'confirmed'))
+      // Shopify EC only — wholesale ledger rows are counted via the orders above.
+      setEcSales(ec.filter(e => e.status !== 'cancelled' && e.channel !== 'Wholesale' && e.channel !== 'WholesaleSample'))
     } finally { setLoading(false) }
   }
 
@@ -132,13 +138,8 @@ export default function ReceivablesPage() {
     setSavingId(sale.id)
     setFeedback(null)
     try {
-      const svc = await getServices()
-      const updated = await svc.sales.updateSaleRecord(sale.id, {
-        paymentStatus: 'invoiced',
-        paymentDate: '',
-        paymentConfirmedAt: '',
-      })
-      setSales(prev => prev.map(s => s.id === sale.id ? updated : s))
+      await patchWholesaleOrder({ orderId: sale.id, action: 'unconfirm_payment' })
+      setSales(prev => prev.map(s => s.id === sale.id ? { ...s, paymentStatus: 'invoiced', paymentDate: undefined, paymentConfirmedAt: undefined } : s))
       setFeedback('入金確認を取り消しました')
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
@@ -149,13 +150,9 @@ export default function ReceivablesPage() {
     setSavingId(id)
     setFeedback(null)
     try {
-      const svc = await getServices()
-      const updated = await svc.sales.updateSaleRecord(id, {
-        paymentStatus: 'paid',
-        paymentDate: paymentDate || todayIso(),
-        paymentConfirmedAt: new Date().toISOString(),
-      })
-      setSales(prev => prev.map(s => s.id === id ? updated : s))
+      const date = paymentDate || todayIso()
+      await patchWholesaleOrder({ orderId: id, action: 'set_billing', paymentStatus: 'paid', paymentDate: date })
+      setSales(prev => prev.map(s => s.id === id ? { ...s, paymentStatus: 'paid', paymentDate: date, paymentConfirmedAt: new Date().toISOString() } : s))
       setConfirmTarget(null)
       setFeedback('入金確認しました')
     } catch (err) {
@@ -167,21 +164,26 @@ export default function ReceivablesPage() {
     setSavingId(id)
     setFeedback(null)
     try {
-      const svc = await getServices()
-      // Keep status and paymentDate consistent: entering a payment date marks
-      // the sale paid; clearing it on a paid sale reverts to 請求済.
-      const coupledStatus: Partial<Record<'paymentStatus', PaymentStatus>> = {}
-      if (patch.paymentDate !== undefined && patch.paymentStatus === undefined) {
-        coupledStatus.paymentStatus = patch.paymentDate ? 'paid' : 'invoiced'
-      }
-      const updated = await svc.sales.updateSaleRecord(id, {
+      await patchWholesaleOrder({
+        orderId: id,
+        action: 'set_billing',
         ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
-        ...coupledStatus,
-        ...(patch.dueDate !== undefined && { dueDate: patch.dueDate || undefined }),
-        ...(patch.paymentDate !== undefined && { paymentDate: patch.paymentDate || undefined }),
-        ...(patch.paymentMethod !== undefined && { paymentMethod: patch.paymentMethod || undefined }),
+        ...(patch.dueDate !== undefined && { dueDate: patch.dueDate }),
+        ...(patch.paymentDate !== undefined && { paymentDate: patch.paymentDate }),
+        ...(patch.paymentMethod !== undefined && { paymentMethod: patch.paymentMethod }),
       })
-      setSales(prev => prev.map(s => s.id === id ? updated : s))
+      setSales(prev => prev.map(s => {
+        if (s.id !== id) return s
+        const next = { ...s }
+        if (patch.dueDate !== undefined) next.dueDate = patch.dueDate || undefined
+        if (patch.paymentMethod !== undefined) next.paymentMethod = patch.paymentMethod || undefined
+        if (patch.paymentStatus !== undefined) next.paymentStatus = patch.paymentStatus
+        if (patch.paymentDate !== undefined) {
+          next.paymentDate = patch.paymentDate || undefined
+          if (patch.paymentStatus === undefined) next.paymentStatus = patch.paymentDate ? 'paid' : 'invoiced'
+        }
+        return next
+      }))
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingId(null) }
@@ -521,7 +523,7 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
             <p className="mt-1 text-xs text-mist">販売案件の詳細（読み取り専用）</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href={`/sales/${sale.id}/document?type=invoice`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">請求書 →</Link>
+            <Link href={`/wholesale/orders/${sale.id}`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">注文詳細 →</Link>
             <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-bone hover:text-mist"><X size={18} /></button>
           </div>
         </div>

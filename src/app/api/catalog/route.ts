@@ -96,10 +96,6 @@ function getStockStatus(currentKg: number): StockStatus {
   return 'normal'
 }
 
-function isReservedSale(status: unknown): boolean {
-  return status === 'negotiating' || status === 'confirmed'
-}
-
 function assertPasscode(provided: string | null | undefined): boolean {
   const expected = process.env.CATALOG_PASSCODE
   if (!expected) return false
@@ -129,10 +125,12 @@ export async function POST(request: Request) {
     )
   }
 
-  const [groupsSnap, productsSnap, salesSnap, selfSnap, ecSnap, settingsSnap, ratesInfo] = await Promise.all([
+  // Direct sales were migrated into wholesale_orders, which reserve stock via the
+  // shared `ec_sales` ledger (channel 'Wholesale'). The old `sales` collection is
+  // no longer a reservation source — all reservations now flow through `ec_sales`.
+  const [groupsSnap, productsSnap, selfSnap, ecSnap, settingsSnap, ratesInfo] = await Promise.all([
     db.collection(COLLECTIONS.groups).get(),
     db.collection(COLLECTIONS.products).get(),
-    db.collection(COLLECTIONS.sales).get(),
     db.collection(COLLECTIONS.selfConsumptions).get(),
     db.collection(COLLECTIONS.ecSales).get(),
     db.collection(COLLECTIONS.settings).doc('main').get(),
@@ -142,24 +140,6 @@ export async function POST(request: Request) {
   const settings = settingsSnap.data() as AnyRecord | undefined
   const alertRatio = num(settings?.stockAlertRatio, DEFAULT_STOCK_ALERT_RATIO)
   const currency = String(settings?.currency ?? DEFAULT_CURRENCY)
-
-  const reservedByProduct: Record<string, number> = {}
-  salesSnap.docs.forEach(doc => {
-    const data = doc.data() as AnyRecord
-    if (!isReservedSale(data.status)) return
-    const items = Array.isArray(data.items) ? data.items : null
-    if (items && items.length > 0) {
-      items.forEach(raw => {
-        const item = raw as AnyRecord
-        const pid = String(item.productId ?? '')
-        if (!pid) return
-        reservedByProduct[pid] = (reservedByProduct[pid] ?? 0) + num(item.quantityKg)
-      })
-    } else {
-      const pid = String(data.productId ?? '')
-      if (pid) reservedByProduct[pid] = (reservedByProduct[pid] ?? 0) + num(data.quantityKg)
-    }
-  })
 
   const selfByProduct: Record<string, number> = {}
   selfSnap.docs.forEach(doc => {
@@ -204,11 +184,10 @@ export async function POST(request: Request) {
         ? deriveArrivalDate(arrivalRecords)
         : String(data.arrivalDate ?? '')
       const adjustmentKg = deriveAdjustmentKg(inventoryChecks)
-      const reservedKg = reservedByProduct[doc.id] ?? 0
       const selfUsedKg = selfByProduct[doc.id] ?? 0
       const ecSoldKg = ecByProduct[doc.id] ?? 0
       const baseline = Math.max(initialStockKg + adjustmentKg, 0)
-      const currentKg = initialStockKg + adjustmentKg - reservedKg - selfUsedKg - ecSoldKg
+      const currentKg = initialStockKg + adjustmentKg - selfUsedKg - ecSoldKg
 
       const product: CatalogProduct & { isActive: boolean; showInCatalog: boolean } = {
         id: doc.id,
