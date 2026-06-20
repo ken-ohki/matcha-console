@@ -7,16 +7,9 @@ import type {
   Product,
   ProductInput,
   ProductWithInventory,
-  Buyer,
-  BuyerDetailsInput,
   EcSaleRecord,
-  EcSaleRecordInput,
-  IssuedDocument,
-  ShippingSlip,
   PurchaseOrder,
   PurchaseOrderInput,
-  SaleRecord,
-  SaleRecordInput,
   SelfConsumptionRecord,
   SelfConsumptionRecordInput,
   Settings,
@@ -39,25 +32,8 @@ export interface IInventoryService {
   deleteArrivalRecord(productId: string, arrivalId: string): Promise<void>
 }
 
-export interface ISalesService {
-  getSaleRecords(): Promise<SaleRecord[]>
-  getBuyers(): Promise<Buyer[]>
-  updateBuyer(id: string, input: BuyerDetailsInput): Promise<Buyer>
-  renameBuyer(id: string, name: string): Promise<Buyer>
-  createSaleRecord(input: SaleRecordInput): Promise<SaleRecord>
-  updateSaleRecord(id: string, input: Partial<SaleRecordInput>): Promise<SaleRecord>
-  deleteSaleRecord(id: string): Promise<void>
-  recordSaleDocument(saleId: string, issued: IssuedDocument): Promise<IssuedDocument[]>
-  deleteSaleDocument(saleId: string, docId: string): Promise<IssuedDocument[]>
-  updateShippingSlip(saleId: string, slip: ShippingSlip | null): Promise<SaleRecord>
-
-}
-
 export interface IEcSalesService {
   getEcSaleRecords(): Promise<EcSaleRecord[]>
-  createEcSaleRecord(input: EcSaleRecordInput): Promise<EcSaleRecord>
-  updateEcSaleRecord(id: string, input: Partial<EcSaleRecordInput>): Promise<EcSaleRecord>
-  deleteEcSaleRecord(id: string): Promise<void>
 }
 
 export interface ISelfConsumptionService {
@@ -161,7 +137,6 @@ export interface ISuppliersService {
 
 export interface IServices {
   inventory: IInventoryService
-  sales: ISalesService
   selfConsumption: ISelfConsumptionService
   ecSales: IEcSalesService
   purchaseOrders: IPurchaseOrdersService

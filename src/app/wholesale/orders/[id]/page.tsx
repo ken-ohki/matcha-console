@@ -149,7 +149,12 @@ export default function WholesaleOrderDetailPage() {
       }
       if (action === 'approve') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-        window.alert(d.ok ? '承認し、お客様へ支払い案内を送信しました。' : `承認に失敗しました（${d.error ?? 'error'}）`)
+        const msg = d.ok
+          ? '承認し、お客様へ支払い案内を送信しました。'
+          : d.error === 'overseas_shipping_required'
+            ? '海外発送の送料を設定してから承認してください（注文を編集して送料を入力）。'
+            : `承認に失敗しました（${d.error ?? 'error'}）`
+        window.alert(msg)
       }
       await load()
     } finally {

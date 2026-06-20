@@ -36,26 +36,6 @@ async function token(): Promise<string> {
   return current.getIdToken()
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_approval: '承認待ち',
-  pending_quote: '見積待ち',
-  quoted: '支払い待ち（見積済）',
-  pending_payment: '支払い待ち',
-  paid: '支払い済み',
-  shipped: '出荷済み',
-  cancelled: '取消',
-}
-
-const STATUS_TONE: Record<string, string> = {
-  pending_approval: 'border-[#a87b1e] text-[#a87b1e]',
-  pending_quote: 'border-[#a87b1e] text-[#a87b1e]',
-  quoted: 'border-[#a87b1e] text-[#a87b1e]',
-  pending_payment: 'border-[#a87b1e] text-[#a87b1e]',
-  paid: 'border-matcha text-matcha',
-  shipped: 'border-ink text-ink',
-  cancelled: 'border-line text-mist',
-}
-
 const CARRIER_LABEL: Record<string, string> = {
   ems: 'EMS',
   dhl: 'DHL',

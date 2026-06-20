@@ -24,9 +24,7 @@ import {
 import type {
   ArrivalRecord,
   AuthUser,
-  Buyer,
   EcSaleRecord,
-  EcSaleRecordInput,
   InventoryCheckRecord,
   InventoryGroup,
   InventoryGroupInput,
@@ -42,12 +40,6 @@ import type {
   PurchaseOrderStatus,
   PurchaseOrderPaymentStatus,
   PurchaseOrderPayment,
-  SaleLineItem,
-  SaleFeeItem,
-  IssuedDocument,
-  ShippingSlip,
-  SaleRecord,
-  SaleRecordInput,
   SelfConsumptionRecord,
   SelfConsumptionRecordInput,
   SelfConsumptionUsageType,
@@ -67,7 +59,6 @@ import type {
   IMastersService,
   IPurchaseOrdersService,
   ISelfConsumptionService,
-  ISalesService,
   ISettingsService,
   ISuppliersService,
   IServices,
@@ -81,8 +72,6 @@ import { deleteStorageObjectByUrl } from './storage'
 const COLLECTIONS = {
   groups: 'inventory_groups',
   products: 'products',
-  sales: 'sales',
-  buyers: 'buyers',
   selfConsumptions: 'self_consumptions',
   ecSales: 'ec_sales',
   settings: 'settings',
@@ -345,248 +334,6 @@ function coerceTaxRate(value: unknown): TaxRate {
 }
 
 /** Normalize 諸費用 line items; drop empty rows (no name and zero amount). */
-function normalizeSaleFees(raw: unknown): SaleFeeItem[] {
-  if (!Array.isArray(raw)) return []
-  const result: SaleFeeItem[] = []
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    const name = String(obj.name ?? '').trim()
-    const quantity = obj.quantity == null ? 1 : Number(obj.quantity) || 0
-    const unitPrice = Number(obj.unitPrice) || 0
-    if (!name && quantity * unitPrice === 0) continue
-    result.push({
-      name,
-      quantity,
-      unit: String(obj.unit ?? '式').trim() || '式',
-      unitPrice,
-      taxRate: coerceTaxRate(obj.taxRate),
-    })
-  }
-  return result
-}
-
-function sumFees(fees: SaleFeeItem[]): number {
-  return fees.reduce((s, f) => s + (Number(f.quantity) || 0) * (Number(f.unitPrice) || 0), 0)
-}
-
-function normalizeShippingSlip(raw: unknown): ShippingSlip | undefined {
-  if (!raw || typeof raw !== 'object') return undefined
-  const obj = raw as Record<string, unknown>
-  const url = String(obj.url ?? '')
-  if (!url) return undefined
-  return {
-    name: String(obj.name ?? '発送伝票'),
-    url,
-    uploadedAt: String(obj.uploadedAt ?? ''),
-    size: obj.size != null ? Number(obj.size) : undefined,
-  }
-}
-
-function normalizeIssuedDocuments(raw: unknown): IssuedDocument[] {
-  if (!Array.isArray(raw)) return []
-  const result: IssuedDocument[] = []
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') continue
-    const obj = item as Record<string, unknown>
-    const url = String(obj.url ?? '')
-    if (!url) continue
-    const type = obj.type === 'delivery' || obj.type === 'quotation' ? obj.type : 'invoice'
-    result.push({
-      id: String(obj.id ?? `${obj.issuedAt ?? ''}-${url}`),
-      type,
-      language: obj.language === 'en' ? 'en' : 'ja',
-      issuedAt: String(obj.issuedAt ?? ''),
-      total: Number(obj.total) || 0,
-      name: String(obj.name ?? '帳票.pdf'),
-      url,
-    })
-  }
-  return result
-}
-
-/**
- * Build the 諸費用 list for a sale, migrating legacy fields (options[], otherFees,
- * otherFeesNote) into the new fee-item shape when the new `fees` array is absent.
- */
-function resolveSaleFees(data: DocumentData): SaleFeeItem[] {
-  if (Array.isArray(data.fees)) return normalizeSaleFees(data.fees)
-  const migrated: SaleFeeItem[] = []
-  if (Array.isArray(data.options)) {
-    for (const o of data.options) {
-      if (!o || typeof o !== 'object') continue
-      const obj = o as Record<string, unknown>
-      const name = String(obj.name ?? '').trim()
-      const amount = Number(obj.amount) || 0
-      if (!name && amount === 0) continue
-      migrated.push({ name: name || 'オプション', quantity: 1, unit: '式', unitPrice: amount, taxRate: coerceTaxRate(obj.taxRate) })
-    }
-  }
-  const legacyOther = Number(data.otherFees) || 0
-  if (legacyOther !== 0) {
-    const note = data.otherFeesNote ? String(data.otherFeesNote) : ''
-    migrated.push({ name: note || '諸費用', quantity: 1, unit: '式', unitPrice: legacyOther, taxRate: 10 })
-  }
-  return migrated
-}
-
-function normalizeSaleItem(raw: unknown): SaleLineItem | null {
-  if (!raw || typeof raw !== 'object') return null
-  const obj = raw as Record<string, unknown>
-  const productId = String(obj.productId ?? '')
-  if (!productId) return null
-  const quantityKg = Number(obj.quantityKg ?? 0)
-  const unitPrice = Number(obj.unitPrice ?? 0)
-  const costPerKg = Number(obj.costPerKg ?? 0)
-  const revenue = obj.revenue != null ? Number(obj.revenue) : quantityKg * unitPrice
-  const costAmount = obj.costAmount != null ? Number(obj.costAmount) : quantityKg * costPerKg
-  const grossProfit = obj.grossProfit != null ? Number(obj.grossProfit) : revenue - costAmount
-  const taxRate = coerceTaxRate(obj.taxRate)
-  return {
-    productId,
-    productSku: String(obj.productSku ?? ''),
-    productName: String(obj.productName ?? ''),
-    quantityKg,
-    unitPrice,
-    costPerKg,
-    revenue,
-    costAmount,
-    grossProfit,
-    taxRate,
-  }
-}
-
-function aggregateItems(items: SaleLineItem[]): {
-  productId: string
-  productSku: string
-  productName: string
-  quantityKg: number
-  unitPrice: number
-  costPerKg: number
-  revenue: number
-  costAmount: number
-  grossProfit: number
-} {
-  const first = items[0]
-  const quantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
-  const revenue = items.reduce((s, i) => s + i.revenue, 0)
-  const costAmount = items.reduce((s, i) => s + i.costAmount, 0)
-  const grossProfit = revenue - costAmount
-  const unitPrice = quantityKg > 0 ? revenue / quantityKg : 0
-  const costPerKg = quantityKg > 0 ? costAmount / quantityKg : 0
-  return {
-    productId: first?.productId ?? '',
-    productSku: first?.productSku ?? '',
-    productName: first?.productName ?? '',
-    quantityKg,
-    unitPrice,
-    costPerKg,
-    revenue,
-    costAmount,
-    grossProfit,
-  }
-}
-
-function mapSale(id: string, data: DocumentData): SaleRecord {
-  const rawItems = Array.isArray(data.items) ? data.items : []
-  let items: SaleLineItem[] = rawItems
-    .map(normalizeSaleItem)
-    .filter((item): item is SaleLineItem => item !== null)
-  if (items.length === 0) {
-    const legacyProductId = String(data.productId ?? '')
-    if (legacyProductId) {
-      const quantityKg = Number(data.quantityKg ?? 0)
-      const unitPrice = Number(data.unitPrice ?? 0)
-      const costPerKg = Number(data.costPerKg ?? 0)
-      const revenue = data.revenue != null ? Number(data.revenue) : quantityKg * unitPrice
-      const costAmount = data.costAmount != null ? Number(data.costAmount) : quantityKg * costPerKg
-      items = [{
-        productId: legacyProductId,
-        productSku: String(data.productSku ?? ''),
-        productName: String(data.productName ?? ''),
-        quantityKg,
-        unitPrice,
-        costPerKg,
-        revenue,
-        costAmount,
-        grossProfit: data.grossProfit != null ? Number(data.grossProfit) : revenue - costAmount,
-        taxRate: 8,
-      }]
-    }
-  }
-  const agg = aggregateItems(items)
-  const shippingFee = Number(data.shippingFee ?? 0)
-  const paymentFee = Number(data.paymentFee ?? 0)
-  const fees = resolveSaleFees(data)
-  const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
-  const grossProfit = agg.revenue - agg.costAmount - paymentFee
-  return {
-    id,
-    status: data.status,
-    paymentStatus: (data.paymentStatus === 'invoiced' || data.paymentStatus === 'paid')
-      ? data.paymentStatus
-      : 'uninvoiced',
-    shippingStatus: (data.shippingStatus === 'producing' || data.shippingStatus === 'ready_to_ship' || data.shippingStatus === 'shipped')
-      ? data.shippingStatus
-      : 'ordering',
-    buyerName: String(data.buyerName ?? ''),
-    items,
-    productId: agg.productId,
-    productSku: agg.productSku,
-    productName: agg.productName,
-    quantityKg: agg.quantityKg,
-    unitPrice: agg.unitPrice,
-    costPerKg: agg.costPerKg,
-    revenue: agg.revenue,
-    costAmount: agg.costAmount,
-    grossProfit,
-    shippingFee,
-    fees,
-    paymentFee,
-    invoiceAmount,
-    country: String(data.country ?? ''),
-    orderDate: data.orderDate ? String(data.orderDate) : undefined,
-    dueDate: data.dueDate ? String(data.dueDate) : undefined,
-    terms: data.terms ? String(data.terms) : undefined,
-    notes: data.notes ? String(data.notes) : undefined,
-    paymentMethod: data.paymentMethod ? String(data.paymentMethod) : undefined,
-    paymentDate: data.paymentDate ? String(data.paymentDate) : undefined,
-    paymentConfirmedAt: data.paymentConfirmedAt ? String(data.paymentConfirmedAt) : undefined,
-    shippingAddress: data.shippingAddress ? String(data.shippingAddress) : undefined,
-    shippingPostalCode: data.shippingPostalCode ? String(data.shippingPostalCode) : undefined,
-    shippingMethod: data.shippingMethod ? String(data.shippingMethod) : undefined,
-    shippingDate: data.shippingDate ? String(data.shippingDate) : undefined,
-    trackingNumber: data.trackingNumber ? String(data.trackingNumber) : undefined,
-    shippingNote: data.shippingNote ? String(data.shippingNote) : undefined,
-    shippingSlip: normalizeShippingSlip(data.shippingSlip),
-    issuedDocuments: normalizeIssuedDocuments(data.issuedDocuments),
-    createdAt: toDate(data.createdAt),
-    updatedAt: toDate(data.updatedAt),
-  }
-}
-
-function mapBuyer(id: string, data: DocumentData): Buyer {
-  return {
-    id,
-    name: String(data.name ?? ''),
-    billingName: data.billingName ? String(data.billingName) : undefined,
-    normalizedName: String(data.normalizedName ?? ''),
-    country: data.country ? String(data.country) : undefined,
-    terms: data.terms ? String(data.terms) : undefined,
-    notes: data.notes ? String(data.notes) : undefined,
-    email: data.email ? String(data.email) : undefined,
-    website: data.website ? String(data.website) : undefined,
-    phone: data.phone ? String(data.phone) : undefined,
-    shippingAddress: data.shippingAddress ? String(data.shippingAddress) : undefined,
-    shippingPostalCode: data.shippingPostalCode ? String(data.shippingPostalCode) : undefined,
-    contactPersonName: data.contactPersonName ? String(data.contactPersonName) : undefined,
-    saleCount: Number(data.saleCount ?? 0),
-    lastSoldAt: data.lastSoldAt ? toDate(data.lastSoldAt) : undefined,
-    createdAt: toDate(data.createdAt),
-    updatedAt: toDate(data.updatedAt),
-  }
-}
-
 function normalizeSelfConsumptionUsageType(value: unknown): SelfConsumptionUsageType {
   if (value === 'sample' || value === 'sample_free' || value === 'sample_paid') return 'sample'
   if (value === 'ingredient') return 'ingredient'
@@ -624,11 +371,27 @@ function mapEcSale(id: string, data: DocumentData): EcSaleRecord {
     channel: data.channel ? String(data.channel) : undefined,
     notes: data.notes ? String(data.notes) : undefined,
     shopifyOrderId: data.shopifyOrderId ? String(data.shopifyOrderId) : undefined,
-    status: data.status === 'cancelled' ? 'cancelled' : 'active',
+    status: data.status === 'cancelled' ? 'cancelled' : data.status === 'reserved' ? 'reserved' : 'active',
+    expiresAtMs: typeof data.expiresAtMs === 'number' ? data.expiresAtMs : undefined,
     cancelledAt: data.cancelledAt ? String(data.cancelledAt) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
+}
+
+/**
+ * Whether an ec_sales record still consumes stock. Mirrors the wholesale app's
+ * `ecConsumesStock` so both apps agree on availability: 'active' (confirmed) and
+ * unexpired 'reserved' (overseas quote hold) count; 'cancelled' and expired
+ * reserved holds do not.
+ */
+function ecRecordConsumesStock(record: { status?: string; expiresAtMs?: number }, nowMs: number): boolean {
+  if (record.status === 'cancelled') return false
+  if (record.status === 'reserved') {
+    const exp = typeof record.expiresAtMs === 'number' ? record.expiresAtMs : 0
+    if (exp && exp < nowMs) return false
+  }
+  return true
 }
 
 function mapMaster(id: string, data: DocumentData): MasterEntry {
@@ -758,18 +521,6 @@ async function getAllGroups(): Promise<InventoryGroup[]> {
   return snap.docs.map(document => mapGroup(document.id, document.data()))
 }
 
-async function getAllSales(): Promise<SaleRecord[]> {
-  const db = getFirebaseDb()
-  const snap = await getDocs(collection(db, COLLECTIONS.sales))
-  return snap.docs.map(document => mapSale(document.id, document.data()))
-}
-
-async function getAllBuyers(): Promise<Buyer[]> {
-  const db = getFirebaseDb()
-  const snap = await getDocs(collection(db, COLLECTIONS.buyers))
-  return snap.docs.map(document => mapBuyer(document.id, document.data()))
-}
-
 async function getAllSelfConsumptions(): Promise<SelfConsumptionRecord[]> {
   const db = getFirebaseDb()
   const snap = await getDocs(collection(db, COLLECTIONS.selfConsumptions))
@@ -788,12 +539,6 @@ async function getSettings(): Promise<Settings> {
   return mapSettings(snap.data())
 }
 
-function isReservedSale(status: SaleRecord['status']): boolean {
-  return status === 'negotiating' || status === 'confirmed'
-}
-
-// Wholesale orders (incl. migrated direct sales) reserve stock via ec_sales with a
-// 'Wholesale'/'WholesaleSample' channel; Shopify uses other channels.
 function isWholesaleChannel(channel?: string): boolean {
   return channel === 'Wholesale' || channel === 'WholesaleSample'
 }
@@ -805,8 +550,11 @@ function computeInventory(
   settings: Settings,
 ): ProductWithInventory[] {
   // Reservations now come from the ec_sales ledger (Wholesale channel), not `sales`.
+  // Expired reserved holds (overseas quotes) no longer consume stock — keep this
+  // in lockstep with the wholesale app's ecConsumesStock.
+  const nowMs = Date.now()
   const reservedByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
-    if (record.status === 'cancelled' || !isWholesaleChannel(record.channel)) return acc
+    if (!ecRecordConsumesStock(record, nowMs) || !isWholesaleChannel(record.channel)) return acc
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
@@ -815,7 +563,7 @@ function computeInventory(
     return acc
   }, {})
   const ecSoldByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
-    if (record.status === 'cancelled' || isWholesaleChannel(record.channel)) return acc
+    if (!ecRecordConsumesStock(record, nowMs) || isWholesaleChannel(record.channel)) return acc
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
@@ -843,29 +591,6 @@ function computeInventory(
     })
 }
 
-async function assertSufficientStock(
-  nextSale: SaleRecordInput,
-  _options?: { excludeSaleId?: string },
-): Promise<{ productMap: Map<string, Product> }> {
-  // Sales are allowed to drive stock negative (e.g. taking an order before the
-  // goods have arrived / been received). We therefore only resolve the product
-  // references here and do NOT block on available stock. The modal surfaces the
-  // resulting (possibly negative) remaining stock in red as a warning.
-  void _options
-  if (!Array.isArray(nextSale.items) || nextSale.items.length === 0) {
-    throw new Error('商品を1つ以上指定してください')
-  }
-  const products = await getAllProducts()
-  const productMap = new Map<string, Product>()
-  for (const item of nextSale.items) {
-    if (productMap.has(item.productId)) continue
-    const product = products.find(p => p.id === item.productId && p.isActive)
-    if (!product) throw new Error('商品が見つかりません')
-    productMap.set(item.productId, product)
-  }
-  return { productMap }
-}
-
 async function assertSufficientSelfConsumptionStock(
   input: SelfConsumptionRecordInput,
   options?: { excludeSelfConsumptionId?: string },
@@ -882,8 +607,9 @@ async function assertSufficientSelfConsumptionStock(
   const selfConsumedKg = selfConsumptions
     .filter(record => record.productId === input.productId && record.id !== options?.excludeSelfConsumptionId)
     .reduce((sum, record) => sum + record.quantityKg, 0)
+  const nowMs = Date.now()
   const ecSoldKg = ecSales
-    .filter(record => record.productId === input.productId && record.status !== 'cancelled')
+    .filter(record => record.productId === input.productId && ecRecordConsumesStock(record, nowMs))
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)
@@ -895,120 +621,6 @@ async function assertSufficientSelfConsumptionStock(
   }
 
   return product
-}
-
-async function assertSufficientEcSaleStock(
-  input: EcSaleRecordInput,
-  options?: { excludeEcSaleId?: string },
-): Promise<Product> {
-  const [products, selfConsumptions, ecSales] = await Promise.all([
-    getAllProducts(),
-    getAllSelfConsumptions(),
-    getAllEcSales(),
-  ])
-  const product = products.find(item => item.id === input.productId && item.isActive)
-  if (!product) throw new Error('商品が見つかりません')
-
-  // Wholesale reservations live in ec_sales now, so ecSoldKg already covers them.
-  const selfConsumedKg = selfConsumptions
-    .filter(record => record.productId === input.productId)
-    .reduce((sum, record) => sum + record.quantityKg, 0)
-  const ecSoldKg = ecSales
-    .filter(record => record.productId === input.productId && record.id !== options?.excludeEcSaleId && record.status !== 'cancelled')
-    .reduce((sum, record) => sum + record.quantityKg, 0)
-  const availableKg = product.initialStockKg
-    + deriveInventoryAdjustmentKg(product.inventoryChecks)
-    - selfConsumedKg
-    - ecSoldKg
-
-  if (input.quantityKg > availableKg) {
-    throw new Error(`在庫が不足しています。残り ${availableKg.toFixed(1)}kg まで登録できます`)
-  }
-
-  return product
-}
-
-async function upsertRelatedSalesFromProduct(product: Product): Promise<void> {
-  const db = getFirebaseDb()
-  const sales = await getAllSales()
-  const related = sales.filter(sale => sale.items.some(item => item.productId === product.id))
-  if (related.length === 0) return
-
-  const batch = writeBatch(db)
-  // 原価は「販売時点のスナップショット」を維持する。商品名・SKU の表示だけ同期し、
-  // costPerKg / costAmount / grossProfit は過去の値を保持する（遡及上書きしない）。
-  related.forEach(sale => {
-    const newItems: SaleLineItem[] = sale.items.map(item => {
-      if (item.productId !== product.id) return item
-      return {
-        ...item,
-        productSku: product.sku,
-        productName: product.name,
-      }
-    })
-    const agg = aggregateItems(newItems)
-    const grossProfit = agg.revenue - agg.costAmount - (sale.paymentFee || 0)
-    const invoiceAmount = agg.revenue + (sale.shippingFee || 0) + sumFees(sale.fees ?? [])
-    batch.update(doc(db, COLLECTIONS.sales, sale.id), {
-      items: newItems,
-      productId: agg.productId,
-      productSku: agg.productSku,
-      productName: agg.productName,
-      quantityKg: agg.quantityKg,
-      unitPrice: agg.unitPrice,
-      costPerKg: agg.costPerKg,
-      revenue: agg.revenue,
-      costAmount: agg.costAmount,
-      grossProfit,
-      invoiceAmount,
-      updatedAt: serverTimestamp(),
-    })
-  })
-  await batch.commit()
-}
-
-async function syncBuyersCollection(): Promise<void> {
-  const db = getFirebaseDb()
-  const sales = await getAllSales()
-  const buyers = await getAllBuyers()
-  const grouped = sales.reduce<Record<string, SaleRecord[]>>((acc, sale) => {
-    const normalizedName = normalizeBuyerName(sale.buyerName)
-    if (!normalizedName) return acc
-    acc[normalizedName] = [...(acc[normalizedName] ?? []), sale]
-    return acc
-  }, {})
-
-  const existingByNormalized = new Map(buyers.map(buyer => [buyer.normalizedName, buyer]))
-  const batch = writeBatch(db)
-
-  Object.entries(grouped).forEach(([normalizedName, records]) => {
-    const sorted = [...records].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    const latest = sorted[0]
-    const existing = existingByNormalized.get(normalizedName)
-    const ref = existing
-      ? doc(db, COLLECTIONS.buyers, existing.id)
-      : doc(collection(db, COLLECTIONS.buyers))
-
-    batch.set(ref, sanitizeRecord({
-      name: latest.buyerName.trim(),
-      normalizedName,
-      country: latest.country.trim() || undefined,
-      terms: latest.terms?.trim() || undefined,
-      notes: latest.notes?.trim() || undefined,
-      saleCount: records.length,
-      lastSoldAt: latest.updatedAt,
-      createdAt: existing?.createdAt ?? serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }), { merge: true })
-
-    existingByNormalized.delete(normalizedName)
-  })
-
-  existingByNormalized.forEach(existing => {
-    batch.delete(doc(db, COLLECTIONS.buyers, existing.id))
-  })
-
-  await batch.commit()
 }
 
 function normalizePoPayments(raw: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] {
@@ -1429,16 +1041,10 @@ export function createFirebaseServices(): IServices {
       await updateDoc(doc(db, COLLECTIONS.products, id), payload)
 
       const merged = { ...current, ...buildProductPayload(mergedInput), updatedAt: new Date() }
-      await upsertRelatedSalesFromProduct(merged)
       return merged
     },
 
     async deleteProduct(id) {
-      const sales = await getAllSales()
-      if (sales.some(sale => isReservedSale(sale.status) && sale.items.some(item => item.productId === id))) {
-        throw new Error('有効な販売案件が残っている商品は削除できません')
-      }
-
       await updateDoc(doc(db, COLLECTIONS.products, id), {
         isActive: false,
         updatedAt: serverTimestamp(),
@@ -1527,377 +1133,6 @@ export function createFirebaseServices(): IServices {
     },
   }
 
-  const salesService: ISalesService = {
-    async getSaleRecords() {
-      const sales = await getAllSales()
-      return sales.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    },
-
-    async getBuyers() {
-      const buyers = await getAllBuyers()
-      return buyers.sort((a, b) => {
-        const left = a.lastSoldAt?.getTime() ?? a.updatedAt.getTime()
-        const right = b.lastSoldAt?.getTime() ?? b.updatedAt.getTime()
-        return right - left
-      })
-    },
-
-    async updateBuyer(id, input) {
-      const ref = doc(db, COLLECTIONS.buyers, id)
-      const cleaned: Record<string, unknown> = {}
-      const optionalKeys = [
-        'billingName',
-        'email',
-        'website',
-        'phone',
-        'shippingAddress',
-        'shippingPostalCode',
-        'contactPersonName',
-        'notes',
-        'country',
-        'terms',
-      ] as const
-      for (const key of optionalKeys) {
-        const value = input[key]
-        if (value === undefined) continue
-        const trimmed = typeof value === 'string' ? value.trim() : value
-        cleaned[key] = trimmed ? trimmed : deleteField()
-      }
-      cleaned.updatedAt = serverTimestamp()
-      await updateDoc(ref, cleaned)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('販売先が見つかりません')
-      return mapBuyer(snap.id, snap.data() ?? {})
-    },
-
-    // Rename a buyer's 管理用の名前. Buyers are derived from sales (linked by the
-    // normalized buyerName), so the rename must cascade to every linked sale or
-    // it would be regenerated on the next sync. Detail fields that the sync does
-    // not own (請求名・連絡先など) are carried over to the renamed buyer doc.
-    async renameBuyer(id, name) {
-      const trimmed = name.trim()
-      if (!trimmed) throw new Error('販売先名を入力してください')
-      const ref = doc(db, COLLECTIONS.buyers, id)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('販売先が見つかりません')
-      const current = mapBuyer(snap.id, snap.data() ?? {})
-
-      const oldNormalized = current.normalizedName || normalizeBuyerName(current.name)
-      const newNormalized = normalizeBuyerName(trimmed)
-
-      // Cascade the new name onto every sale linked to this buyer.
-      const sales = await getAllSales()
-      const linked = sales.filter(sale => normalizeBuyerName(sale.buyerName) === oldNormalized)
-      if (linked.length > 0) {
-        const batch = writeBatch(db)
-        linked.forEach(sale => {
-          batch.update(doc(db, COLLECTIONS.sales, sale.id), {
-            buyerName: trimmed,
-            updatedAt: serverTimestamp(),
-          })
-        })
-        await batch.commit()
-      }
-
-      // Regenerate the buyers collection from the updated sales.
-      await syncBuyersCollection()
-
-      // Re-apply detail fields the sync does not manage onto the renamed doc.
-      const carry = sanitizeRecord({
-        billingName: current.billingName,
-        email: current.email,
-        website: current.website,
-        phone: current.phone,
-        shippingAddress: current.shippingAddress,
-        shippingPostalCode: current.shippingPostalCode,
-        contactPersonName: current.contactPersonName,
-      })
-      const refreshed = await getAllBuyers()
-      const target = refreshed.find(b => b.normalizedName === newNormalized)
-      if (!target) throw new Error('販売先の更新に失敗しました')
-      if (Object.keys(carry).length > 0) {
-        await updateDoc(doc(db, COLLECTIONS.buyers, target.id), {
-          ...carry,
-          updatedAt: serverTimestamp(),
-        })
-      }
-      const finalSnap = await getDoc(doc(db, COLLECTIONS.buyers, target.id))
-      return mapBuyer(finalSnap.id, finalSnap.data() ?? {})
-    },
-
-    async createSaleRecord(input) {
-      const { productMap } = await assertSufficientStock(input)
-
-      const items: SaleLineItem[] = input.items.map(line => {
-        const product = productMap.get(line.productId)!
-        const quantityKg = Number(line.quantityKg) || 0
-        const unitPrice = Number(line.unitPrice) || 0
-        const costPerKg = product.purchaseUnitPrice ?? 0
-        const revenue = quantityKg * unitPrice
-        const costAmount = quantityKg * costPerKg
-        const taxRate = coerceTaxRate(line.taxRate)
-        return {
-          productId: product.id,
-          productSku: product.sku,
-          productName: product.name,
-          quantityKg,
-          unitPrice,
-          costPerKg,
-          revenue,
-          costAmount,
-          grossProfit: revenue - costAmount,
-          taxRate,
-        }
-      })
-      const agg = aggregateItems(items)
-      const shippingFee = Number(input.shippingFee) || 0
-      const paymentFee = Number(input.paymentFee) || 0
-      const fees = normalizeSaleFees(input.fees)
-      const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
-      const grossProfit = agg.revenue - agg.costAmount - paymentFee
-
-      const { items: _ignoreItems, fees: _ignoreFees, ...rest } = input
-      void _ignoreItems
-      void _ignoreFees
-      const payload = sanitizeRecord({
-        ...rest,
-        buyerName: input.buyerName.trim(),
-        country: input.country.trim(),
-        orderDate: input.orderDate?.trim() || undefined,
-        dueDate: input.dueDate?.trim() || undefined,
-        terms: input.terms?.trim() || undefined,
-        notes: input.notes?.trim() || undefined,
-        items,
-        fees,
-        productId: agg.productId,
-        productSku: agg.productSku,
-        productName: agg.productName,
-        quantityKg: agg.quantityKg,
-        unitPrice: agg.unitPrice,
-        costPerKg: agg.costPerKg,
-        revenue: agg.revenue,
-        costAmount: agg.costAmount,
-        grossProfit,
-        shippingFee,
-        paymentFee,
-        invoiceAmount,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-
-      const ref = await addDoc(collection(db, COLLECTIONS.sales), payload)
-      await syncBuyersCollection()
-      return {
-        id: ref.id,
-        status: input.status,
-        paymentStatus: input.paymentStatus,
-        shippingStatus: input.shippingStatus,
-        buyerName: input.buyerName.trim(),
-        items,
-        productId: agg.productId,
-        productSku: agg.productSku,
-        productName: agg.productName,
-        quantityKg: agg.quantityKg,
-        unitPrice: agg.unitPrice,
-        costPerKg: agg.costPerKg,
-        revenue: agg.revenue,
-        costAmount: agg.costAmount,
-        grossProfit,
-        shippingFee,
-        fees,
-        paymentFee,
-        invoiceAmount,
-        country: input.country.trim(),
-        orderDate: input.orderDate,
-        dueDate: input.dueDate,
-        terms: input.terms,
-        notes: input.notes,
-        paymentMethod: input.paymentMethod,
-        paymentDate: input.paymentDate,
-        paymentConfirmedAt: input.paymentConfirmedAt,
-        shippingAddress: input.shippingAddress,
-        shippingPostalCode: input.shippingPostalCode,
-        shippingMethod: input.shippingMethod,
-        shippingDate: input.shippingDate,
-        trackingNumber: input.trackingNumber,
-        shippingNote: input.shippingNote,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    },
-
-    async updateSaleRecord(id, input) {
-      const snap = await getDoc(doc(db, COLLECTIONS.sales, id))
-      if (!snap.exists()) throw new Error('販売案件が見つかりません')
-      const current = mapSale(snap.id, snap.data() ?? {})
-
-      const mergedItems = input.items ?? current.items.map(item => ({
-        productId: item.productId,
-        quantityKg: item.quantityKg,
-        unitPrice: item.unitPrice,
-        taxRate: item.taxRate,
-      }))
-
-      const merged: SaleRecordInput = {
-        status: input.status ?? current.status,
-        paymentStatus: input.paymentStatus ?? current.paymentStatus,
-        shippingStatus: input.shippingStatus ?? current.shippingStatus,
-        buyerName: input.buyerName ?? current.buyerName,
-        items: mergedItems,
-        shippingFee: input.shippingFee ?? current.shippingFee,
-        fees: input.fees ?? current.fees,
-        paymentFee: input.paymentFee ?? current.paymentFee,
-        country: input.country ?? current.country,
-        orderDate: input.orderDate ?? current.orderDate,
-        dueDate: input.dueDate ?? current.dueDate,
-        terms: input.terms ?? current.terms,
-        notes: input.notes ?? current.notes,
-        paymentMethod: input.paymentMethod ?? current.paymentMethod,
-        paymentDate: input.paymentDate ?? current.paymentDate,
-        paymentConfirmedAt: input.paymentConfirmedAt ?? current.paymentConfirmedAt,
-        shippingAddress: input.shippingAddress ?? current.shippingAddress,
-        shippingPostalCode: input.shippingPostalCode ?? current.shippingPostalCode,
-        shippingMethod: input.shippingMethod ?? current.shippingMethod,
-        shippingDate: input.shippingDate ?? current.shippingDate,
-        trackingNumber: input.trackingNumber ?? current.trackingNumber,
-        shippingNote: input.shippingNote ?? current.shippingNote,
-      }
-
-      const { productMap } = await assertSufficientStock(merged, { excludeSaleId: id })
-      // 原価は販売時点のスナップショットを維持: 既存明細にある商品はその原価を引き継ぎ、
-      // 新規追加された商品行のみ現行の仕入単価を使う。
-      const prevCostByProduct = new Map(current.items.map(i => [i.productId, i.costPerKg]))
-      const items: SaleLineItem[] = merged.items.map(line => {
-        const product = productMap.get(line.productId)!
-        const quantityKg = Number(line.quantityKg) || 0
-        const unitPrice = Number(line.unitPrice) || 0
-        const costPerKg = prevCostByProduct.has(line.productId)
-          ? (prevCostByProduct.get(line.productId) ?? 0)
-          : (product.purchaseUnitPrice ?? 0)
-        const revenue = quantityKg * unitPrice
-        const costAmount = quantityKg * costPerKg
-        const taxRate = coerceTaxRate(line.taxRate)
-        return {
-          productId: product.id,
-          productSku: product.sku,
-          productName: product.name,
-          quantityKg,
-          unitPrice,
-          costPerKg,
-          revenue,
-          costAmount,
-          grossProfit: revenue - costAmount,
-          taxRate,
-        }
-      })
-      const agg = aggregateItems(items)
-      const shippingFee = Number(merged.shippingFee) || 0
-      const paymentFee = Number(merged.paymentFee) || 0
-      const fees = normalizeSaleFees(merged.fees)
-      const invoiceAmount = agg.revenue + shippingFee + sumFees(fees)
-      const grossProfit = agg.revenue - agg.costAmount - paymentFee
-
-      const { items: _ignoreItems, fees: _ignoreFees, ...rest } = merged
-      void _ignoreItems
-      void _ignoreFees
-      await updateDoc(doc(db, COLLECTIONS.sales, id), sanitizeRecord({
-        ...rest,
-        buyerName: merged.buyerName.trim(),
-        country: merged.country.trim(),
-        dueDate: merged.dueDate?.trim() || undefined,
-        terms: merged.terms?.trim() || undefined,
-        notes: merged.notes?.trim() || undefined,
-        items,
-        fees,
-        productId: agg.productId,
-        productSku: agg.productSku,
-        productName: agg.productName,
-        quantityKg: agg.quantityKg,
-        unitPrice: agg.unitPrice,
-        costPerKg: agg.costPerKg,
-        revenue: agg.revenue,
-        costAmount: agg.costAmount,
-        grossProfit,
-        shippingFee,
-        paymentFee,
-        invoiceAmount,
-        updatedAt: serverTimestamp(),
-      }))
-      await syncBuyersCollection()
-
-      return {
-        id,
-        status: merged.status,
-        paymentStatus: merged.paymentStatus,
-        shippingStatus: merged.shippingStatus,
-        buyerName: merged.buyerName.trim(),
-        items,
-        productId: agg.productId,
-        productSku: agg.productSku,
-        productName: agg.productName,
-        quantityKg: agg.quantityKg,
-        unitPrice: agg.unitPrice,
-        costPerKg: agg.costPerKg,
-        revenue: agg.revenue,
-        costAmount: agg.costAmount,
-        grossProfit,
-        shippingFee,
-        fees,
-        paymentFee,
-        invoiceAmount,
-        country: merged.country.trim(),
-        orderDate: merged.orderDate,
-        dueDate: merged.dueDate,
-        terms: merged.terms,
-        notes: merged.notes,
-        paymentMethod: merged.paymentMethod,
-        paymentDate: merged.paymentDate,
-        shippingAddress: merged.shippingAddress,
-        shippingPostalCode: merged.shippingPostalCode,
-        shippingMethod: merged.shippingMethod,
-        shippingDate: merged.shippingDate,
-        trackingNumber: merged.trackingNumber,
-        shippingNote: merged.shippingNote,
-        createdAt: current.createdAt,
-        updatedAt: new Date(),
-      }
-    },
-
-    async deleteSaleRecord(id) {
-      await deleteDoc(doc(db, COLLECTIONS.sales, id))
-      await syncBuyersCollection()
-    },
-
-    async recordSaleDocument(saleId, issued) {
-      const ref = doc(db, COLLECTIONS.sales, saleId)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('販売案件が見つかりません')
-      const existing = normalizeIssuedDocuments(snap.data()?.issuedDocuments)
-      const next = [...existing, issued]
-      await updateDoc(ref, { issuedDocuments: next, updatedAt: serverTimestamp() })
-      return next
-    },
-
-    async deleteSaleDocument(saleId, docId) {
-      const ref = doc(db, COLLECTIONS.sales, saleId)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('販売案件が見つかりません')
-      const target = normalizeIssuedDocuments(snap.data()?.issuedDocuments).find(d => d.id === docId)
-      const next = normalizeIssuedDocuments(snap.data()?.issuedDocuments).filter(d => d.id !== docId)
-      await updateDoc(ref, { issuedDocuments: next, updatedAt: serverTimestamp() })
-      if (target?.url) await deleteStorageObjectByUrl(target.url)
-      return next
-    },
-
-    async updateShippingSlip(saleId, slip) {
-      const ref = doc(db, COLLECTIONS.sales, saleId)
-      await updateDoc(ref, { shippingSlip: slip ?? deleteField(), updatedAt: serverTimestamp() })
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('販売案件が見つかりません')
-      return mapSale(snap.id, snap.data() ?? {})
-    },
-  }
-
   const selfConsumptionService: ISelfConsumptionService = {
     async getSelfConsumptionRecords() {
       const records = await getAllSelfConsumptions()
@@ -1983,91 +1218,6 @@ export function createFirebaseServices(): IServices {
         if (dateDiff !== 0) return dateDiff
         return b.updatedAt.getTime() - a.updatedAt.getTime()
       })
-    },
-
-    async createEcSaleRecord(input) {
-      const product = await assertSufficientEcSaleStock(input)
-      const revenue = input.unitPrice != null ? input.quantityKg * input.unitPrice : undefined
-      const payload = sanitizeRecord({
-        ...input,
-        soldOn: input.soldOn.trim(),
-        orderNumber: input.orderNumber?.trim() || undefined,
-        channel: input.channel?.trim() || undefined,
-        notes: input.notes?.trim() || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        revenue,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-
-      const ref = await addDoc(collection(db, COLLECTIONS.ecSales), payload)
-
-      return {
-        id: ref.id,
-        productId: input.productId,
-        quantityKg: input.quantityKg,
-        soldOn: input.soldOn.trim(),
-        orderNumber: input.orderNumber?.trim() || undefined,
-        unitPrice: input.unitPrice,
-        channel: input.channel?.trim() || undefined,
-        notes: input.notes?.trim() || undefined,
-        shopifyOrderId: input.shopifyOrderId || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        revenue,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
-    },
-
-    async updateEcSaleRecord(id, input) {
-      const snap = await getDoc(doc(db, COLLECTIONS.ecSales, id))
-      if (!snap.exists()) throw new Error('Shopify販売の記録が見つかりません')
-      const current = mapEcSale(snap.id, snap.data() ?? {})
-
-      const merged: EcSaleRecordInput = {
-        productId: input.productId ?? current.productId,
-        quantityKg: input.quantityKg ?? current.quantityKg,
-        soldOn: input.soldOn ?? current.soldOn,
-        orderNumber: input.orderNumber ?? current.orderNumber,
-        unitPrice: input.unitPrice ?? current.unitPrice,
-        channel: input.channel ?? current.channel,
-        notes: input.notes ?? current.notes,
-      }
-
-      const product = await assertSufficientEcSaleStock(merged, { excludeEcSaleId: id })
-      const revenue = merged.unitPrice != null ? merged.quantityKg * merged.unitPrice : undefined
-
-      await updateDoc(doc(db, COLLECTIONS.ecSales, id), sanitizeRecord({
-        ...merged,
-        soldOn: merged.soldOn.trim(),
-        orderNumber: merged.orderNumber?.trim() || undefined,
-        channel: merged.channel?.trim() || undefined,
-        notes: merged.notes?.trim() || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        revenue,
-        updatedAt: serverTimestamp(),
-      }))
-
-      return {
-        id,
-        ...merged,
-        soldOn: merged.soldOn.trim(),
-        orderNumber: merged.orderNumber?.trim() || undefined,
-        channel: merged.channel?.trim() || undefined,
-        notes: merged.notes?.trim() || undefined,
-        productSku: product.sku,
-        productName: product.name,
-        revenue,
-        createdAt: current.createdAt,
-        updatedAt: new Date(),
-      }
-    },
-
-    async deleteEcSaleRecord(id) {
-      await deleteDoc(doc(db, COLLECTIONS.ecSales, id))
     },
   }
 
@@ -2657,7 +1807,6 @@ export function createFirebaseServices(): IServices {
 
   return {
     inventory: inventoryService,
-    sales: salesService,
     selfConsumption: selfConsumptionService,
     ecSales: ecSalesService,
     purchaseOrders: purchaseOrdersService,

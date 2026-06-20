@@ -11,7 +11,7 @@
 // are absent from the backup (use the dedicated delete script for removals).
 import { readdirSync, readFileSync } from 'node:fs'
 import { resolve, basename } from 'node:path'
-import { getDb, fromJsonSafe } from './_firestore.mjs'
+import { getDb, fromJsonSafe } from '../_firestore.mjs'
 
 const args = process.argv.slice(2)
 const dir = args.find(a => !a.startsWith('--'))

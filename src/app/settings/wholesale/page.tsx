@@ -8,12 +8,10 @@ import { getServices } from '@/lib/services'
 import type { Settings, ShippingTierJp, WholesaleOption, WholesaleRankDiscounts } from '@/types'
 import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 
-const DEFAULT_THRESHOLD = 10
 const uid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)
 
 export default function SettingsWholesalePage() {
-  const [threshold, setThreshold] = useState<number | ''>('')
   const [sampleFee, setSampleFee] = useState<number | ''>('')
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
@@ -28,7 +26,6 @@ export default function SettingsWholesalePage() {
     setLoading(true)
     const services = await getServices()
     const stored = await services.settings.getSettings()
-    setThreshold(stored.wholesaleThresholdKgDefault ?? DEFAULT_THRESHOLD)
     setSampleFee(stored.wholesaleSampleFeeJpy ?? 100)
     setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
@@ -41,10 +38,6 @@ export default function SettingsWholesalePage() {
   }, [])
 
   const handleSave = async () => {
-    if (threshold === '' || Number(threshold) <= 0) {
-      setFeedback({ tone: 'error', message: 'しきい値は 0 より大きい数値を入力してください' })
-      return
-    }
     const cleanTiers = tiers
       .map(t => ({ uptoKg: Number(t.uptoKg), feeJpy: Number(t.feeJpy) }))
       .filter(t => Number.isFinite(t.uptoKg) && Number.isFinite(t.feeJpy) && t.uptoKg > 0 && t.feeJpy >= 0)
@@ -63,7 +56,6 @@ export default function SettingsWholesalePage() {
         }))
         .filter(o => o.name)
       const input: Partial<Settings> = {
-        wholesaleThresholdKgDefault: Number(threshold),
         wholesaleSampleFeeJpy: sampleFee === '' ? 0 : Math.max(0, Number(sampleFee)),
         wholesaleRankDiscounts: {
           standard: Math.min(100, Math.max(0, Number(rankDiscounts.standard) || 0)),

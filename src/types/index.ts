@@ -218,7 +218,9 @@ export interface EcSaleRecord {
   channel?: string
   notes?: string
   shopifyOrderId?: string
-  status?: 'active' | 'cancelled'
+  status?: 'active' | 'reserved' | 'cancelled'
+  /** Set only on 'reserved' holds (overseas quote). The hold stops consuming stock once expired. */
+  expiresAtMs?: number
   cancelledAt?: string
   createdAt: Date
   updatedAt: Date

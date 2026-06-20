@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, MessageSquare, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LucideIcon } from 'lucide-react'
 

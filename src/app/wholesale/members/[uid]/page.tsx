@@ -51,7 +51,7 @@ interface Order {
 }
 
 const STATUS_LABEL: Record<string, string> = { pending: '承認待ち', approved: '承認済み', rejected: '却下', suspended: '停止' }
-const ORDER_STATUS_LABEL: Record<string, string> = { pending_payment: '支払い待ち', paid: '支払い済み', shipped: '出荷済み', cancelled: '取消' }
+const ORDER_STATUS_LABEL: Record<string, string> = { pending_approval: '承認待ち', pending_quote: '見積り待ち', quoted: '見積り済み', pending_payment: '支払い待ち', paid: '支払い済み', shipped: '出荷済み', cancelled: '取消' }
 const BUSINESS_STAGE_LABEL: Record<string, string> = { pre_opening: '開業前', operating: '開業済' }
 const VOLUME_LABEL: Record<string, string> = {
   undecided: '未定', under_10kg: '10kg未満', '10_50kg': '10〜50kg', '50_100kg': '50〜100kg', over_100kg: '100kg以上',

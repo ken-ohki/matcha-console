@@ -12,10 +12,12 @@ export const PROJECT_ROOT = resolve(__dirname, '..')
 for (const file of ['.env.local', '.env']) {
   try {
     const text = readFileSync(resolve(PROJECT_ROOT, file), 'utf-8')
-    for (const line of text.split('\n')) {
+    for (const line of text.split(/\r?\n/)) {
       const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/)
       if (!m) continue
-      if (!(m[1] in process.env)) process.env[m[1]] = m[2]
+      // Strip surrounding single/double quotes (and any stray CR) from the value.
+      const value = m[2].replace(/^(['"])(.*)\1$/, '$2')
+      if (!(m[1] in process.env)) process.env[m[1]] = value
     }
   } catch {}
 }

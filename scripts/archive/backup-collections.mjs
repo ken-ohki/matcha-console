@@ -9,7 +9,7 @@
 // Output: scripts/backups/<ISO>/<collection>.json  (each: [{ id, data }] Timestamp-safe)
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { getDb, toJsonSafe, PROJECT_ROOT } from './_firestore.mjs'
+import { getDb, toJsonSafe, PROJECT_ROOT } from '../_firestore.mjs'
 
 const DEFAULT_COLLECTIONS = ['sales', 'buyers', 'ec_sales', 'wholesale_orders', 'wholesale_members']
 const collections = process.argv.slice(2).filter(a => !a.startsWith('--'))

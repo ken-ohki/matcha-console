@@ -161,6 +161,10 @@ export default function ProductDetailPage() {
     }
 
     for (const sale of sales) {
+      // Only confirmed orders move stock. Cancelled and not-yet-committed
+      // (overseas quote / made-to-order approval) orders are excluded so this
+      // ledger matches the computed stock (which deducts via ec_sales).
+      if (sale.status !== 'confirmed') continue
       sale.items.forEach((item, i) => {
         if (item.productId !== pid) return
         rows.push({

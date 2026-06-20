@@ -34,7 +34,7 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
 if (getApps().length === 0) {
   initializeApp({ credential: cert(serviceAccount), projectId: serviceAccount.project_id })
 }
-const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
 const db = getFirestore(databaseId)
 
 const COL = {

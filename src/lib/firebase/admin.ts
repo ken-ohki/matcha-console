@@ -54,7 +54,7 @@ export function getAdminApp(): App {
 
 export function getAdminDb(): Firestore {
   if (adminDb) return adminDb
-  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
   adminDb = getFirestore(getAdminApp(), databaseId)
   return adminDb
 }

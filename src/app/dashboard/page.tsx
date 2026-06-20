@@ -7,7 +7,7 @@ import { getServices } from '@/lib/services'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { orderToSale, type WholesaleOrderRow } from '@/lib/wholesaleAdapter'
 import type { SaleRecord } from '@/types'
-import { UserCheck, CreditCard, FileText, MessageSquare, RefreshCw, ArrowRight, PackageMinus } from 'lucide-react'
+import { UserCheck, CreditCard, FileText, RefreshCw, ArrowRight, PackageMinus } from 'lucide-react'
 
 interface WOrder {
   id: string
@@ -90,6 +90,9 @@ export default function DashboardPage() {
   const monthly = useMemo(() => {
     const agg = new Map(months.map(m => [m.key, { revenue: 0, gross: 0, qty: 0 }]))
     for (const s of sales) {
+      // Only confirmed sales count as revenue — exclude cancelled, overseas
+      // quotes (pending_quote/quoted) and made-to-order approvals (pending_approval).
+      if (s.status !== 'confirmed') continue
       const date = s.orderDate || s.dueDate
       if (!date) continue
       const a = agg.get(date.slice(0, 7))

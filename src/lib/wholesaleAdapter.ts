@@ -6,7 +6,8 @@
 //   粗利 = 税抜売上(subtotal+shipping+option fees) − 原価 − 支払手数料
 //   原価 = Σ purchaseUnitPrice × kg  (snapshot for migrated orders, live for new ones)
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
-import type { SaleRecord, SaleLineItem, SaleStatus, PaymentStatus, ShippingStatus, TaxRate } from '@/types'
+import { defaultTaxRateForCountry } from '@/lib/tax'
+import type { SaleRecord, SaleLineItem, SaleStatus, PaymentStatus, ShippingStatus } from '@/types'
 
 /** Raw wholesale order as returned by GET /api/wholesale/orders (staff). */
 export interface WholesaleOrderRow {
@@ -66,11 +67,16 @@ export async function patchWholesaleOrder(body: Record<string, unknown>): Promis
 
 function mapStatus(s?: string): SaleStatus {
   if (s === 'cancelled') return 'cancelled'
-  if (s === 'pending_quote' || s === 'quoted') return 'negotiating'
+  // Not yet a committed sale: overseas quote flow + made-to-order approval.
+  // These must NOT count as confirmed revenue in financials/receivables.
+  if (s === 'pending_quote' || s === 'quoted' || s === 'pending_approval') return 'negotiating'
   return 'confirmed' // pending_payment | paid | shipped
 }
 function mapPaymentStatus(o: WholesaleOrderRow): PaymentStatus {
   if (o.paymentStatus === 'paid') return 'paid'
+  // Honour an explicitly-set invoice state (入金管理); otherwise default by status.
+  if (o.paymentStatus === 'invoiced') return 'invoiced'
+  if (o.paymentStatus === 'uninvoiced') return 'uninvoiced'
   return mapStatus(o.status) === 'confirmed' ? 'invoiced' : 'uninvoiced'
 }
 function mapShippingStatus(s?: string): ShippingStatus {
@@ -80,6 +86,8 @@ const isoDate = (ms?: number) => (ms ? new Date(ms).toISOString().slice(0, 10) :
 
 /** Convert one wholesale order into a SaleRecord for the accounting screens. */
 export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, number>): SaleRecord {
+  // Goods tax rate follows the destination: domestic matcha = 8%, export = 免税(0%).
+  const lineTaxRate = defaultTaxRateForCountry(o.shippingCountry)
   const items: SaleLineItem[] = (o.items ?? []).map(it => {
     const costPerKg = costByProduct[it.productId] ?? 0
     const quantityKg = Number(it.quantityKg) || 0
@@ -95,7 +103,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
       revenue,
       costAmount,
       grossProfit: revenue - costAmount,
-      taxRate: 8 as TaxRate,
+      taxRate: lineTaxRate,
     }
   })
 

@@ -11,7 +11,7 @@
 //   node scripts/migrate-direct-to-wholesale.mjs --commit   # write
 //
 // Run scripts/backup-collections.mjs FIRST.
-import { getDb, Timestamp, toJsonSafe } from './_firestore.mjs'
+import { getDb, Timestamp, toJsonSafe } from '../_firestore.mjs'
 
 const COMMIT = process.argv.includes('--commit')
 const { db, projectId, dbId } = getDb()

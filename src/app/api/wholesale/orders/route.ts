@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function db(): Firestore {
-  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
   return getFirestore(getAdminApp(), databaseId)
 }
 
@@ -234,12 +234,15 @@ export async function PATCH(request: Request) {
     if (body.paymentMethod !== undefined) patch.paymentMethod = body.paymentMethod || FieldValue.delete()
     if (body.paymentStatus !== undefined) {
       const paid = body.paymentStatus === 'paid'
-      patch.paymentStatus = paid ? 'paid' : 'unpaid'
       if (paid) {
+        patch.paymentStatus = 'paid'
         const ms = body.paymentDate ? Date.parse(body.paymentDate) : NaN
         patch.paidAt = Number.isFinite(ms) ? Timestamp.fromMillis(ms) : FieldValue.serverTimestamp()
         if (cur?.status === 'pending_payment' || cur?.status === 'quoted') patch.status = 'paid'
       } else {
+        // Preserve the 未請求/請求済 distinction (invoiced / uninvoiced) rather than
+        // collapsing to 'unpaid' — otherwise it reverts on reload.
+        patch.paymentStatus = body.paymentStatus === 'invoiced' || body.paymentStatus === 'uninvoiced' ? body.paymentStatus : 'unpaid'
         patch.paidAt = FieldValue.delete()
         if (cur?.status === 'paid') patch.status = 'pending_payment'
       }
@@ -311,11 +314,26 @@ export async function PATCH(request: Request) {
     const prodSnap = await database.collection('products').get()
     const products = new Map(prodSnap.docs.map(d => [d.id, d.data() as Record<string, unknown>]))
 
+    // Goods tax follows the destination (matcha 8% domestic / 免税 0% export) —
+    // derived server-side, not trusted from the client.
+    const domestic = ['jp', 'japan', '日本'].includes(String(body.shippingCountry ?? cur.shippingCountry ?? '').trim().toLowerCase())
+    const goodsTaxRate = domestic ? 8 : 0
+    // Preserve any chosen repackage option from the original order (the edit form
+    // does not expose options, so we must not silently drop their fees).
+    const curItems = (Array.isArray(cur.items) ? cur.items : []) as Record<string, unknown>[]
+    const usedOrig = new Set<number>()
+
     const items = body.items.map(it => {
       const p = products.get(it.productId)
       const qty = Number(it.quantityKg) || 0
       const unit = Number(it.unitPriceJpy) || 0
-      const taxRate = it.taxRate === 0 || it.taxRate === 10 ? it.taxRate : 8
+      const oi = curItems.findIndex((ci, j) => !usedOrig.has(j) && String(ci.productId) === it.productId)
+      let option: Record<string, unknown> | undefined
+      if (oi >= 0) {
+        usedOrig.add(oi)
+        const o = curItems[oi].option
+        if (o && typeof o === 'object') option = o as Record<string, unknown>
+      }
       return {
         kind: 'wholesale' as const,
         productId: it.productId,
@@ -324,17 +342,27 @@ export async function PATCH(request: Request) {
         quantityKg: qty,
         unitPriceJpy: unit,
         lineTotalJpy: qty * unit,
-        _taxRate: taxRate,
+        ...(option ? { option } : {}),
+        _taxRate: goodsTaxRate,
         _costPerKg: Number(p?.purchaseUnitPrice ?? 0),
         _madeToOrder: p?.madeToOrder === true,
       }
     })
     const subtotalJpy = items.reduce((s, i) => s + i.lineTotalJpy, 0)
+    // Option fee per line = bags × price/bag, bags = round(qty ÷ portion).
+    const optionFeesJpy = items.reduce((s, i) => {
+      const o = (i as { option?: Record<string, unknown> }).option
+      if (!o) return s
+      const portionKg = Number(o.portionKg) || 0
+      const pricePerBag = Number(o.pricePerBagJpy) || 0
+      const bags = portionKg > 0 ? Math.round(i.quantityKg / portionKg) : 0
+      return s + bags * pricePerBag
+    }, 0)
     const shippingFeeJpy = body.shippingFeeJpy != null ? Number(body.shippingFeeJpy) : Number(cur.shippingFeeJpy ?? 0)
     const paymentFeeJpy = body.paymentFeeJpy != null ? Number(body.paymentFeeJpy) : Number(cur.paymentFeeJpy ?? 0)
-    const domestic = ['jp', 'japan', '日本'].includes(String(body.shippingCountry ?? cur.shippingCountry ?? '').trim().toLowerCase())
-    const { taxBreakdown, taxJpy } = recomputeTax(items.map(i => ({ revenue: i.lineTotalJpy, taxRate: i._taxRate })), domestic ? shippingFeeJpy : 0)
-    const totalJpy = subtotalJpy + shippingFeeJpy + taxJpy
+    // Shipping + option fees are taxed at the standard 10% domestically, 0% on export.
+    const { taxBreakdown, taxJpy } = recomputeTax(items.map(i => ({ revenue: i.lineTotalJpy, taxRate: i._taxRate })), domestic ? shippingFeeJpy + optionFeesJpy : 0)
+    const totalJpy = subtotalJpy + shippingFeeJpy + optionFeesJpy + taxJpy
     const costAmountJpy = items.reduce((s, i) => s + i._costPerKg * i.quantityKg, 0)
     const grossProfitJpy = subtotalJpy - costAmountJpy - paymentFeeJpy
 
@@ -361,7 +389,7 @@ export async function PATCH(request: Request) {
     batch.set(ref, {
       items: items.map(({ _taxRate, _costPerKg, _madeToOrder, ...rest }) => { void _taxRate; void _costPerKg; void _madeToOrder; return rest }),
       subtotalJpy, taxBreakdown, taxJpy, totalJpy, displayTotal: totalJpy,
-      shippingFeeJpy, paymentFeeJpy, costAmountJpy, grossProfitJpy,
+      shippingFeeJpy, optionFeesJpy, paymentFeeJpy, costAmountJpy, grossProfitJpy,
       isDomestic: domestic,
       ...(body.shippingCountry !== undefined ? { shippingCountry: body.shippingCountry } : {}),
       ...(body.shippingAddress !== undefined ? { shippingAddress: body.shippingAddress || null } : {}),

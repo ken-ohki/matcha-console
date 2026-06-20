@@ -45,7 +45,6 @@ export const dynamic = 'force-dynamic'
 const COLLECTIONS = {
   groups: 'inventory_groups',
   products: 'products',
-  sales: 'sales',
   selfConsumptions: 'self_consumptions',
   ecSales: 'ec_sales',
   settings: 'settings',
@@ -148,10 +147,17 @@ export async function POST(request: Request) {
     selfByProduct[pid] = (selfByProduct[pid] ?? 0) + num(data.quantityKg)
   })
 
+  // An ec_sales doc consumes stock unless it's cancelled or an expired 'reserved'
+  // hold (overseas quote). Keep this in lockstep with the wholesale app.
+  const nowMs = Date.now()
   const ecByProduct: Record<string, number> = {}
   ecSnap.docs.forEach(doc => {
     const data = doc.data() as AnyRecord
     if (data.status === 'cancelled') return
+    if (data.status === 'reserved') {
+      const exp = typeof data.expiresAtMs === 'number' ? data.expiresAtMs : 0
+      if (exp && exp < nowMs) return
+    }
     const pid = String(data.productId ?? '')
     ecByProduct[pid] = (ecByProduct[pid] ?? 0) + num(data.quantityKg)
   })

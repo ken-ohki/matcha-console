@@ -48,7 +48,7 @@ export function getFirebaseApp(): FirebaseApp {
 export function getFirebaseDb(): Firestore {
   if (firestoreDb) return firestoreDb
   const app = getFirebaseApp()
-  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
   firestoreDb = getFirestore(app, databaseId)
   return firestoreDb
 }

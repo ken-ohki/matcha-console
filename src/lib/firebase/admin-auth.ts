@@ -29,7 +29,7 @@ export async function requireAdmin(request: Request): Promise<{ uid: string; ema
     throw new AuthError(401, 'invalid_token')
   }
 
-  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
   const db = getFirestore(getAdminApp(), databaseId)
   const userSnap = await db.collection('users').doc(decoded.uid).get()
   if (!userSnap.exists) throw new AuthError(403, 'user_not_found')

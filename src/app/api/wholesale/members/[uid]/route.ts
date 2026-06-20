@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function db() {
-  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow'
+  const databaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console'
   return getFirestore(getAdminApp(), databaseId)
 }
 
@@ -16,10 +16,8 @@ function handleAuthError(err: unknown) {
   return NextResponse.json({ error: 'internal', detail: err instanceof Error ? err.message : 'unknown' }, { status: 500 })
 }
 
-/** Escape member-supplied text before interpolating into email HTML. */
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
-}
+// Base URL of the wholesale storefront app (owns the Resend email transport).
+const WHOLESALE_BASE_URL = process.env.WHOLESALE_BASE_URL || 'https://wholesale.sabo-matcha.jp'
 
 interface ActionBody {
   action?: 'approve' | 'reject' | 'suspend' | 'set_rank'
@@ -123,15 +121,18 @@ export async function POST(request: Request, context: { params: Promise<{ uid: s
       { merge: true },
     )
 
-    // Queue an approval email via the Trigger-Email extension (mail collection).
+    // Send the approval email via the wholesale app (it owns the Resend transport;
+    // the legacy Trigger-Email `mail` collection has been retired). Best-effort.
     if (member.email) {
-      await database.collection('mail').add({
-        to: member.email,
-        message: {
-          subject: 'SABO Wholesale — お申し込みが承認されました / Your account is approved',
-          html: `<p>${escapeHtml(String(member.companyName ?? ''))} 様</p><p>SABO 卸売サイトのご登録が承認されました。下記よりログインしてご利用ください。<br/>Your SABO wholesale account has been approved. Please log in:</p><p><a href="https://wholesale.sabo-matcha.jp/login">https://wholesale.sabo-matcha.jp/login</a></p>`,
-        },
-      })
+      try {
+        await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/notify-member-approved`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: request.headers.get('authorization') ?? '' },
+          body: JSON.stringify({ email: member.email, companyName: member.companyName ?? '' }),
+        })
+      } catch (err) {
+        console.error('[member approve] approval email failed', err)
+      }
     }
 
     return NextResponse.json({ ok: true, status: 'approved' })

@@ -23,7 +23,7 @@ const APPLY = process.argv.includes('--apply')
 
 const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
 if (getApps().length === 0) initializeApp({ credential: cert(sa), projectId: sa.project_id })
-const db = getFirestore(process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'chaflow')
+const db = getFirestore(process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID || 'matcha-console')
 
 // Field name → master type
 const FIELD_TYPE = {
