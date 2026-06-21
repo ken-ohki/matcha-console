@@ -43,6 +43,7 @@ export default function NewWholesaleOrderPage() {
   const [ship, setShip] = useState({ country: 'JP', postalCode: '', address: '', contactName: '', phone: '', overseasCarrier: 'ems' })
   const [shippingFeeJpy, setShippingFeeJpy] = useState('')
   const [markPaid, setMarkPaid] = useState(true)
+  const [asQuote, setAsQuote] = useState(false)
   // Direct (staff-entered) orders default to NOT emailing the customer.
   const [suppressEmail, setSuppressEmail] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -158,7 +159,8 @@ export default function NewWholesaleOrderPage() {
           phone: ship.phone || undefined,
           overseasCarrier: ship.country !== 'JP' ? ship.overseasCarrier : undefined,
           shippingFeeJpy: shippingFeeJpy !== '' ? Number(shippingFeeJpy) : undefined,
-          markPaid,
+          asQuote,
+          markPaid: asQuote ? false : markPaid,
           suppressEmail,
         }),
       })
@@ -247,9 +249,16 @@ export default function NewWholesaleOrderPage() {
               )}
               <L label="送料(¥・税抜) 空欄=自動/0"><input type="number" min="0" step="1" className="field-input" value={shippingFeeJpy} onChange={e => setShippingFeeJpy(e.target.value)} /></L>
             </div>
-            <div className="mt-3 flex flex-wrap gap-4 text-sm text-graphite">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={markPaid} onChange={e => setMarkPaid(e.target.checked)} /> 入金済みにする（請求書/既払い）</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={suppressEmail} onChange={e => setSuppressEmail(e.target.checked)} /> 顧客へのメールを送らない</label>
+            <div className="mt-3 space-y-2 text-sm text-graphite">
+              <div className="flex flex-wrap gap-4">
+                <label className="flex cursor-pointer items-center gap-2"><input type="radio" name="createMode" checked={!asQuote} onChange={() => setAsQuote(false)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 即確定（在庫引当・通常注文）</label>
+                <label className="flex cursor-pointer items-center gap-2"><input type="radio" name="createMode" checked={asQuote} onChange={() => setAsQuote(true)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 見積として作成（承諾後に確定）</label>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <label className={`flex cursor-pointer items-center gap-2 ${asQuote ? 'opacity-40' : ''}`}><input type="checkbox" checked={markPaid && !asQuote} disabled={asQuote} onChange={e => setMarkPaid(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 入金済みにする（請求書/既払い）</label>
+                <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={suppressEmail} onChange={e => setSuppressEmail(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 顧客へのメールを送らない</label>
+              </div>
+              {asQuote && <p className="text-[11px] text-mist">見積として作成すると在庫を引当てたうえで「承諾待ち（見積）」になります。見積書を発行→顧客の承諾後、注文詳細の「承諾して確定」で確定します。</p>}
             </div>
           </section>
 

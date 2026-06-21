@@ -8,6 +8,7 @@ import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { useStickyState } from '@/hooks/useStickyState'
 import type { MasterEntry, SaleRecord } from '@/types'
 import { translateValue } from '@/lib/masters'
 import { ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
@@ -51,8 +52,8 @@ export default function ShippingPage() {
   const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filterChip, setFilterChip] = useState<FilterChip>('to_ship')
-  const [view, setView] = useState<View>('list')
+  const [filterChip, setFilterChip] = useStickyState<FilterChip>('shipping.filterChip', 'to_ship')
+  const [view, setView] = useStickyState<View>('shipping.view', 'list')
   const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
 
   const load = async () => {

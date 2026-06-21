@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
+import { useStickyState } from '@/hooks/useStickyState'
 import { Check, X, Ban, RefreshCw, Search } from 'lucide-react'
 
 interface Member {
@@ -61,9 +62,9 @@ export default function WholesaleMembersPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [filter, setFilter] = useState('all')
-  const [countryFilter, setCountryFilter] = useState('all')
-  const [rankFilter, setRankFilter] = useState('all')
+  const [filter, setFilter] = useStickyState('members.filter', 'all')
+  const [countryFilter, setCountryFilter] = useStickyState('members.country', 'all')
+  const [rankFilter, setRankFilter] = useStickyState('members.rank', 'all')
   const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {

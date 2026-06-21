@@ -193,7 +193,7 @@ function ReceiveModal({
             <div className="space-y-3">
               <div className="flex flex-col gap-2 rounded-2xl border border-[#e6dfcf] p-3">
                 <label className="flex items-center gap-2 text-sm font-medium text-ink">
-                  <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
+                  <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} className="h-4 w-4 cursor-pointer accent-[#174c33]" />
                   新規商品として登録
                 </label>
                 {mode === 'new' && (
@@ -244,7 +244,7 @@ function ReceiveModal({
 
               <div className="flex flex-col gap-2 rounded-2xl border border-[#e6dfcf] p-3">
                 <label className="flex items-center gap-2 text-sm font-medium text-ink">
-                  <input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} />
+                  <input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} className="h-4 w-4 cursor-pointer accent-[#174c33]" />
                   既存商品に紐付け
                 </label>
                 {mode === 'existing' && (

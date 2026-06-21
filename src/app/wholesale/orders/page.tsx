@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { formatCurrency } from '@/lib/format'
+import { useStickyState } from '@/hooks/useStickyState'
 import { RefreshCw } from 'lucide-react'
 
 interface OrderItem {
@@ -56,6 +57,7 @@ function paymentMethodLabel(o: Order): string {
 // Payment vs shipping are separate concerns; `status` mixes them, so derive each.
 function paymentStateLabel(o: Order): { label: string; tone: string } {
   if (o.status === 'cancelled') return { label: '取消', tone: 'border-line text-mist' }
+  if (o.status === 'pending_acceptance') return { label: '承諾待ち（見積）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'pending_approval') return { label: '承認待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'pending_quote') return { label: '見積待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'quoted') return { label: '支払い待ち（見積済）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
@@ -72,7 +74,7 @@ export default function WholesaleOrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<OrdersTab>('all')
+  const [tab, setTab] = useStickyState<OrdersTab>('orders.tab', 'all')
 
   // EC = self-service web orders (origin 'self' or legacy undefined); 直販 = staff-entered/migrated.
   const shown = orders.filter(o => tab === 'all' ? true : tab === 'direct' ? o.origin === 'direct' : o.origin !== 'direct')

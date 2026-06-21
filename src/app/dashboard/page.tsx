@@ -28,7 +28,7 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   shipped: '出荷済み',
   cancelled: '取消',
 }
-const ATTENTION_STATUSES = ['pending_approval', 'pending_quote', 'quoted', 'pending_payment']
+const ATTENTION_STATUSES = ['pending_acceptance', 'pending_approval', 'pending_quote', 'quoted', 'pending_payment']
 
 async function token(): Promise<string> {
   const current = getFirebaseAuthInstance().currentUser

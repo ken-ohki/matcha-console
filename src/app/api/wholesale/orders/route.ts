@@ -81,7 +81,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -407,6 +407,19 @@ export async function PATCH(request: Request) {
   if (body.action === 'cancel') {
     await cancelOrder(database, body.orderId)
     return NextResponse.json({ ok: true, status: 'cancelled' })
+  }
+  // Customer accepted the quoted amount → confirm the direct order. Stock was
+  // already held at quote creation, so this is a pure status flip to pending_payment.
+  if (body.action === 'accept_quote') {
+    const snap = await ref.get()
+    const cur = snap.data() as { status?: string } | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    if (cur.status !== 'pending_acceptance') return NextResponse.json({ error: 'not_pending_acceptance' }, { status: 400 })
+    await ref.set(
+      { status: 'pending_payment', acceptedAt: new Date().toISOString(), updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    )
+    return NextResponse.json({ ok: true, status: 'pending_payment' })
   }
   return NextResponse.json({ error: 'invalid_action' }, { status: 400 })
 }

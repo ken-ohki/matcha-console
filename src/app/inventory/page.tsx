@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCultivars, formatOptionList } from '@/lib/product-master'
 import { optionsForType, translateValues, type MasterOption } from '@/lib/masters'
 import { getServices } from '@/lib/services'
+import { useStickyState, useStickySet } from '@/hooks/useStickyState'
 import type {
   InventoryGroup,
   InventoryGroupInput,
@@ -354,16 +355,16 @@ export default function InventoryPage() {
   const [masters, setMasters] = useState<MasterEntry[]>([])
   const [sampleFeeJpy, setSampleFeeJpy] = useState(100)
   const [loading, setLoading] = useState(true)
-  const [activeGroupId, setActiveGroupId] = useState<string>('all')
-  const [search, setSearch] = useState('')
-  const [sortKey, setSortKey] = useState<'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'>('manual')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [gradeFilters, setGradeFilters] = useState<Set<string>>(new Set())
-  const [originFilters, setOriginFilters] = useState<Set<string>>(new Set())
-  const [statusFilters, setStatusFilters] = useState<Set<'out' | 'low' | 'normal'>>(new Set())
-  const [catalogFilter, setCatalogFilter] = useState<'all' | 'visible' | 'hidden'>('all')
-  const [askFilter, setAskFilter] = useState<'all' | 'ask' | 'normal'>('all')
-  const [showArchived, setShowArchived] = useState(false)
+  const [activeGroupId, setActiveGroupId] = useStickyState<string>('inv.group', 'all')
+  const [search, setSearch] = useStickyState('inv.search', '')
+  const [sortKey, setSortKey] = useStickyState<'manual' | 'sku' | 'name' | 'tea' | 'origin' | 'stock' | 'price' | 'status'>('inv.sortKey', 'manual')
+  const [sortDir, setSortDir] = useStickyState<'asc' | 'desc'>('inv.sortDir', 'asc')
+  const [gradeFilters, setGradeFilters] = useStickySet('inv.grade')
+  const [originFilters, setOriginFilters] = useStickySet('inv.origin')
+  const [statusFilters, setStatusFilters] = useStickySet('inv.status') as [Set<'out' | 'low' | 'normal'>, typeof setGradeFilters]
+  const [catalogFilter, setCatalogFilter] = useStickyState<'all' | 'visible' | 'hidden'>('inv.catalog', 'all')
+  const [askFilter, setAskFilter] = useStickyState<'all' | 'ask' | 'normal'>('inv.ask', 'all')
+  const [showArchived, setShowArchived] = useStickyState('inv.showArchived', false)
   const [modalOpen, setModalOpen] = useState(false)
   const [prefillProduct, setPrefillProduct] = useState<Partial<ProductWithInventory> | null>(null)
 
@@ -526,6 +527,7 @@ export default function InventoryPage() {
 
   const totalInitialStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.initialStockKg, 0), [groupProducts])
   const totalCurrentStockKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.currentStockKg, 0), [groupProducts])
+  const archivedCount = useMemo(() => groupProducts.filter(p => p.archived).length, [groupProducts])
   const totalAllocatedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.salesAllocatedKg, 0), [groupProducts])
   const totalSelfConsumedKg = useMemo(() => groupProducts.reduce((sum, product) => sum + product.selfConsumedKg, 0), [groupProducts])
   const isDraggable = !search && sortKey === 'manual' && user?.role === 'admin' && activeGroupId !== 'all'
@@ -853,8 +855,8 @@ export default function InventoryPage() {
               className="w-full rounded-xl border border-line py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-matcha md:w-[32rem]"
             />
             <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-graphite">
-              <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} />
-              アーカイブを表示
+              <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[#174c33]" />
+              アーカイブを表示{archivedCount > 0 ? `（${archivedCount}）` : ''}
             </label>
           </div>
           <InventoryFilterBar

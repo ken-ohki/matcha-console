@@ -67,9 +67,10 @@ export async function patchWholesaleOrder(body: Record<string, unknown>): Promis
 
 function mapStatus(s?: string): SaleStatus {
   if (s === 'cancelled') return 'cancelled'
-  // Not yet a committed sale: overseas quote flow + made-to-order approval.
-  // These must NOT count as confirmed revenue in financials/receivables.
-  if (s === 'pending_quote' || s === 'quoted' || s === 'pending_approval') return 'negotiating'
+  // Not yet a committed sale: overseas quote flow, made-to-order approval, and
+  // direct-order quotes awaiting customer acceptance. These must NOT count as
+  // confirmed revenue in financials/receivables.
+  if (s === 'pending_quote' || s === 'quoted' || s === 'pending_approval' || s === 'pending_acceptance') return 'negotiating'
   return 'confirmed' // pending_payment | paid | shipped
 }
 function mapPaymentStatus(o: WholesaleOrderRow): PaymentStatus {

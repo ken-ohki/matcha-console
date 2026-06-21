@@ -75,6 +75,7 @@ async function token(): Promise<string> {
 }
 
 const STATUS_LABEL: Record<string, string> = {
+  pending_acceptance: '承諾待ち（見積）',
   pending_approval: '承認待ち',
   pending_quote: '見積待ち',
   quoted: '支払い待ち（見積済）',
@@ -134,7 +135,8 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote', extra: Record<string, unknown> = {}) => {
+    if (action === 'accept_quote' && !window.confirm('お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）')) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
     if (action === 'cancel') {
@@ -168,6 +170,10 @@ export default function WholesaleOrderDetailPage() {
             ? '海外発送の送料を設定してから承認してください（注文を編集して送料を入力）。'
             : `承認に失敗しました（${d.error ?? 'error'}）`
         window.alert(msg)
+      }
+      if (action === 'accept_quote') {
+        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+        window.alert(d.ok ? '承諾を反映し、注文を確定しました（支払い待ち）。' : `確定に失敗しました（${d.error ?? 'error'}）`)
       }
       if (action === 'cancel' && res.ok && wasPaid) {
         window.alert(
@@ -267,6 +273,19 @@ export default function WholesaleOrderDetailPage() {
     window.open(URL.createObjectURL(blob), '_blank')
   }
 
+  const downloadQuotation = async () => {
+    if (!order) return
+    const res = await fetch(`/api/wholesale/orders/${id}/quotation?lang=${docLang}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      window.alert(`見積書の発行に失敗しました。${d.detail || d.error || ''}`)
+      return
+    }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
   const downloadDeliveryNote = async () => {
     if (!order) return
     const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
@@ -291,6 +310,10 @@ export default function WholesaleOrderDetailPage() {
   const paymentFee = o?.paymentFeeJpy ?? 0
   const grossProfit = o?.grossProfitJpy ?? revenueExTax - totalCost - paymentFee
   const marginRate = revenueExTax > 0 ? (grossProfit / revenueExTax) * 100 : null
+
+  // Document availability: 見積書 for direct orders (not cancelled); 領収書/納品書 once paid/shipped.
+  const canQuote = o?.origin === 'direct' && o?.status !== 'cancelled'
+  const canReceiptDelivery = o?.status === 'paid' || o?.status === 'shipped'
 
   return (
     <AppLayout>
@@ -506,22 +529,28 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
+              {o.status === 'pending_acceptance' && !editing && (
+                <button onClick={() => act('accept_quote')} disabled={busy} className="btn-primary">承諾して確定</button>
+              )}
               {o.status === 'pending_approval' && !editing && (
                 <button onClick={() => act('approve')} disabled={busy} className="btn-primary">承認して支払い案内を送る</button>
               )}
               {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}
-              {(o.status === 'paid' || o.status === 'shipped') && (
+              {(canQuote || canReceiptDelivery) && (
                 <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                   <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
                   <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
                 </div>
               )}
-              {(o.status === 'paid' || o.status === 'shipped') && (
+              {canQuote && (
+                <button onClick={downloadQuotation} disabled={busy} className="btn-ghost">見積書を発行</button>
+              )}
+              {canReceiptDelivery && (
                 <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>
               )}
-              {(o.status === 'paid' || o.status === 'shipped') && (
+              {canReceiptDelivery && (
                 <button onClick={downloadDeliveryNote} disabled={busy} className="btn-ghost">納品書を発行</button>
               )}
               {o.status !== 'cancelled' && o.status !== 'shipped' && (
