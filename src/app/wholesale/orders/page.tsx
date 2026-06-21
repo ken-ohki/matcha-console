@@ -70,11 +70,19 @@ function shippingStateLabel(o: Order): { label: string; tone: string } {
   return { label: '未発送', tone: 'border-line text-mist' }
 }
 
+// Closed = 取引完了済（出荷済み）or 取消. Everything else still needs staff action.
+function isClosed(o: Order): boolean {
+  return o.status === 'shipped' || !!o.shippedAt || o.status === 'cancelled'
+}
+
+type OrdersBucket = 'action' | 'done' | 'all'
+
 export default function WholesaleOrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useStickyState<OrdersTab>('orders.tab', 'all')
+  const [bucket, setBucket] = useStickyState<OrdersBucket>('orders.bucket', 'action')
 
   // EC = self-service web orders (origin 'self' or legacy undefined); 直販 = staff-entered/migrated.
   const shown = orders.filter(o => tab === 'all' ? true : tab === 'direct' ? o.origin === 'direct' : o.origin !== 'direct')
@@ -83,6 +91,20 @@ export default function WholesaleOrdersPage() {
     ec: orders.filter(o => o.origin !== 'direct').length,
     direct: orders.filter(o => o.origin === 'direct').length,
   }
+
+  // 対応が必要 / 取引完了済 split, applied on top of the channel tab.
+  const bucketCounts = {
+    action: shown.filter(o => !isClosed(o)).length,
+    done: shown.filter(isClosed).length,
+    all: shown.length,
+  }
+  const list =
+    bucket === 'action'
+      ? shown.filter(o => !isClosed(o))
+      : bucket === 'done'
+        ? shown.filter(isClosed)
+        : [...shown].sort((a, b) => Number(isClosed(a)) - Number(isClosed(b))) // すべて: 対応が必要を上に
+
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -130,10 +152,25 @@ export default function WholesaleOrdersPage() {
           ))}
         </div>
 
+        <div className="mb-bl-3 flex flex-wrap gap-1.5">
+          {([['action', '対応が必要'], ['done', '取引完了済'], ['all', 'すべて']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setBucket(key)}
+              className={`rounded-full border px-2.5 py-1 text-xs transition ${bucket === key ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+            >
+              {label} ({bucketCounts[key]})
+            </button>
+          ))}
+        </div>
+
         {loading ? (
           <p className="text-sm text-mist">読み込み中…</p>
-        ) : shown.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">注文はありません。</p>
+        ) : list.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">
+            {bucket === 'action' ? '対応が必要な注文はありません。' : bucket === 'done' ? '完了済みの注文はありません。' : '注文はありません。'}
+          </p>
         ) : (
           <div className="overflow-x-auto panel">
             <table className="min-w-[1280px] w-full text-sm">
@@ -151,7 +188,7 @@ export default function WholesaleOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {shown.map(o => (
+                {list.map(o => (
                   <tr
                     key={o.id}
                     onClick={() => router.push(`/wholesale/orders/${o.id}`)}

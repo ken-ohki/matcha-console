@@ -18,7 +18,7 @@ const TYPE_TABS: { type: MasterType; label: string; description: string }[] = [
   { type: 'shading', label: '被覆方法', description: 'Shading methods' },
   { type: 'certification', label: '認証', description: 'Certifications' },
   { type: 'terms', label: '取引条件', description: 'Sales / payment terms' },
-  { type: 'shipping_method', label: '発送方法', description: 'Shipping methods' },
+  { type: 'shipping_method', label: '発送業者', description: 'Shipping carriers' },
 ]
 
 interface DraftRow {

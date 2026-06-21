@@ -195,7 +195,7 @@ export default function ShippingPage() {
 
         {/* View tabs */}
         <div className="flex gap-1 border-b border-[#e6dfcf]">
-          {([['list', '発送リスト'], ['history', '発送方法別履歴'], ['slips', '伝票一覧']] as const).map(([key, label]) => (
+          {([['list', '発送リスト'], ['history', '発送業者別履歴'], ['slips', '伝票一覧']] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
@@ -248,7 +248,7 @@ export default function ShippingPage() {
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="販売先・商品・追跡番号・発送方法"
+                placeholder="販売先・商品・追跡番号・発送業者"
                 className="w-full rounded-xl border border-line py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
               />
             </div>
@@ -264,7 +264,7 @@ export default function ShippingPage() {
                     <th className="px-3 py-3 font-medium">商品</th>
                     <th className="px-3 py-3 font-medium">メモ</th>
                     <th className="px-3 py-3 font-medium">納期</th>
-                    <th className="px-3 py-3 font-medium">発送方法</th>
+                    <th className="px-3 py-3 font-medium">発送業者</th>
                     <th className="px-3 py-3 font-medium">発送日</th>
                     <th className="px-3 py-3 font-medium">追跡番号</th>
                     <th className="px-3 py-3 font-medium">納品書</th>
@@ -379,7 +379,7 @@ export default function ShippingPage() {
                     <th className="px-3 py-3 font-medium">添付日</th>
                     <th className="px-3 py-3 font-medium">販売先 / 国</th>
                     <th className="px-3 py-3 font-medium">商品</th>
-                    <th className="px-3 py-3 font-medium">発送方法</th>
+                    <th className="px-3 py-3 font-medium">発送業者</th>
                     <th className="px-3 py-3 font-medium">発送日</th>
                     <th className="px-3 py-3 font-medium">伝票</th>
                     <th className="px-3 py-3 font-medium"></th>
@@ -430,8 +430,8 @@ export default function ShippingPage() {
         </div>
 
         <div className="text-xs text-mist">
-          ※発送方法は「
-          <Link href="/settings/masters" className="underline">設定 → マスター管理 → 発送方法</Link>
+          ※発送業者は「
+          <Link href="/settings/masters" className="underline">設定 → マスター管理 → 発送業者</Link>
           」で登録できます。
         </div>
       </div>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
+import type { MasterEntry } from '@/types'
 import { ArrowLeft, RefreshCw, Plus, Trash2 } from 'lucide-react'
 
 interface OrderItem {
@@ -29,6 +30,7 @@ interface Order {
   optionFeesJpy?: number
   taxJpy?: number
   totalJpy?: number
+  feeLines?: { name: string; quantity?: number; unit?: string; unitPriceJpy?: number; amountJpy: number; taxRate?: number }[]
   paymentMethod?: string
   paymentStatus?: string
   status?: string
@@ -52,11 +54,13 @@ interface Order {
   paymentFeeJpy?: number
   dueDate?: string
   paidAtMs?: number
+  createdAtMs?: number
   origin?: string
 }
 
 interface EditState {
   items: { productId: string; quantityKg: string; unitPriceJpy: string; taxRate: number }[]
+  feeLines: { name: string; quantity: string; unitPriceJpy: string; taxRate: number }[]
   shippingCountry: string
   shippingPostalCode: string
   shippingAddress: string
@@ -100,6 +104,7 @@ export default function WholesaleOrderDetailPage() {
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
+  const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
   const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
@@ -121,7 +126,15 @@ export default function WholesaleOrderDetailPage() {
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
-      const products = await services.inventory.getProductsWithInventory()
+      const [products, masters] = await Promise.all([
+        services.inventory.getProductsWithInventory(),
+        services.masters.listMasters(),
+      ])
+      setCarriers(
+        masters
+          .filter(m => m.type === 'shipping_method' && m.isActive !== false)
+          .sort((a, b) => a.sortOrder - b.sortOrder),
+      )
       const costMap: Record<string, number> = {}
       for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
       setCostByProduct(costMap)
@@ -192,6 +205,7 @@ export default function WholesaleOrderDetailPage() {
     if (!order) return
     setEdit({
       items: (order.items ?? []).map(i => ({ productId: i.productId ?? '', quantityKg: String(i.quantityKg ?? ''), unitPriceJpy: String(i.unitPriceJpy ?? ''), taxRate: 8 })),
+      feeLines: (order.feeLines ?? []).map(f => ({ name: f.name ?? '', quantity: String(f.quantity ?? 1), unitPriceJpy: String(f.unitPriceJpy ?? f.amountJpy ?? ''), taxRate: f.taxRate ?? 8 })),
       shippingCountry: order.shippingCountry ?? 'JP',
       shippingPostalCode: order.shippingPostalCode ?? '',
       shippingAddress: order.shippingAddress ?? '',
@@ -209,13 +223,16 @@ export default function WholesaleOrderDetailPage() {
     if (!edit || !order) return
     const items = edit.items.filter(i => i.productId).map(i => ({ productId: i.productId, quantityKg: Number(i.quantityKg) || 0, unitPriceJpy: Number(i.unitPriceJpy) || 0, taxRate: i.taxRate }))
     if (items.length === 0) { window.alert('商品を1つ以上指定してください'); return }
+    const feeLines = edit.feeLines
+      .filter(f => f.name.trim())
+      .map(f => ({ name: f.name.trim(), quantity: Number(f.quantity) || 0, unitPriceJpy: Number(f.unitPriceJpy) || 0, taxRate: f.taxRate }))
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
         body: JSON.stringify({
-          orderId: order.id, action: 'update_direct_order', items,
+          orderId: order.id, action: 'update_direct_order', items, feeLines,
           shippingCountry: edit.shippingCountry, shippingPostalCode: edit.shippingPostalCode, shippingAddress: edit.shippingAddress,
           contactName: edit.contactName, phone: edit.phone, notes: edit.notes, dueDate: edit.dueDate,
           shippingFeeJpy: edit.shippingFeeJpy !== '' ? Number(edit.shippingFeeJpy) : undefined,
@@ -230,6 +247,8 @@ export default function WholesaleOrderDetailPage() {
   }
   const setEditItem = (idx: number, patch: Partial<EditState['items'][number]>) =>
     setEdit(e => e ? { ...e, items: e.items.map((it, i) => i === idx ? { ...it, ...patch } : it) } : e)
+  const setEditFee = (idx: number, patch: Partial<EditState['feeLines'][number]>) =>
+    setEdit(e => e ? { ...e, feeLines: e.feeLines.map((f, i) => i === idx ? { ...f, ...patch } : f) } : e)
 
   const quote = async (shippingFeeJpy: number, overseasCarrier: string) => {
     setBusy(true)
@@ -286,6 +305,19 @@ export default function WholesaleOrderDetailPage() {
     window.open(URL.createObjectURL(await res.blob()), '_blank')
   }
 
+  const downloadInvoice = async () => {
+    if (!order) return
+    const res = await fetch(`/api/wholesale/orders/${id}/invoice?lang=${docLang}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      window.alert(`請求書の発行に失敗しました。${d.detail || d.error || ''}`)
+      return
+    }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
   const downloadDeliveryNote = async () => {
     if (!order) return
     const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
@@ -311,8 +343,12 @@ export default function WholesaleOrderDetailPage() {
   const grossProfit = o?.grossProfitJpy ?? revenueExTax - totalCost - paymentFee
   const marginRate = revenueExTax > 0 ? (grossProfit / revenueExTax) * 100 : null
 
-  // Document availability: 見積書 for direct orders (not cancelled); 領収書/納品書 once paid/shipped.
+  // Document availability:
+  // 見積書 — direct orders (amount not yet finalized), not cancelled.
+  // 請求書 — once the amount is committed (支払い待ち以降)、取消以外.
+  // 領収書/納品書 — once paid/shipped.
   const canQuote = o?.origin === 'direct' && o?.status !== 'cancelled'
+  const canInvoice = !!o && !['pending_acceptance', 'pending_approval', 'pending_quote', 'cancelled'].includes(o.status ?? '')
   const canReceiptDelivery = o?.status === 'paid' || o?.status === 'shipped'
 
   return (
@@ -343,6 +379,9 @@ export default function WholesaleOrderDetailPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-mono text-sm text-ink">{o.orderNumber}</p>
+                  {o.createdAtMs ? (
+                    <p className="text-xs text-mist">注文日: {new Date(o.createdAtMs).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                  ) : null}
                   <p className="mt-1 text-lg font-semibold text-ink">{o.memberCompanyName}</p>
                   {(o.contactName || o.phone) && (
                     <p className="text-sm text-mist">{[o.contactName, o.phone].filter(Boolean).join(' · ')}</p>
@@ -379,8 +418,32 @@ export default function WholesaleOrderDetailPage() {
                       <button onClick={() => setEdit(e => e ? { ...e, items: e.items.filter((_, i) => i !== idx) } : e)} className="mb-1 p-2 text-mist hover:text-alert" aria-label="削除"><Trash2 size={16} /></button>
                     </div>
                   ))}
-                  <button onClick={() => setEdit(e => e ? { ...e, items: [...e.items, { productId: '', quantityKg: '', unitPriceJpy: '', taxRate: 8 }] } : e)} className="flex items-center gap-1 text-sm text-matchaDeep hover:underline"><Plus size={14} /> 行を追加</button>
+                  <button onClick={() => setEdit(e => e ? { ...e, items: [...e.items, { productId: '', quantityKg: '', unitPriceJpy: '', taxRate: 8 }] } : e)} className="flex items-center gap-1 text-sm text-matchaDeep hover:underline"><Plus size={14} /> 商品行を追加</button>
                 </div>
+
+                <div className="mt-5 space-y-2 border-t border-line pt-4">
+                  <p className="text-xs font-medium text-graphite">オプション・諸費用</p>
+                  {edit.feeLines.map((f, idx) => (
+                    <div key={idx} className="flex flex-wrap items-end gap-2">
+                      <label className="min-w-[180px] flex-1 text-[11px] text-mist">項目名
+                        <input className="field-input mt-1" value={f.name} onChange={e => setEditFee(idx, { name: e.target.value })} placeholder="例: 小分け加工費 / 通関手数料" />
+                      </label>
+                      <label className="w-20 text-[11px] text-mist">数量<input type="number" min="0" step="1" className="field-input mt-1" value={f.quantity} onChange={e => setEditFee(idx, { quantity: e.target.value })} /></label>
+                      <label className="w-32 text-[11px] text-mist">単価(¥)<input type="number" min="0" step="1" className="field-input mt-1" value={f.unitPriceJpy} onChange={e => setEditFee(idx, { unitPriceJpy: e.target.value })} /></label>
+                      <label className="w-24 text-[11px] text-mist">税率
+                        <select className="field-input mt-1" value={f.taxRate} onChange={e => setEditFee(idx, { taxRate: Number(e.target.value) })}>
+                          <option value={8}>8%</option>
+                          <option value={10}>10%</option>
+                          <option value={0}>免税</option>
+                        </select>
+                      </label>
+                      <span className="mb-2 w-24 text-right text-xs text-mist">¥{((Number(f.quantity) || 0) * (Number(f.unitPriceJpy) || 0)).toLocaleString()}</span>
+                      <button onClick={() => setEdit(e => e ? { ...e, feeLines: e.feeLines.filter((_, i) => i !== idx) } : e)} className="mb-1 p-2 text-mist hover:text-alert" aria-label="削除"><Trash2 size={16} /></button>
+                    </div>
+                  ))}
+                  <button onClick={() => setEdit(e => e ? { ...e, feeLines: [...e.feeLines, { name: '', quantity: '1', unitPriceJpy: '', taxRate: 8 }] } : e)} className="flex items-center gap-1 text-sm text-matchaDeep hover:underline"><Plus size={14} /> オプションを追加</button>
+                </div>
+
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="text-[11px] text-mist">国（JP=国内）<input className="field-input mt-1" value={edit.shippingCountry} onChange={e => setEdit({ ...edit, shippingCountry: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">郵便番号<input className="field-input mt-1" value={edit.shippingPostalCode} onChange={e => setEdit({ ...edit, shippingPostalCode: e.target.value })} /></label>
@@ -430,7 +493,15 @@ export default function WholesaleOrderDetailPage() {
               <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
                 <Row label="小計（税抜）" value={`¥${(o.subtotalJpy ?? 0).toLocaleString()}`} />
                 {typeof o.shippingFeeJpy === 'number' && o.shippingFeeJpy > 0 && <Row label="送料" value={`¥${o.shippingFeeJpy.toLocaleString()}`} />}
-                {typeof o.optionFeesJpy === 'number' && o.optionFeesJpy > 0 && <Row label="オプション料" value={`¥${o.optionFeesJpy.toLocaleString()}`} />}
+                {o.feeLines && o.feeLines.length > 0
+                  ? o.feeLines.map((f, i) => (
+                      <Row
+                        key={i}
+                        label={`諸費用: ${f.name}${f.quantity ? ` ×${f.quantity}${f.unit ?? ''}` : ''}${f.taxRate != null ? `（${f.taxRate === 0 ? '免税' : `${f.taxRate}%`}）` : ''}`}
+                        value={`¥${f.amountJpy.toLocaleString()}`}
+                      />
+                    ))
+                  : typeof o.optionFeesJpy === 'number' && o.optionFeesJpy > 0 && <Row label="オプション料" value={`¥${o.optionFeesJpy.toLocaleString()}`} />}
                 <Row label="消費税" value={`¥${(o.taxJpy ?? 0).toLocaleString()}`} />
                 <Row label="合計（税込）" value={`¥${(o.totalJpy ?? 0).toLocaleString()}`} strong />
               </dl>
@@ -508,7 +579,13 @@ export default function WholesaleOrderDetailPage() {
             {(o.status === 'paid' || o.status === 'shipped') && (
               <Section title="出荷・発送通知">
                 <div className="mb-3 flex flex-wrap items-end gap-2">
-                  <label className="text-xs text-mist">発送業者<input className="mt-1 block w-40 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="例: ヤマト / EMS" value={carrierLabel} onChange={e => setCarrierLabel(e.target.value)} /></label>
+                  <label className="text-xs text-mist">発送業者
+                    <select className="mt-1 block w-44 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={carrierLabel} onChange={e => setCarrierLabel(e.target.value)}>
+                      <option value="">— 選択 —</option>
+                      {carriers.map(c => <option key={c.id} value={c.englishName}>{c.japaneseName || c.englishName}</option>)}
+                      {carrierLabel && !carriers.some(c => c.englishName === carrierLabel) && <option value={carrierLabel}>{carrierLabel}（旧値）</option>}
+                    </select>
+                  </label>
                   <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
                   {o.status === 'paid' ? (
                     <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
@@ -538,7 +615,7 @@ export default function WholesaleOrderDetailPage() {
               {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}
-              {(canQuote || canReceiptDelivery) && (
+              {(canQuote || canInvoice || canReceiptDelivery) && (
                 <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                   <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
                   <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
@@ -546,6 +623,9 @@ export default function WholesaleOrderDetailPage() {
               )}
               {canQuote && (
                 <button onClick={downloadQuotation} disabled={busy} className="btn-ghost">見積書を発行</button>
+              )}
+              {canInvoice && (
+                <button onClick={downloadInvoice} disabled={busy} className="btn-ghost">請求書を発行</button>
               )}
               {canReceiptDelivery && (
                 <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>

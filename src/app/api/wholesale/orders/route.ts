@@ -94,6 +94,7 @@ interface PatchBody {
   paymentMethod?: string
   // update_direct_order fields (直販 content edit)
   items?: { productId: string; quantityKg: number; unitPriceJpy: number; taxRate?: number }[]
+  feeLines?: { name: string; quantity?: number; unitPriceJpy?: number; taxRate?: number }[]
   shippingCountry?: string
   shippingAddress?: string
   shippingPostalCode?: string
@@ -349,8 +350,9 @@ export async function PATCH(request: Request) {
       }
     })
     const subtotalJpy = items.reduce((s, i) => s + i.lineTotalJpy, 0)
-    // Option fee per line = bags × price/bag, bags = round(qty ÷ portion).
-    const optionFeesJpy = items.reduce((s, i) => {
+    // 小分けオプション (per-item repackage) fee = bags × price/bag, bags = round(qty ÷ portion).
+    // Taxed at the standard 10% (domestic) like shipping.
+    const optionFromItems = items.reduce((s, i) => {
       const o = (i as { option?: Record<string, unknown> }).option
       if (!o) return s
       const portionKg = Number(o.portionKg) || 0
@@ -358,10 +360,27 @@ export async function PATCH(request: Request) {
       const bags = portionKg > 0 ? Math.round(i.quantityKg / portionKg) : 0
       return s + bags * pricePerBag
     }, 0)
+    // Named option/misc fee lines (諸費用) — each with its own qty・単価・税率.
+    const feeLines = (Array.isArray(body.feeLines) ? body.feeLines : [])
+      .filter(f => String(f.name ?? '').trim())
+      .map(f => {
+        const quantity = Number(f.quantity) || 0
+        const unitPriceJpy = Number(f.unitPriceJpy) || 0
+        // Export orders are 免税 regardless of the entered rate.
+        const taxRate = !domestic ? 0 : f.taxRate === 0 || f.taxRate === 10 ? f.taxRate : 8
+        return { name: String(f.name).trim(), quantity, unitPriceJpy, amountJpy: Math.round(quantity * unitPriceJpy), taxRate }
+      })
+    const feeLinesTotal = feeLines.reduce((s, f) => s + f.amountJpy, 0)
+    const optionFeesJpy = optionFromItems + feeLinesTotal
     const shippingFeeJpy = body.shippingFeeJpy != null ? Number(body.shippingFeeJpy) : Number(cur.shippingFeeJpy ?? 0)
     const paymentFeeJpy = body.paymentFeeJpy != null ? Number(body.paymentFeeJpy) : Number(cur.paymentFeeJpy ?? 0)
-    // Shipping + option fees are taxed at the standard 10% domestically, 0% on export.
-    const { taxBreakdown, taxJpy } = recomputeTax(items.map(i => ({ revenue: i.lineTotalJpy, taxRate: i._taxRate })), domestic ? shippingFeeJpy + optionFeesJpy : 0)
+    // Goods + fee lines are bucketed by their own rate; shipping + 小分けオプション
+    // are standard 10% (domestic) / 0 (export).
+    const taxableLines = [
+      ...items.map(i => ({ revenue: i.lineTotalJpy, taxRate: i._taxRate })),
+      ...feeLines.map(f => ({ revenue: f.amountJpy, taxRate: f.taxRate })),
+    ]
+    const { taxBreakdown, taxJpy } = recomputeTax(taxableLines, domestic ? shippingFeeJpy + optionFromItems : 0)
     const totalJpy = subtotalJpy + shippingFeeJpy + optionFeesJpy + taxJpy
     const costAmountJpy = items.reduce((s, i) => s + i._costPerKg * i.quantityKg, 0)
     const grossProfitJpy = subtotalJpy - costAmountJpy - paymentFeeJpy
@@ -390,6 +409,7 @@ export async function PATCH(request: Request) {
       items: items.map(({ _taxRate, _costPerKg, _madeToOrder, ...rest }) => { void _taxRate; void _costPerKg; void _madeToOrder; return rest }),
       subtotalJpy, taxBreakdown, taxJpy, totalJpy, displayTotal: totalJpy,
       shippingFeeJpy, optionFeesJpy, paymentFeeJpy, costAmountJpy, grossProfitJpy,
+      feeLines,
       isDomestic: domestic,
       ...(body.shippingCountry !== undefined ? { shippingCountry: body.shippingCountry } : {}),
       ...(body.shippingAddress !== undefined ? { shippingAddress: body.shippingAddress || null } : {}),
