@@ -650,6 +650,15 @@ export default function WholesaleOrderDetailPage() {
               {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}
+              {/* Card fallback: if a Stripe webhook is missed and the order stays unpaid,
+                  staff can confirm manually AFTER verifying payment in the Stripe dashboard. */}
+              {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
+                <button
+                  onClick={() => { if (window.confirm('Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。')) act('confirm_payment') }}
+                  disabled={busy}
+                  className="btn-ghost"
+                >入金を手動確認（カード）</button>
+              )}
               {(canQuote || canInvoice || canReceiptDelivery) && (
                 <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                   <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
