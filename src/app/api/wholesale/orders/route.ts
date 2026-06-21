@@ -102,7 +102,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order' | 'delete_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order' | 'delete_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -216,6 +216,23 @@ export async function PATCH(request: Request) {
     const auth = request.headers.get('authorization') ?? ''
     try {
       const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/approve`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify({ orderId: body.orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+    }
+  }
+
+  // Resend card payment link: delegate to the wholesale app (issues a fresh Stripe
+  // session and emails it to the customer). For unpaid card orders stuck awaiting payment.
+  if (body.action === 'resend_payment_link') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/resend-payment-link`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: auth },
         body: JSON.stringify({ orderId: body.orderId }),

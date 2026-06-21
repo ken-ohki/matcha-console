@@ -153,7 +153,7 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link', extra: Record<string, unknown> = {}) => {
     if (action === 'accept_quote' && !window.confirm('お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）')) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
@@ -168,6 +168,7 @@ export default function WholesaleOrderDetailPage() {
       }
     }
     if (action === 'approve' && !window.confirm('この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？')) return
+    if (action === 'resend_payment_link' && !window.confirm('お客様へカード決済リンクをメールで送信しますか？（新しいStripe決済リンクを発行します）')) return
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -198,8 +199,23 @@ export default function WholesaleOrderDetailPage() {
             : `確定に失敗しました（${d.error ?? 'error'}）`
         window.alert(msg)
       }
+      if (action === 'resend_payment_link') {
+        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; emailSent?: boolean; checkoutUrl?: string; error?: string }
+        const msg = d.ok
+          ? d.emailSent
+            ? 'お客様へカード決済リンクをメール送信しました。'
+            : `決済リンクを発行しましたが、メール送信に失敗しました。下記リンクを手動でお伝えください:\n${d.checkoutUrl ?? ''}`
+          : d.error === 'not_payable'
+            ? 'この注文は決済リンクを送信できる状態ではありません（カードの支払い待ちのみ対象）。'
+            : d.error === 'insufficient_stock'
+              ? '在庫が不足しているため決済リンクを発行できません。'
+              : d.error === 'no_email'
+                ? 'この注文にお客様のメールアドレスがありません。'
+                : `送信に失敗しました（${d.error ?? 'error'}）`
+        window.alert(msg)
+      }
       // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
-      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote') {
+      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link') {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
         window.alert(`操作に失敗しました（${d.error ?? 'error'}）`)
       }
@@ -703,6 +719,9 @@ export default function WholesaleOrderDetailPage() {
               )}
               {/* Card fallback: if a Stripe webhook is missed and the order stays unpaid,
                   staff can confirm manually AFTER verifying payment in the Stripe dashboard. */}
+              {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && o.paymentStatus !== 'paid' && (
+                <button onClick={() => act('resend_payment_link')} disabled={busy} className="btn-primary">決済リンクを送信</button>
+              )}
               {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
                 <button
                   onClick={() => { if (window.confirm('Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。')) act('confirm_payment') }}
