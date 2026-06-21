@@ -38,9 +38,8 @@ export async function GET(request: Request) {
       return x.status === 'pending_acceptance' && typeof x.acceptanceExpiresAtMs === 'number' && x.acceptanceExpiresAtMs < now
     })
     .map(d => d.id)
-  for (const oid of expiredIds) {
-    try { await cancelOrder(database, oid) } catch { /* best-effort */ }
-  }
+  // Cancel expired quotes concurrently (each is an idempotent transaction).
+  await Promise.all(expiredIds.map(oid => cancelOrder(database, oid).catch(() => {})))
   const expired = new Set(expiredIds)
 
   const orders = snap.docs
@@ -86,7 +85,10 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
   await database.runTransaction(async txn => {
     const snap = await txn.get(orderRef)
     if (!snap.exists) return
-    const data = snap.data() as { ecSaleIds?: string[] }
+    const data = snap.data() as { ecSaleIds?: string[]; status?: string }
+    // Never resurrect a closed order — confirming a cancelled order would re-fire
+    // its (released) holds, and confirming paid/shipped is a no-op at best.
+    if (data.status === 'cancelled' || data.status === 'paid' || data.status === 'shipped') return
     const ecRefs = (data.ecSaleIds ?? []).map(id => database.collection('ec_sales').doc(id))
     const ecSnaps = await Promise.all(ecRefs.map(r => txn.get(r)))
     ecSnaps.forEach((ecSnap, i) => {
@@ -293,6 +295,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true })
   }
   if (body.action === 'mark_shipped') {
+    const cur = (await ref.get()).data() as { status?: string } | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    // Only a paid order can be shipped (don't ship unpaid / cancelled / already-shipped).
+    if (cur.status !== 'paid') return NextResponse.json({ error: 'not_paid' }, { status: 400 })
     const now = new Date().toISOString()
     await ref.set(
       {
@@ -329,6 +335,8 @@ export async function PATCH(request: Request) {
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     // Editable: staff-entered/migrated (直販) orders, or any order awaiting approval (受注生産).
     if (cur.origin !== 'direct' && cur.status !== 'pending_approval') return NextResponse.json({ error: 'ec_order_not_editable' }, { status: 400 })
+    // Never edit a settled order — recomputing would rewrite an already-paid total.
+    if (cur.status === 'paid' || cur.status === 'shipped') return NextResponse.json({ error: 'order_settled_not_editable' }, { status: 400 })
     if (!Array.isArray(body.items) || body.items.length === 0) return NextResponse.json({ error: 'no_items' }, { status: 400 })
 
     const prodSnap = await database.collection('products').get()
@@ -405,12 +413,23 @@ export async function PATCH(request: Request) {
     const grossProfitJpy = subtotalJpy - costAmountJpy - paymentFeeJpy
 
     // Rebuild ec_sales reservations (delete old, create fresh) unless cancelled.
+    // Preserve the HOLD KIND of the order's current state so editing an unaccepted
+    // quote doesn't firm its stock: pending_acceptance / quoted keep a 'reserved'
+    // hold with the same expiry; pending_quote (overseas, not yet quoted) has no
+    // hold; everything else is a firm 'active' reservation.
+    const curStatus = String(cur.status ?? '')
+    const ecStatus = curStatus === 'pending_acceptance' || curStatus === 'quoted' ? 'reserved' : 'active'
+    const ecExpiresAtMs =
+      curStatus === 'pending_acceptance' ? Number(cur.acceptanceExpiresAtMs) || undefined
+        : curStatus === 'quoted' ? Number(cur.holdExpiresAtMs) || undefined
+          : undefined
+    const reserveOnEdit = curStatus !== 'cancelled' && curStatus !== 'pending_quote'
     const batch = database.batch()
     for (const ecId of (Array.isArray(cur.ecSaleIds) ? cur.ecSaleIds : []) as string[]) {
       batch.delete(database.collection('ec_sales').doc(ecId))
     }
     const ecSaleIds: string[] = []
-    if (cur.status !== 'cancelled') {
+    if (reserveOnEdit) {
       items.forEach((it, i) => {
         if (!it.productId) return
         if (it._madeToOrder) return // made-to-order lines don't reserve stock
@@ -418,7 +437,8 @@ export async function PATCH(request: Request) {
         ecSaleIds.push(ecId)
         batch.set(database.collection('ec_sales').doc(ecId), {
           productId: it.productId, productSku: it.productSku, productName: it.productName, quantityKg: it.quantityKg,
-          channel: 'Wholesale', status: 'active', wholesaleOrderId: body.orderId, orderNumber: cur.orderNumber ?? '',
+          channel: 'Wholesale', status: ecStatus, ...(ecExpiresAtMs ? { expiresAtMs: ecExpiresAtMs } : {}),
+          wholesaleOrderId: body.orderId, orderNumber: cur.orderNumber ?? '',
           soldOn: new Date().toISOString().slice(0, 10), unitPrice: it.unitPriceJpy, revenue: it.lineTotalJpy,
           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true })
@@ -452,9 +472,14 @@ export async function PATCH(request: Request) {
   // moves to pending_payment.
   if (body.action === 'accept_quote') {
     const snap = await ref.get()
-    const cur = snap.data() as { status?: string; ecSaleIds?: string[] } | undefined
+    const cur = snap.data() as { status?: string; ecSaleIds?: string[]; acceptanceExpiresAtMs?: number } | undefined
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     if (cur.status !== 'pending_acceptance') return NextResponse.json({ error: 'not_pending_acceptance' }, { status: 400 })
+    // Reject an expired quote — its reserved holds no longer consume stock and the
+    // stock may have been resold, so firming them blindly could oversell.
+    if (typeof cur.acceptanceExpiresAtMs === 'number' && cur.acceptanceExpiresAtMs < Date.now()) {
+      return NextResponse.json({ error: 'quote_expired' }, { status: 409 })
+    }
     const batch = database.batch()
     for (const ecId of cur.ecSaleIds ?? []) {
       batch.set(

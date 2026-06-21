@@ -20,6 +20,10 @@ function monthKey(iso: string): string {
  * matches the printed invoice. Export sales should mark their lines 免税.
  */
 export function computeSaleTaxIncluded(sale: SaleRecord): number {
+  // Trust the stored 税込 total when present (wholesale orders carry the exact
+  // amount charged / on the invoice) — this avoids rounding drift and country-string
+  // tax re-derivation. Falls back to computing tax for legacy direct sales.
+  if (sale.taxIncludedTotal != null && sale.taxIncludedTotal > 0) return sale.taxIncludedTotal
   // invoiceAmount already includes fee items (税抜); add tax computed over items +
   // fee items (each with its own rate) + shipping (10%).
   const base = sale.invoiceAmount > 0 ? sale.invoiceAmount : sale.revenue

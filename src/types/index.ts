@@ -152,6 +152,9 @@ export interface SaleRecord {
   fees?: SaleFeeItem[]
   paymentFee: number
   invoiceAmount: number
+  // 税込請求額の権威値（請求書PDFと同一）。設定時は税の再計算より優先する。
+  // wholesale 注文は保存済み totalJpy をそのまま使い、丸め差や国名表記揺れを排除。
+  taxIncludedTotal?: number
   country: string
   orderDate?: string            // 発注日（顧客が発注した日）
   dueDate?: string              // 納期（納品日の基準にも使用）

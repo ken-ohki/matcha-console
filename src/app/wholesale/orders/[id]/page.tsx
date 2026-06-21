@@ -34,6 +34,7 @@ interface Order {
   feeLines?: { name: string; quantity?: number; unit?: string; unitPriceJpy?: number; amountJpy: number; taxRate?: number }[]
   paymentMethod?: string
   paymentStatus?: string
+  needsRefund?: boolean
   status?: string
   shippingCountry?: string
   shippingPostalCode?: string
@@ -187,7 +188,17 @@ export default function WholesaleOrderDetailPage() {
       }
       if (action === 'accept_quote') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-        window.alert(d.ok ? '承諾を反映し、注文を確定しました（支払い待ち）。' : `確定に失敗しました（${d.error ?? 'error'}）`)
+        const msg = d.ok
+          ? '承諾を反映し、注文を確定しました（支払い待ち）。'
+          : d.error === 'quote_expired'
+            ? '見積の有効期限が切れています。この見積は自動取消の対象のため確定できません。再度見積を作成してください。'
+            : `確定に失敗しました（${d.error ?? 'error'}）`
+        window.alert(msg)
+      }
+      // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
+      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote') {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        window.alert(`操作に失敗しました（${d.error ?? 'error'}）`)
       }
       if (action === 'cancel' && res.ok && wasPaid) {
         window.alert(
@@ -363,7 +374,7 @@ export default function WholesaleOrderDetailPage() {
             <ArrowLeft size={15} /> 卸売注文一覧へ
           </Link>
           <div className="flex items-center gap-2">
-            {(o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && (
+            {(o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && o?.status !== 'paid' && o?.status !== 'shipped' && (
               <button onClick={startEdit} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">内容を編集</button>
             )}
             <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
@@ -378,6 +389,13 @@ export default function WholesaleOrderDetailPage() {
           <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">注文が見つかりません。</p>
         ) : (
           <div className={`space-y-5 ${busy ? 'opacity-50' : ''}`}>
+            {/* Manual-refund warning: payment landed on a cancelled order, or a paid order was cancelled. */}
+            {(o.needsRefund || (o.status === 'cancelled' && o.paymentStatus === 'paid')) && (
+              <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                ⚠ <strong>要返金</strong>：取消済みの注文に入金があります（自動返金はされません）。
+                {o.paymentMethod === 'bank_transfer' ? '銀行振込の返金を手動でお振込ください。' : 'Stripeダッシュボードで手動返金を行ってください。'}
+              </div>
+            )}
             {/* Header */}
             <div className="panel p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -420,13 +438,11 @@ export default function WholesaleOrderDetailPage() {
                           )}
                         </div>
                       )}
-                      <label className="w-24 text-[11px] text-mist">税率
-                        <select className="field-input mt-1" value={it.taxRate} onChange={e => setEditItem(idx, { taxRate: Number(e.target.value) })}>
-                          <option value={8}>8%</option>
-                          <option value={10}>10%</option>
-                          <option value={0}>免税</option>
-                        </select>
-                      </label>
+                      <div className="w-24 text-[11px] text-mist">税率
+                        <div className="field-input mt-1 cursor-not-allowed bg-bone text-mist" title="商品の税率は仕向地で自動決定されます（国内 8% 軽減税率 / 輸出 免税）">
+                          {(() => { const c = (edit.shippingCountry ?? '').trim().toLowerCase(); const domestic = c === '' || c === '日本' || c === 'japan' || c === 'jp'; return domestic ? '8%（軽減）' : '免税' })()}
+                        </div>
+                      </div>
                       <button onClick={() => setEdit(e => e ? { ...e, items: e.items.filter((_, i) => i !== idx) } : e)} className="mb-1 p-2 text-mist hover:text-alert" aria-label="削除"><Trash2 size={16} /></button>
                     </div>
                   ))}

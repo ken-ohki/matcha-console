@@ -7,7 +7,7 @@
 //   原価 = Σ purchaseUnitPrice × kg  (snapshot for migrated orders, live for new ones)
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { defaultTaxRateForCountry } from '@/lib/tax'
-import type { SaleRecord, SaleLineItem, SaleStatus, PaymentStatus, ShippingStatus } from '@/types'
+import type { SaleRecord, SaleLineItem, SaleFeeItem, SaleStatus, PaymentStatus, ShippingStatus, TaxRate } from '@/types'
 
 /** Raw wholesale order as returned by GET /api/wholesale/orders (staff). */
 export interface WholesaleOrderRow {
@@ -19,7 +19,9 @@ export interface WholesaleOrderRow {
   subtotalJpy?: number
   shippingFeeJpy?: number
   optionFeesJpy?: number
+  feeLines?: { name?: string; amountJpy?: number; taxRate?: number }[]
   totalJpy?: number
+  taxJpy?: number
   status?: string // pending_quote | quoted | pending_payment | paid | shipped | cancelled
   paymentStatus?: string // unpaid | paid
   paymentMethod?: string
@@ -112,6 +114,20 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
   const shippingFee = o.shippingFeeJpy ?? 0
   const optionFees = o.optionFeesJpy ?? 0
   const paymentFee = o.paymentFeeJpy ?? 0
+
+  // Itemize 諸費用 / 小分け加工費 as tax-bearing fee lines so the detail breakdown
+  // taxes them (domestic services = 10%, export = 0). The headline 税込 total is
+  // taken from the order's stored totalJpy (see taxIncludedTotal below), so this is
+  // only for the per-rate display. Each feeLine keeps its own rate; the remaining
+  // option portion (per-item 小分け) is the standard service rate.
+  const serviceRate: TaxRate = lineTaxRate === 0 ? 0 : 10
+  const feeLines = o.feeLines ?? []
+  const feeLinesSum = feeLines.reduce((a, f) => a + (Number(f.amountJpy) || 0), 0)
+  const optionPortion = Math.max(0, optionFees - feeLinesSum)
+  const fees: SaleFeeItem[] = [
+    ...feeLines.map(f => ({ name: f.name || '諸費用', quantity: 1, unit: '式', unitPrice: Number(f.amountJpy) || 0, taxRate: (f.taxRate ?? serviceRate) as TaxRate })),
+    ...(optionPortion > 0 ? [{ name: '小分け加工費', quantity: 1, unit: '式', unitPrice: optionPortion, taxRate: serviceRate }] : []),
+  ]
   const liveCost = items.reduce((a, it) => a + it.costAmount, 0)
   const costAmount = o.costAmountJpy ?? liveCost // snapshot for migrated, live for new
   const grossProfit = o.grossProfitJpy ?? subtotal - costAmount - paymentFee
@@ -136,7 +152,10 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
     grossProfit,
     shippingFee,
     paymentFee,
+    fees: fees.length > 0 ? fees : undefined,
     invoiceAmount: subtotal + shippingFee + optionFees,
+    // Authoritative 税込 total = the order's stored totalJpy (= invoice = amount charged).
+    taxIncludedTotal: o.totalJpy && o.totalJpy > 0 ? o.totalJpy : undefined,
     country: o.shippingCountry ?? '',
     orderDate: isoDate(o.createdAtMs),
     dueDate: o.dueDate || undefined,
