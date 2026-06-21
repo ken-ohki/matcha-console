@@ -135,7 +135,18 @@ export default function WholesaleOrderDetailPage() {
   }, [load])
 
   const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve', extra: Record<string, unknown> = {}) => {
-    if (action === 'cancel' && !window.confirm('この注文を取消し、在庫予約を解放しますか？')) return
+    // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
+    const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
+    if (action === 'cancel') {
+      if (wasPaid) {
+        const note = order?.paymentMethod === 'bank_transfer'
+          ? 'この注文は入金済み（銀行振込）です。取消しても自動返金は行われません。返金は手動でお振込ください。'
+          : 'この注文はStripeで決済済みです。取消しても自動返金は行われません。Stripeダッシュボードで手動返金が必要です。'
+        if (!window.confirm(`${note}\n\n取消して在庫予約を解放しますか？`)) return
+      } else if (!window.confirm('この注文を取消し、在庫予約を解放しますか？')) {
+        return
+      }
+    }
     if (action === 'approve' && !window.confirm('この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？')) return
     setBusy(true)
     try {
@@ -157,6 +168,13 @@ export default function WholesaleOrderDetailPage() {
             ? '海外発送の送料を設定してから承認してください（注文を編集して送料を入力）。'
             : `承認に失敗しました（${d.error ?? 'error'}）`
         window.alert(msg)
+      }
+      if (action === 'cancel' && res.ok && wasPaid) {
+        window.alert(
+          order?.paymentMethod === 'bank_transfer'
+            ? '取消しました。入金済みのため、返金（お振込）を手動で対応してください。'
+            : '取消しました。Stripeダッシュボードで返金処理を行ってください（自動返金はされていません）。',
+        )
       }
       await load()
     } finally {

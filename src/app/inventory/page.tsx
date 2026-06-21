@@ -38,6 +38,18 @@ function formatKg(value: number): string {
   return `${value.toFixed(1)} kg`
 }
 
+/** EC即時購入可能数量(kg) = min(設定値, 現在庫)。設定なしは在庫全量。 */
+function ecAvailableKg(p: ProductWithInventory): number {
+  const cap = p.wholesaleAvailableKg != null ? Math.min(p.wholesaleAvailableKg, p.currentStockKg) : p.currentStockKg
+  return Math.max(0, cap)
+}
+
+/** サンプル単価(10g) = round(卸売単価 × 0.01 + サンプル手数料)。卸売サイトと同式。 */
+function sampleUnitPriceJpy(p: ProductWithInventory, feeJpy: number): number | null {
+  if (!p.sampleAvailable || p.standardWholesalePrice == null) return null
+  return Math.round(p.standardWholesalePrice * 0.01 + feeJpy)
+}
+
 /** Color-code a stock quantity by tier: マイナス / 0 / 10kg未満 / 10kg以上. */
 function stockColorClass(kg: number): string {
   if (kg < 0) return 'text-alert font-bold'   // マイナス（在庫割れ）
@@ -340,6 +352,7 @@ export default function InventoryPage() {
   const [groups, setGroups] = useState<InventoryGroup[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
   const [masters, setMasters] = useState<MasterEntry[]>([])
+  const [sampleFeeJpy, setSampleFeeJpy] = useState(100)
   const [loading, setLoading] = useState(true)
   const [activeGroupId, setActiveGroupId] = useState<string>('all')
   const [search, setSearch] = useState('')
@@ -388,14 +401,16 @@ export default function InventoryPage() {
   const load = async (preferredActiveGroupId?: string) => {
     setLoading(true)
     const services = await getServices()
-    const [nextGroups, nextProducts, nextMasters] = await Promise.all([
+    const [nextGroups, nextProducts, nextMasters, nextSettings] = await Promise.all([
       services.inventory.getInventoryGroups(),
       services.inventory.getProductsWithInventory(),
       services.masters.listMasters(),
+      services.settings.getSettings(),
     ])
     setGroups(nextGroups)
     setProducts(nextProducts)
     setMasters(nextMasters)
+    setSampleFeeJpy(nextSettings.wholesaleSampleFeeJpy ?? 100)
     setActiveGroupId(prev => {
       if (preferredActiveGroupId && nextGroups.some(group => group.id === preferredActiveGroupId)) {
         return preferredActiveGroupId
@@ -702,8 +717,8 @@ export default function InventoryPage() {
       <div className="space-y-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-ink">在庫管理</h1>
-            <p className="mt-1 text-sm text-mist">全{products.length}件 / 茶葉マスターを画像定義に更新</p>
+            <h1 className="text-2xl font-bold text-ink">商品管理</h1>
+            <p className="mt-1 text-sm text-mist">全{products.length}件 / 商品マスター・卸売設定・在庫</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -936,6 +951,9 @@ export default function InventoryPage() {
                   <th className="px-3 py-3 text-left font-medium text-mist">仕入先</th>
                   <th className="px-3 py-3 text-left font-medium text-mist">認証</th>
                   <SortableTh label="残在庫" sortKey="stock" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
+                  <th className="px-3 py-3 text-right font-medium text-mist">包装単位</th>
+                  <th className="px-3 py-3 text-right font-medium text-mist">EC可能数量</th>
+                  <th className="px-3 py-3 text-right font-medium text-mist">サンプル単価</th>
                   <SortableTh label="卸単価" sortKey="price" current={sortKey} dir={sortDir} onSort={handleSort} align="right" />
                   <th className="px-3 py-3 text-right font-medium text-mist">仕入単価</th>
                   <th className="px-3 py-3 text-right font-medium text-mist">粗利</th>
@@ -991,6 +1009,9 @@ export default function InventoryPage() {
                     <td className="px-3 py-3 text-graphite">{compactText(product.supplier)}</td>
                     <td className="px-3 py-3 text-graphite">{formatOptionList(translateValues(masters, 'certification', product.certifications))}</td>
                     <td className={`px-3 py-3 text-right font-semibold ${stockColorClass(product.currentStockKg)}`}>{product.currentStockKg.toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right text-graphite">{(product.standardPackageKg ?? 1).toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right text-graphite">{ecAvailableKg(product).toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right text-graphite">{(() => { const sp = sampleUnitPriceJpy(product, sampleFeeJpy); return sp == null ? '—' : formatCurrency(sp) })()}</td>
                     <td className="px-3 py-3 text-right font-semibold text-ink">{formatCurrency(wholesale)}</td>
                     <td className="px-3 py-3 text-right text-graphite">{formatCurrency(cost)}</td>
                     <td className={`px-3 py-3 text-right ${margin == null ? 'text-mist' : margin < 0 ? 'text-alert' : 'text-matcha'}`}>{margin == null ? '-' : formatCurrency(margin)}</td>
