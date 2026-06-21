@@ -67,20 +67,25 @@ export async function patchWholesaleOrder(body: Record<string, unknown>): Promis
   }
 }
 
-function mapStatus(s?: string): SaleStatus {
+function mapStatus(o: WholesaleOrderRow): SaleStatus {
+  const s = o.status
   if (s === 'cancelled') return 'cancelled'
   // Not yet a committed sale: overseas quote flow, made-to-order approval, and
   // direct-order quotes awaiting customer acceptance. These must NOT count as
   // confirmed revenue in financials/receivables.
   if (s === 'pending_quote' || s === 'quoted' || s === 'pending_approval' || s === 'pending_acceptance') return 'negotiating'
-  return 'confirmed' // pending_payment | paid | shipped
+  // A card order awaiting its FIRST payment is an incomplete checkout (failed/abandoned
+  // Stripe payment), not a confirmed sale — exclude from revenue until paid. A
+  // bank-transfer pending_payment order is a committed awaiting-deposit order (confirmed).
+  if (s === 'pending_payment' && o.paymentMethod === 'stripe' && o.paymentStatus !== 'paid') return 'negotiating'
+  return 'confirmed' // pending_payment(bank) | paid | shipped
 }
 function mapPaymentStatus(o: WholesaleOrderRow): PaymentStatus {
   if (o.paymentStatus === 'paid') return 'paid'
   // Honour an explicitly-set invoice state (入金管理); otherwise default by status.
   if (o.paymentStatus === 'invoiced') return 'invoiced'
   if (o.paymentStatus === 'uninvoiced') return 'uninvoiced'
-  return mapStatus(o.status) === 'confirmed' ? 'invoiced' : 'uninvoiced'
+  return mapStatus(o) === 'confirmed' ? 'invoiced' : 'uninvoiced'
 }
 function mapShippingStatus(s?: string): ShippingStatus {
   return s === 'shipped' ? 'shipped' : 'ordering'
@@ -136,7 +141,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
 
   return {
     id: o.id,
-    status: mapStatus(o.status),
+    status: mapStatus(o),
     paymentStatus: mapPaymentStatus(o),
     shippingStatus: mapShippingStatus(o.status),
     buyerName: o.memberCompanyName ?? '',
