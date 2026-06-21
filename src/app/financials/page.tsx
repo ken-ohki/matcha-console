@@ -206,15 +206,21 @@ export default function FinancialsPage() {
     const unpaid = filteredOrders
       .filter(o => o.paymentStatus !== 'paid')
       .reduce((s, o) => s + poExpense(o), 0)
+    // Stripe processing fees on collected card orders, and the net actually deposited.
+    const stripeFees = filteredSales
+      .filter(r => r.paymentStatus === 'paid')
+      .reduce((s, r) => s + (r.stripeFeeJpy ?? 0), 0)
     return {
       totalRevenue,
       ecRevenue: ecTotal,
       collected,
+      stripeFees,
+      netDeposited: collected - stripeFees,
       outstanding,
       totalExpense,
       paid,
       unpaid,
-      realizedNet: collected - paid,
+      realizedNet: collected - stripeFees - paid,
       expectedNet: totalRevenue - totalExpense,
     }
   }, [filteredSales, filteredOrders, filteredEc])
@@ -483,6 +489,8 @@ export default function FinancialsPage() {
           <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
           <KPICard title="うち EC売上" value={formatCurrency(kpis.ecRevenue)} color="default" icon={<ShoppingBag size={16} />} />
           <KPICard title="入金済" value={formatCurrency(kpis.collected)} color="green" icon={<ArrowDownCircle size={16} />} />
+          <KPICard title="Stripe手数料" value={formatCurrency(kpis.stripeFees)} color="amber" icon={<Wallet size={16} />} />
+          <KPICard title="入金額（手数料差引後）" value={formatCurrency(kpis.netDeposited)} color="green" icon={<ArrowDownCircle size={16} />} />
           <KPICard title="未収" value={formatCurrency(kpis.outstanding)} color="amber" icon={<AlertTriangle size={16} />} />
           <KPICard title="仕入計" value={formatCurrency(kpis.totalExpense)} color="default" icon={<ArrowUpCircle size={16} />} />
           <KPICard title="支払済 PO" value={formatCurrency(kpis.paid)} color="green" icon={<Wallet size={16} />} />
