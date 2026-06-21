@@ -213,6 +213,30 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
+  // Permanently delete a (test) order + its stock holds. Irreversible — double-confirm
+  // and require typing the order number so a real order can't be removed by a stray click.
+  const deleteOrder = async () => {
+    if (!order) return
+    if (!window.confirm(`注文「${order.orderNumber}」を完全に削除します。\n\nこの操作は元に戻せません。テスト注文のみ削除してください。\n紐づく在庫引当（ec_sales）も削除し、在庫を解放します。`)) return
+    const typed = window.prompt(`確認のため注文番号「${order.orderNumber}」を入力してください`, '')
+    if (typed === null) return
+    if (typed.trim() !== order.orderNumber) { window.alert('注文番号が一致しません。削除を中止しました。'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: order.id, action: 'delete_order' }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) { window.alert(`削除に失敗しました（${d.error ?? 'error'}）`); return }
+      window.alert('注文を削除しました。')
+      router.push('/wholesale/orders')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const startEdit = () => {
     if (!order) return
     setEdit({
@@ -680,6 +704,12 @@ export default function WholesaleOrderDetailPage() {
               {o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
+            </div>
+
+            {/* Danger zone: permanent delete (test-data cleanup) */}
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3">
+              <p className="text-xs text-red-800">テスト注文の削除：注文と在庫引当を完全に削除します（元に戻せません）。</p>
+              <button onClick={deleteOrder} disabled={busy} className="rounded-lg border border-red-400 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">注文を削除</button>
             </div>
           </div>
         )}

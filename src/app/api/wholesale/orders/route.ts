@@ -102,7 +102,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order' | 'delete_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -466,6 +466,19 @@ export async function PATCH(request: Request) {
   if (body.action === 'cancel') {
     await cancelOrder(database, body.orderId)
     return NextResponse.json({ ok: true, status: 'cancelled' })
+  }
+  // Permanently delete an order (test-data cleanup). Hard-deletes the order doc AND
+  // its linked ec_sales reservations (releasing stock). Staff-only, irreversible —
+  // the UI requires typing the order number to confirm.
+  if (body.action === 'delete_order') {
+    const snap = await ref.get()
+    const cur = snap.data() as { ecSaleIds?: string[] } | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    const batch = database.batch()
+    for (const ecId of cur.ecSaleIds ?? []) batch.delete(database.collection('ec_sales').doc(ecId))
+    batch.delete(ref)
+    await batch.commit()
+    return NextResponse.json({ ok: true, deleted: true })
   }
   // Customer accepted the quoted amount → confirm the direct order. The 14-day
   // 'reserved' stock holds are firmed to 'active' (no more expiry) and the order
