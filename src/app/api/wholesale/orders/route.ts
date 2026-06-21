@@ -25,7 +25,24 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const status = url.searchParams.get('status')
 
-  const snap = await db().collection('wholesale_orders').get()
+  const database = db()
+  const snap = await database.collection('wholesale_orders').get()
+
+  // Expire stale quotes: a 'pending_acceptance' order past its acceptance deadline
+  // releases its stock and is cancelled. Best-effort, idempotent — runs when staff
+  // view the orders list (no separate cron).
+  const now = Date.now()
+  const expiredIds = snap.docs
+    .filter(d => {
+      const x = d.data() as { status?: string; acceptanceExpiresAtMs?: number }
+      return x.status === 'pending_acceptance' && typeof x.acceptanceExpiresAtMs === 'number' && x.acceptanceExpiresAtMs < now
+    })
+    .map(d => d.id)
+  for (const oid of expiredIds) {
+    try { await cancelOrder(database, oid) } catch { /* best-effort */ }
+  }
+  const expired = new Set(expiredIds)
+
   const orders = snap.docs
     .map(d => {
       const data = d.data() as Record<string, unknown>
@@ -33,7 +50,9 @@ export async function GET(request: Request) {
       const paidAtMs = paidAt && typeof (paidAt as { toMillis?: () => number }).toMillis === 'function'
         ? (paidAt as { toMillis: () => number }).toMillis()
         : undefined
-      return { ...rest, id: d.id, createdAtMs: typeof data.createdAtMs === 'number' ? data.createdAtMs : 0, paidAtMs } as Record<string, unknown> & { id: string; createdAtMs: number }
+      // Reflect the just-applied expiry cancellation in the response.
+      const liveStatus = expired.has(d.id) ? 'cancelled' : data.status
+      return { ...rest, status: liveStatus, id: d.id, createdAtMs: typeof data.createdAtMs === 'number' ? data.createdAtMs : 0, paidAtMs } as Record<string, unknown> & { id: string; createdAtMs: number }
     })
     .filter(o => (status ? o.status === status : true))
     .sort((a, b) => (b.createdAtMs as number) - (a.createdAtMs as number))
@@ -428,17 +447,24 @@ export async function PATCH(request: Request) {
     await cancelOrder(database, body.orderId)
     return NextResponse.json({ ok: true, status: 'cancelled' })
   }
-  // Customer accepted the quoted amount → confirm the direct order. Stock was
-  // already held at quote creation, so this is a pure status flip to pending_payment.
+  // Customer accepted the quoted amount → confirm the direct order. The 14-day
+  // 'reserved' stock holds are firmed to 'active' (no more expiry) and the order
+  // moves to pending_payment.
   if (body.action === 'accept_quote') {
     const snap = await ref.get()
-    const cur = snap.data() as { status?: string } | undefined
+    const cur = snap.data() as { status?: string; ecSaleIds?: string[] } | undefined
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     if (cur.status !== 'pending_acceptance') return NextResponse.json({ error: 'not_pending_acceptance' }, { status: 400 })
-    await ref.set(
-      { status: 'pending_payment', acceptedAt: new Date().toISOString(), updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    )
+    const batch = database.batch()
+    for (const ecId of cur.ecSaleIds ?? []) {
+      batch.set(
+        database.collection('ec_sales').doc(ecId),
+        { status: 'active', expiresAtMs: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      )
+    }
+    batch.set(ref, { status: 'pending_payment', acceptedAt: new Date().toISOString(), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    await batch.commit()
     return NextResponse.json({ ok: true, status: 'pending_payment' })
   }
   return NextResponse.json({ error: 'invalid_action' }, { status: 400 })
