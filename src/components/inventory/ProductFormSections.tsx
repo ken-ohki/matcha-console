@@ -661,13 +661,17 @@ export function ProductMasterSection({
 
 export function ProductPricingSection({ form, setForm }: FormProps) {
   const [masterOptions, setMasterOptions] = useState<WholesaleOption[]>([])
+  const [sampleFeeJpy, setSampleFeeJpy] = useState(100)
   useEffect(() => {
     let active = true
     ;(async () => {
       try {
         const services = await getServices()
         const settings = await services.settings.getSettings()
-        if (active) setMasterOptions((settings.wholesaleOptions ?? []).filter(o => o.active))
+        if (active) {
+          setMasterOptions((settings.wholesaleOptions ?? []).filter(o => o.active))
+          setSampleFeeJpy(settings.wholesaleSampleFeeJpy ?? 100)
+        }
       } catch {
         /* ignore — options simply unavailable */
       }
@@ -676,6 +680,11 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
       active = false
     }
   }, [])
+
+  // Sample price is auto-calculated (not entered): 10g of the standard wholesale
+  // price + the sample fee from 卸売設定. Same formula as the storefront.
+  const computedSamplePrice =
+    form.standardWholesalePrice != null ? Math.round(form.standardWholesalePrice * 0.01 + sampleFeeJpy) : null
 
   const configs = form.wholesaleOptions ?? []
   const configFor = (optionId: string) => configs.find(c => c.optionId === optionId)
@@ -753,17 +762,11 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
           <p className="mt-1 text-[11px] text-mist">標準の包装形態 (kg・整数)。卸売サイトの注文数量はこの倍数のみ選択できます（例: 5 なら 5kg・10kg…）。空欄は 1kg。</p>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-graphite">サンプル価格（1個 / 10g）</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={form.samplePrice ?? ''}
-            onChange={event => setForm(prev => ({ ...prev, samplePrice: event.target.value ? Number(event.target.value) : undefined }))}
-            className={fieldCls}
-            placeholder="例: 500"
-          />
-          <p className="mt-1 text-[11px] text-mist">卸売サイトのサンプル1個(10g)あたりの価格。サンプルは1商品2個(20g)まで注文可。</p>
+          <label className="mb-1 block text-sm font-medium text-graphite">サンプル価格（1個 / 10g・自動計算）</label>
+          <div className={`${fieldCls} flex items-center bg-bone text-graphite`}>
+            {computedSamplePrice != null ? `¥${computedSamplePrice.toLocaleString()}` : '— （標準卸売価格を入力すると算出）'}
+          </div>
+          <p className="mt-1 text-[11px] text-mist">標準卸売価格の10g相当（×0.01）＋卸売設定のサンプル手数料（現在 ¥{sampleFeeJpy.toLocaleString()}・税抜）。サンプルは1商品2個(20g)まで注文可。</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-graphite">備考（管理用）</label>
@@ -829,7 +832,7 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
       <div className="mt-2 flex items-center justify-between rounded-xl border border-line bg-bone px-4 py-3">
         <div>
           <p className="text-sm font-medium text-graphite">サンプル販売を有効化</p>
-          <p className="text-xs text-mist">卸売サイトで1商品2個(20g)までサンプル注文可。上の「サンプル価格」を設定してください</p>
+          <p className="text-xs text-mist">卸売サイトで1商品2個(20g)までサンプル注文可。価格は上の「サンプル価格」を自動計算します</p>
         </div>
         <button
           type="button"
