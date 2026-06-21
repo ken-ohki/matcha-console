@@ -45,7 +45,6 @@ export default function NewWholesaleOrderPage() {
   const [markPaid, setMarkPaid] = useState(true)
   const [asQuote, setAsQuote] = useState(false)
   // Direct (staff-entered) orders default to NOT emailing the customer.
-  const [suppressEmail, setSuppressEmail] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -161,7 +160,7 @@ export default function NewWholesaleOrderPage() {
           shippingFeeJpy: shippingFeeJpy !== '' ? Number(shippingFeeJpy) : undefined,
           asQuote,
           markPaid: asQuote ? false : markPaid,
-          suppressEmail,
+          suppressEmail: true, // 直接注文は顧客へメールを送らない
         }),
       })
       const data = (await res.json().catch(() => ({}))) as { orderId?: string; error?: string; detail?: unknown }
@@ -256,7 +255,6 @@ export default function NewWholesaleOrderPage() {
               </div>
               <div className="flex flex-wrap gap-4">
                 <label className={`flex cursor-pointer items-center gap-2 ${asQuote ? 'opacity-40' : ''}`}><input type="checkbox" checked={markPaid && !asQuote} disabled={asQuote} onChange={e => setMarkPaid(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 入金済みにする（請求書/既払い）</label>
-                <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={suppressEmail} onChange={e => setSuppressEmail(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[#174c33]" /> 顧客へのメールを送らない</label>
               </div>
               {asQuote && <p className="text-[11px] text-mist">見積として作成すると在庫を引当てたうえで「承諾待ち（見積）」になります。見積書を発行→顧客の承諾後、注文詳細の「承諾して確定」で確定します。</p>}
             </div>

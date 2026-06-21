@@ -23,6 +23,7 @@ interface Order {
   orderNumber: string
   memberCompanyName?: string
   memberEmail?: string
+  shippingEmail?: string
   contactName?: string
   phone?: string
   items?: OrderItem[]
@@ -223,6 +224,9 @@ export default function WholesaleOrderDetailPage() {
     if (!edit || !order) return
     const items = edit.items.filter(i => i.productId).map(i => ({ productId: i.productId, quantityKg: Number(i.quantityKg) || 0, unitPriceJpy: Number(i.unitPriceJpy) || 0, taxRate: i.taxRate }))
     if (items.length === 0) { window.alert('商品を1つ以上指定してください'); return }
+    // Guard against 原価割れ — warn (but allow) when a unit price is below cost/kg.
+    const belowCost = items.filter(i => { const c = costByProduct[i.productId]; return c != null && i.unitPriceJpy < c })
+    if (belowCost.length > 0 && !window.confirm(`単価が原価を下回っている商品が ${belowCost.length} 件あります（原価割れ）。このまま保存しますか？`)) return
     const feeLines = edit.feeLines
       .filter(f => f.name.trim())
       .map(f => ({ name: f.name.trim(), quantity: Number(f.quantity) || 0, unitPriceJpy: Number(f.unitPriceJpy) || 0, taxRate: f.taxRate }))
@@ -408,6 +412,14 @@ export default function WholesaleOrderDetailPage() {
                       </label>
                       <label className="w-24 text-[11px] text-mist">数量(kg)<input type="number" min="0" step="0.1" className="field-input mt-1" value={it.quantityKg} onChange={e => setEditItem(idx, { quantityKg: e.target.value })} /></label>
                       <label className="w-32 text-[11px] text-mist">単価(¥/kg)<input type="number" min="0" step="1" className="field-input mt-1" value={it.unitPriceJpy} onChange={e => setEditItem(idx, { unitPriceJpy: e.target.value })} /></label>
+                      {it.productId && costByProduct[it.productId] != null && (
+                        <div className="mb-2 text-[11px] leading-tight">
+                          <span className="text-mist">原価<br />¥{Math.round(costByProduct[it.productId]).toLocaleString()}/kg</span>
+                          {it.unitPriceJpy !== '' && Number(it.unitPriceJpy) < costByProduct[it.productId] && (
+                            <span className="block font-bold text-alert">⚠ 原価割れ</span>
+                          )}
+                        </div>
+                      )}
                       <label className="w-24 text-[11px] text-mist">税率
                         <select className="field-input mt-1" value={it.taxRate} onChange={e => setEditItem(idx, { taxRate: Number(e.target.value) })}>
                           <option value={8}>8%</option>
@@ -471,7 +483,7 @@ export default function WholesaleOrderDetailPage() {
                     <th className="py-2 font-medium">商品名</th>
                     <th className="py-2 text-right font-medium">購入数量</th>
                     <th className="py-2 text-right font-medium">単価</th>
-                    <th className="py-2 text-right font-medium">原価</th>
+                    <th className="py-2 text-right font-medium">原価/kg</th>
                     <th className="py-2 text-right font-medium">金額（税抜）</th>
                   </tr>
                 </thead>
@@ -484,7 +496,14 @@ export default function WholesaleOrderDetailPage() {
                       </td>
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.sampleUnits ? `サンプル ${i.sampleUnits}×10g` : `${i.quantityKg}kg`}</td>
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.unitPriceJpy != null ? `¥${i.unitPriceJpy.toLocaleString()}` : '—'}</td>
-                      <td className="whitespace-nowrap py-2 text-right text-mist">{costByProduct[i.productId ?? ''] != null ? `¥${Math.round(itemCost(i)).toLocaleString()}` : '—'}</td>
+                      <td className="whitespace-nowrap py-2 text-right">
+                        {(() => {
+                          const cost = costByProduct[i.productId ?? '']
+                          if (cost == null) return <span className="text-mist">—</span>
+                          const below = i.unitPriceJpy != null && i.unitPriceJpy < cost
+                          return <span className={below ? 'font-medium text-alert' : 'text-mist'}>¥{Math.round(cost).toLocaleString()}{below ? '（原価割れ）' : ''}</span>
+                        })()}
+                      </td>
                       <td className="whitespace-nowrap py-2 text-right text-ink">¥{((i.lineTotalJpy ?? 0) + (i.option?.feeJpy ?? 0)).toLocaleString()}</td>
                     </tr>
                   ))}
@@ -550,7 +569,7 @@ export default function WholesaleOrderDetailPage() {
                   <Field label="名前" value={o.contactName} />
                   <Field label="郵便番号" value={o.shippingPostalCode} />
                   <Field label="電話番号" value={o.phone} />
-                  <Field label="メールアドレス" value={o.memberEmail} />
+                  <Field label="メールアドレス" value={o.shippingEmail || o.memberEmail} />
                 </dl>
               ) : (
                 <p className="text-sm text-mist">—</p>

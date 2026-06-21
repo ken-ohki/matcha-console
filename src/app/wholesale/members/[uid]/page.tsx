@@ -36,6 +36,7 @@ interface Member {
 interface SavedAddress {
   contactName?: string
   phone?: string
+  email?: string
   country?: string
   postalCode?: string
   address?: string
@@ -383,6 +384,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                   <dl className="space-y-2">
                     <Field label="お届け先名" value={member.defaultShipping.contactName} />
                     <Field label="電話番号" value={member.defaultShipping.phone} />
+                    <Field label="メールアドレス" value={member.defaultShipping.email} />
                     <Field label="国 / 地域" value={member.defaultShipping.country} />
                     <Field label="郵便番号" value={member.defaultShipping.postalCode} />
                     <Field label="住所" value={member.defaultShipping.address} />

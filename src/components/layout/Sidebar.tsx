@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
-import { ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
+import { Megaphone, ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LucideIcon } from 'lucide-react'
 
@@ -27,6 +27,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
       { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
       { href: '/inventory', label: '商品管理', icon: ShoppingBag },
+      { href: '/announcements', label: 'お知らせ', icon: Megaphone },
       { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
       { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
     ],
