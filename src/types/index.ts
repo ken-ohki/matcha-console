@@ -361,6 +361,10 @@ export interface Settings {
   wholesaleSampleFeeJpy?: number
   // 顧客ランク別の割引率(%)。卸売商品価格に適用。
   wholesaleRankDiscounts?: WholesaleRankDiscounts
+  // トラブル時などに卸売サイトの新規注文受付を一時停止するフラグ。
+  orderingPaused?: boolean
+  // 受付停止中に顧客へ表示するメッセージ（任意）。
+  orderingPausedMessage?: string
 }
 
 export type WholesaleRank = 'standard' | 'premium' | 'exclusive'

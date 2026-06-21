@@ -16,6 +16,8 @@ export default function SettingsWholesalePage() {
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [options, setOptions] = useState<WholesaleOption[]>([])
+  const [orderingPaused, setOrderingPaused] = useState(false)
+  const [pausedMessage, setPausedMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -30,6 +32,8 @@ export default function SettingsWholesalePage() {
     setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
     setOptions(stored.wholesaleOptions ?? [])
+    setOrderingPaused(stored.orderingPaused ?? false)
+    setPausedMessage(stored.orderingPausedMessage ?? '')
     setLoading(false)
   }
 
@@ -64,6 +68,8 @@ export default function SettingsWholesalePage() {
         },
         shippingRatesJp: cleanTiers,
         wholesaleOptions: cleanOptions,
+        orderingPaused,
+        orderingPausedMessage: pausedMessage.trim(),
       }
       await services.settings.updateSettings(input)
       setTiers(cleanTiers)
@@ -124,6 +130,23 @@ export default function SettingsWholesalePage() {
         {loading ? (
           <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
         ) : (
+          <>
+          <div className="mb-5 rounded-3xl border border-line bg-white p-5 shadow-sm">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
+              <input type="checkbox" checked={orderingPaused} onChange={e => setOrderingPaused(e.target.checked)} />
+              注文受付を一時停止する
+            </label>
+            <p className="mt-1 text-xs text-mist">トラブル時などに卸売サイトの新規注文受付を停止します（直接注文＝スタッフ入力は継続できます）。停止中はカタログ・お会計に下記メッセージが表示され、顧客は注文できません。</p>
+            <label className="mt-3 block text-sm font-medium text-ink">停止中の表示メッセージ（任意）</label>
+            <textarea
+              value={pausedMessage}
+              onChange={e => setPausedMessage(e.target.value)}
+              rows={2}
+              placeholder="現在、ご注文の受付を一時停止しています。再開までお待ちください。"
+              className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+            />
+            {orderingPaused && <p className="mt-2 text-xs font-bold text-alert">⚠ 現在、新規注文の受付を停止しています（保存後に反映）。</p>}
+          </div>
           <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="max-w-xs">
@@ -141,6 +164,7 @@ export default function SettingsWholesalePage() {
               </div>
             </div>
           </div>
+          </>
         )}
 
         {!loading && (

@@ -53,3 +53,32 @@
     @apply rounded-xl border border-line bg-paper shadow-[0_1px_3px_rgba(17,17,17,0.06),0_1px_2px_rgba(17,17,17,0.04)];
   }
 }
+
+/* Horizontal scroll regions (wide tables etc.): always show a draggable scrollbar so
+   the off-screen content is discoverable and scrollable with a mouse, not only touch /
+   trackpad. The ::-webkit-scrollbar rule opts these containers out of macOS overlay
+   (auto-hiding) scrollbars; the bar still only appears when content actually overflows. */
+.overflow-x-auto,
+.overflow-auto {
+  scrollbar-width: thin; /* Firefox: keep a visible (thin) bar */
+  -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+}
+.overflow-x-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.overflow-x-auto::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
+  background: #eef0ee;
+  border-radius: 6px;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: #c2c8c2;
+  border-radius: 6px;
+}
+.overflow-x-auto::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: #a3aaa3;
+}

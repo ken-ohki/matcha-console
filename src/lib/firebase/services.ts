@@ -234,6 +234,8 @@ function getDefaultSettings(): Settings {
     wholesaleOptions: [],
     wholesaleSampleFeeJpy: 100,
     wholesaleRankDiscounts: { standard: 0, premium: 0, exclusive: 0 },
+    orderingPaused: false,
+    orderingPausedMessage: '',
   }
 }
 
@@ -459,6 +461,8 @@ function mapSettings(data?: DocumentData): Settings {
     wholesaleSampleFeeJpy:
       data.wholesaleSampleFeeJpy != null ? Number(data.wholesaleSampleFeeJpy) : defaults.wholesaleSampleFeeJpy,
     wholesaleRankDiscounts: mapRankDiscounts(data.wholesaleRankDiscounts),
+    orderingPaused: data.orderingPaused === true,
+    orderingPausedMessage: typeof data.orderingPausedMessage === 'string' ? data.orderingPausedMessage : '',
   }
 }
 
