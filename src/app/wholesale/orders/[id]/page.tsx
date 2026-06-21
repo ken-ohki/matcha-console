@@ -317,11 +317,10 @@ export default function WholesaleOrderDetailPage() {
   const downloadReceipt = async () => {
     if (!order) return
     const en = docLang === 'en'
-    const atena = window.prompt(en ? 'Bill to (receipt)' : '宛名（領収書）', en ? (order.memberCompanyName ?? '') : `${order.memberCompanyName ?? ''} 御中`)
-    if (atena === null) return
+    // 宛名は請求先名を自動使用（変更は会員の請求先情報を修正）。但し書きのみ指定可。
     const proviso = window.prompt(en ? 'For (description)' : '但し書き', en ? 'matcha products' : '抹茶代として')
     if (proviso === null) return
-    const res = await fetch(`/api/wholesale/orders/${id}/receipt?atena=${encodeURIComponent(atena)}&proviso=${encodeURIComponent(proviso)}&lang=${docLang}`, {
+    const res = await fetch(`/api/wholesale/orders/${id}/receipt?proviso=${encodeURIComponent(proviso)}&lang=${docLang}`, {
       headers: { Authorization: `Bearer ${await token()}` },
     })
     if (!res.ok) {
