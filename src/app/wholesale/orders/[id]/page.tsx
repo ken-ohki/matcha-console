@@ -48,6 +48,8 @@ interface Order {
   checkoutUrl?: string
   notes?: string
   buyerTaxId?: string
+  couponCode?: string
+  couponDiscountJpy?: number
   trackingNumber?: string
   shippingCarrierLabel?: string
   shippedAt?: string
@@ -56,6 +58,10 @@ interface Order {
   costAmountJpy?: number
   grossProfitJpy?: number
   paymentFeeJpy?: number
+  adminMemo?: string
+  shippingMemo?: string
+  stripeFeeJpy?: number
+  stripeNetJpy?: number
   dueDate?: string
   paidAtMs?: number
   createdAtMs?: number
@@ -114,12 +120,31 @@ export default function WholesaleOrderDetailPage() {
   const [edit, setEdit] = useState<EditState | null>(null)
   const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
   const [linkCopied, setLinkCopied] = useState(false)
+  const [adminMemo, setAdminMemo] = useState('')
+  const [shippingMemo, setShippingMemo] = useState('')
 
   const copyLink = (url: string) => {
     navigator.clipboard?.writeText(url).then(
       () => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 1500) },
       () => {},
     )
+  }
+
+  const saveMemos = async () => {
+    if (!order) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: order.id, action: 'set_memos', adminMemo, shippingMemo }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) window.alert(`保存に失敗しました（${d.error ?? 'error'}）`)
+      else await load()
+    } finally {
+      setBusy(false)
+    }
   }
 
   const load = useCallback(async () => {
@@ -138,6 +163,8 @@ export default function WholesaleOrderDetailPage() {
       setOrder(found)
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
+      setAdminMemo(found?.adminMemo ?? '')
+      setShippingMemo(found?.shippingMemo ?? '')
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
       const [products, masters] = await Promise.all([
         services.inventory.getProductsWithInventory(),
@@ -592,6 +619,9 @@ export default function WholesaleOrderDetailPage() {
               </table>
               <dl className="mt-3 space-y-1 border-t border-line pt-3 text-sm">
                 <Row label="小計（税抜）" value={`¥${(o.subtotalJpy ?? 0).toLocaleString()}`} />
+                {typeof o.couponDiscountJpy === 'number' && o.couponDiscountJpy > 0 && (
+                  <Row label={`クーポン割引${o.couponCode ? `（${o.couponCode}）` : ''}`} value={`-¥${o.couponDiscountJpy.toLocaleString()}`} />
+                )}
                 {typeof o.shippingFeeJpy === 'number' && o.shippingFeeJpy > 0 && <Row label="送料" value={`¥${o.shippingFeeJpy.toLocaleString()}`} />}
                 {o.feeLines && o.feeLines.length > 0
                   ? o.feeLines.map((f, i) => (
@@ -639,6 +669,13 @@ export default function WholesaleOrderDetailPage() {
                 <Row label="発送状況" value={o.status === 'cancelled' ? '—' : (o.status === 'shipped' || o.shippedAt) ? '出荷済み' : '未発送'} />
                 {o.dueDate && <Row label="支払期日" value={o.dueDate} />}
                 {o.paidAtMs && <Row label="入金日" value={new Date(o.paidAtMs).toLocaleDateString('ja-JP')} />}
+                {/* Stripe settlement — fee charged + net actually deposited (card only). */}
+                {o.paymentMethod === 'stripe' && typeof o.stripeFeeJpy === 'number' && (
+                  <>
+                    <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
+                    <Row label="入金額（手数料差引後）" value={`¥${(o.stripeNetJpy ?? (o.totalJpy ?? 0) - o.stripeFeeJpy).toLocaleString()}`} strong />
+                  </>
+                )}
               </dl>
             </Section>
 
@@ -657,6 +694,37 @@ export default function WholesaleOrderDetailPage() {
               )}
               {o.buyerTaxId && <p className="mt-1 text-xs text-mist">税番号: {o.buyerTaxId}</p>}
               {o.notes && <p className="mt-2 text-sm text-mist">備考: {o.notes}</p>}
+            </Section>
+
+            {/* Staff-only memos (never shown to the customer). Shipping memo appears on 発送管理. */}
+            <Section title="メモ（社内用）">
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="text-xs text-mist">注文メモ</span>
+                  <textarea
+                    value={adminMemo}
+                    onChange={e => setAdminMemo(e.target.value)}
+                    rows={2}
+                    className="field-input mt-1 w-full"
+                    placeholder="この注文に関する社内メモ"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-mist">発送用メモ（発送管理に表示）</span>
+                  <textarea
+                    value={shippingMemo}
+                    onChange={e => setShippingMemo(e.target.value)}
+                    rows={2}
+                    className="field-input mt-1 w-full"
+                    placeholder="梱包・発送時の注意など"
+                  />
+                </label>
+                <button
+                  onClick={saveMemos}
+                  disabled={busy || (adminMemo === (o.adminMemo ?? '') && shippingMemo === (o.shippingMemo ?? ''))}
+                  className="btn-primary disabled:opacity-50"
+                >メモを保存</button>
+              </div>
             </Section>
 
             {/* Quote (overseas, not yet quoted) */}

@@ -297,7 +297,7 @@ export default function ShippingPage() {
                         </td>
                         <td className="px-3 py-3">
                           {sale.shippingNote
-                            ? <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-medium text-[#a87b1e]">メモ有</span>
+                            ? <span className="block max-w-[220px] truncate text-[11px] text-ink" title={sale.shippingNote}>{sale.shippingNote}</span>
                             : <span className="text-[11px] text-mist">-</span>}
                         </td>
                         <td className={`whitespace-nowrap px-3 py-3 ${overdue ? 'font-medium text-alert' : 'text-mist'}`}>{sale.dueDate || '-'}</td>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
-import type { Settings, ShippingTierJp, WholesaleOption, WholesaleRankDiscounts } from '@/types'
+import type { Settings, ShippingTierJp, WholesaleCoupon, WholesaleOption, WholesaleRankDiscounts } from '@/types'
 import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 
 const uid = () =>
@@ -16,6 +16,8 @@ export default function SettingsWholesalePage() {
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [options, setOptions] = useState<WholesaleOption[]>([])
+  const [coupons, setCoupons] = useState<WholesaleCoupon[]>([])
+  const [products, setProducts] = useState<{ id: string; name: string; sku?: string }[]>([])
   const [orderingPaused, setOrderingPaused] = useState(false)
   const [pausedMessage, setPausedMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -32,8 +34,15 @@ export default function SettingsWholesalePage() {
     setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
     setOptions(stored.wholesaleOptions ?? [])
+    setCoupons(stored.wholesaleCoupons ?? [])
     setOrderingPaused(stored.orderingPaused ?? false)
     setPausedMessage(stored.orderingPausedMessage ?? '')
+    try {
+      const prods = await services.inventory.getProductsWithInventory()
+      setProducts(prods.map(p => ({ id: p.id, name: p.name, sku: p.sku })))
+    } catch {
+      setProducts([])
+    }
     setLoading(false)
   }
 
@@ -59,7 +68,20 @@ export default function SettingsWholesalePage() {
             .filter(t => t.label && Number.isFinite(t.portionKg) && t.portionKg > 0 && Number.isFinite(t.pricePerBagJpy) && t.pricePerBagJpy >= 0),
         }))
         .filter(o => o.name)
+      const cleanCoupons: WholesaleCoupon[] = coupons
+        .map(c => ({
+          id: c.id,
+          code: c.code.trim().toUpperCase(),
+          name: c.name.trim(),
+          discountType: c.discountType === 'fixed' ? 'fixed' as const : 'percentage' as const,
+          discountValue: Math.max(0, Number(c.discountValue) || 0),
+          eligibleProductIds: Array.isArray(c.eligibleProductIds) ? c.eligibleProductIds : [],
+          expiresAt: (c.expiresAt ?? '').trim() || undefined,
+          active: c.active !== false,
+        }))
+        .filter(c => c.code && c.name)
       const input: Partial<Settings> = {
+        wholesaleCoupons: cleanCoupons,
         wholesaleSampleFeeJpy: sampleFee === '' ? 0 : Math.max(0, Number(sampleFee)),
         wholesaleRankDiscounts: {
           standard: Math.min(100, Math.max(0, Number(rankDiscounts.standard) || 0)),
@@ -74,6 +96,7 @@ export default function SettingsWholesalePage() {
       await services.settings.updateSettings(input)
       setTiers(cleanTiers)
       setOptions(cleanOptions)
+      setCoupons(cleanCoupons)
       setFeedback({ tone: 'success', message: '卸売設定を保存しました' })
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
@@ -147,6 +170,82 @@ export default function SettingsWholesalePage() {
             />
             {orderingPaused && <p className="mt-2 text-xs font-bold text-alert">⚠ 現在、新規注文の受付を停止しています（保存後に反映）。</p>}
           </div>
+
+          {/* Coupons */}
+          <div className="mb-5 rounded-3xl border border-line bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">クーポン</h2>
+                <p className="mt-1 text-xs text-mist">チェックアウトでコードを入力すると、対象商品の小計に割引が適用されます（1注文1枚）。対象商品が未選択の場合は全商品が対象です。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCoupons(prev => [...prev, { id: uid(), code: '', name: '', discountType: 'percentage', discountValue: 0, eligibleProductIds: [], expiresAt: '', active: true }])}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line px-3 py-1.5 text-sm text-ink hover:bg-bone"
+              >
+                <Plus size={14} /> クーポンを追加
+              </button>
+            </div>
+            {coupons.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">クーポンがありません。</p>
+            ) : (
+              <div className="space-y-4">
+                {coupons.map((c, ci) => {
+                  const set = (patch: Partial<WholesaleCoupon>) => setCoupons(prev => prev.map((x, j) => (j === ci ? { ...x, ...patch } : x)))
+                  const eligible = c.eligibleProductIds ?? []
+                  const toggleProduct = (pid: string) =>
+                    set({ eligibleProductIds: eligible.includes(pid) ? eligible.filter(x => x !== pid) : [...eligible, pid] })
+                  return (
+                    <div key={c.id} className="rounded-2xl border border-line p-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-[11px] text-mist">コード（大文字）
+                          <input value={c.code} onChange={e => set({ code: e.target.value.toUpperCase() })} placeholder="SUMMER2025" className="field-input mt-1 w-full uppercase" />
+                        </label>
+                        <label className="text-[11px] text-mist">クーポン名
+                          <input value={c.name} onChange={e => set({ name: e.target.value })} placeholder="夏季10%OFF" className="field-input mt-1 w-full" />
+                        </label>
+                        <label className="text-[11px] text-mist">割引タイプ
+                          <select value={c.discountType} onChange={e => set({ discountType: e.target.value === 'fixed' ? 'fixed' : 'percentage' })} className="field-input mt-1 w-full">
+                            <option value="percentage">割引率（%）</option>
+                            <option value="fixed">割引額（¥）</option>
+                          </select>
+                        </label>
+                        <label className="text-[11px] text-mist">{c.discountType === 'fixed' ? '割引額（¥）' : '割引率（%）'}
+                          <input type="number" min="0" value={c.discountValue} onChange={e => set({ discountValue: Number(e.target.value) })} className="field-input mt-1 w-full" />
+                        </label>
+                        <label className="text-[11px] text-mist">有効期限（任意）
+                          <input type="date" value={c.expiresAt ?? ''} onChange={e => set({ expiresAt: e.target.value })} className="field-input mt-1 w-full" />
+                        </label>
+                        <label className="flex items-end gap-2 pb-2 text-sm text-ink">
+                          <input type="checkbox" checked={c.active !== false} onChange={e => set({ active: e.target.checked })} className="h-4 w-4" />
+                          有効
+                        </label>
+                      </div>
+                      <div className="mt-3">
+                        <p className="text-[11px] text-mist">対象商品（未選択＝全商品）{eligible.length > 0 ? ` — ${eligible.length}件選択中` : ''}</p>
+                        <div className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-line p-2">
+                          {products.length === 0 ? (
+                            <p className="px-1 py-2 text-xs text-mist">商品がありません。</p>
+                          ) : (
+                            products.map(p => (
+                              <label key={p.id} className="flex items-center gap-2 px-1 py-1 text-sm text-ink">
+                                <input type="checkbox" checked={eligible.includes(p.id)} onChange={() => toggleProduct(p.id)} className="h-3.5 w-3.5" />
+                                <span className="truncate">{p.name}{p.sku ? ` (${p.sku})` : ''}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setCoupons(prev => prev.filter((_, j) => j !== ci))} className="mt-3 inline-flex items-center gap-1 text-xs text-alert hover:underline">
+                        <Trash2 size={12} /> このクーポンを削除
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="rounded-3xl border border-line bg-white p-5 shadow-sm">
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="max-w-xs">

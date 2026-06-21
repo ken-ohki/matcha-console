@@ -102,7 +102,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'update_direct_order' | 'delete_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -124,6 +124,9 @@ interface PatchBody {
   shippingEmail?: string
   notes?: string
   paymentFeeJpy?: number
+  // set_memos fields (staff-only internal memos)
+  adminMemo?: string
+  shippingMemo?: string
 }
 
 // Tax: 0=exempt, 8=reduced(matcha), 10=standard. Fees always 10%. Floor per bucket.
@@ -309,6 +312,14 @@ export async function PATCH(request: Request) {
     if (body.shippingCarrierLabel !== undefined) patch.shippingCarrierLabel = body.shippingCarrierLabel.trim() || FieldValue.delete()
     if (body.shipped === true) { patch.status = 'shipped'; patch.shippedAt = new Date().toISOString() }
     if (body.shipped === false) { patch.status = 'paid'; patch.shippedAt = FieldValue.delete() }
+    await ref.set(patch, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
+  // Staff-only internal memos: order memo + shipping memo (shown on 発送管理).
+  if (body.action === 'set_memos') {
+    const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
+    if (body.adminMemo !== undefined) patch.adminMemo = body.adminMemo.trim() || FieldValue.delete()
+    if (body.shippingMemo !== undefined) patch.shippingMemo = body.shippingMemo.trim() || FieldValue.delete()
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }

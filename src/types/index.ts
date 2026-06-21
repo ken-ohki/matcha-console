@@ -171,6 +171,9 @@ export interface SaleRecord {
   shippingNote?: string   // 発送担当者へのメモ
   shippingSlip?: ShippingSlip   // 発送伝票（送り状など）の添付
   issuedDocuments?: IssuedDocument[]   // 発行したPDF帳票の履歴
+  // Stripe settlement (card orders): processing fee + net amount deposited.
+  stripeFeeJpy?: number
+  stripeNetJpy?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -365,6 +368,20 @@ export interface Settings {
   orderingPaused?: boolean
   // 受付停止中に顧客へ表示するメッセージ（任意）。
   orderingPausedMessage?: string
+  // クーポンのマスタ。チェックアウトでコード入力して適用。
+  wholesaleCoupons?: WholesaleCoupon[]
+}
+
+/** クーポン定義。コード入力で対象商品の小計に割引を適用（1注文1枚）。 */
+export interface WholesaleCoupon {
+  id: string
+  code: string // 大文字小文字を無視して照合
+  name: string
+  discountType: 'percentage' | 'fixed'
+  discountValue: number // %（percentage）または ¥（fixed）
+  eligibleProductIds?: string[] // 空＝全商品が対象
+  expiresAt?: string // YYYY-MM-DD（その日の終わりまで有効）
+  active: boolean
 }
 
 export type WholesaleRank = 'standard' | 'premium' | 'exclusive'
