@@ -70,6 +70,7 @@ interface EditState {
   shippingAddress: string
   contactName: string
   phone: string
+  shippingEmail: string
   notes: string
   dueDate: string
   shippingFeeJpy: string
@@ -249,6 +250,7 @@ export default function WholesaleOrderDetailPage() {
       shippingAddress: order.shippingAddress ?? '',
       contactName: order.contactName ?? '',
       phone: order.phone ?? '',
+      shippingEmail: order.shippingEmail ?? '',
       notes: order.notes ?? '',
       dueDate: order.dueDate ?? '',
       shippingFeeJpy: order.shippingFeeJpy != null ? String(order.shippingFeeJpy) : '',
@@ -275,7 +277,7 @@ export default function WholesaleOrderDetailPage() {
         body: JSON.stringify({
           orderId: order.id, action: 'update_direct_order', items, feeLines,
           shippingCountry: edit.shippingCountry, shippingPostalCode: edit.shippingPostalCode, shippingAddress: edit.shippingAddress,
-          contactName: edit.contactName, phone: edit.phone, notes: edit.notes, dueDate: edit.dueDate,
+          contactName: edit.contactName, phone: edit.phone, shippingEmail: edit.shippingEmail, notes: edit.notes, dueDate: edit.dueDate,
           shippingFeeJpy: edit.shippingFeeJpy !== '' ? Number(edit.shippingFeeJpy) : undefined,
           paymentFeeJpy: edit.paymentFeeJpy !== '' ? Number(edit.paymentFeeJpy) : undefined,
         }),
@@ -520,6 +522,7 @@ export default function WholesaleOrderDetailPage() {
                   <label className="text-[11px] text-mist sm:col-span-2">住所<input className="field-input mt-1" value={edit.shippingAddress} onChange={e => setEdit({ ...edit, shippingAddress: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">お届け先名<input className="field-input mt-1" value={edit.contactName} onChange={e => setEdit({ ...edit, contactName: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">電話<input className="field-input mt-1" value={edit.phone} onChange={e => setEdit({ ...edit, phone: e.target.value })} /></label>
+                  <label className="text-[11px] text-mist sm:col-span-2">メールアドレス<input type="email" className="field-input mt-1" value={edit.shippingEmail} onChange={e => setEdit({ ...edit, shippingEmail: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">送料(¥税抜)<input type="number" min="0" step="1" className="field-input mt-1" value={edit.shippingFeeJpy} onChange={e => setEdit({ ...edit, shippingFeeJpy: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">支払手数料(¥)<input type="number" min="0" step="1" className="field-input mt-1" value={edit.paymentFeeJpy} onChange={e => setEdit({ ...edit, paymentFeeJpy: e.target.value })} /></label>
                   <label className="text-[11px] text-mist">支払期日<input type="date" className="field-input mt-1" value={edit.dueDate} onChange={e => setEdit({ ...edit, dueDate: e.target.value })} /></label>
@@ -652,8 +655,9 @@ export default function WholesaleOrderDetailPage() {
               <p className="rounded-lg border border-line bg-bone px-4 py-3 text-xs text-mist">銀行振込のご案内をメール送付済み。入金後に「入金確認」を押してください。</p>
             )}
 
-            {/* Fulfillment — tracking + shipping status (editable even after shipping) */}
-            {(o.status === 'paid' || o.status === 'shipped') && (
+            {/* Fulfillment — carrier/tracking + shipping status. Direct (staff-entered)
+                orders can edit the 発送 info at any (non-cancelled) status. */}
+            {(o.status === 'paid' || o.status === 'shipped' || (o.origin === 'direct' && o.status !== 'cancelled')) && (
               <Section title="出荷・発送通知">
                 <div className="mb-3 flex flex-wrap items-end gap-2">
                   <label className="text-xs text-mist">発送業者
@@ -666,18 +670,23 @@ export default function WholesaleOrderDetailPage() {
                   <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
                   {o.status === 'paid' ? (
                     <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
-                  ) : (
+                  ) : o.status === 'shipped' ? (
                     <>
                       <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷情報を更新</button>
                       <button onClick={() => act('set_fulfillment', { shipped: false })} disabled={busy} className="btn-ghost">未出荷に戻す</button>
                     </>
+                  ) : (
+                    // Direct order not yet paid/shipped — save carrier/tracking without changing status.
+                    <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">発送情報を保存</button>
                   )}
                 </div>
                 {o.shippedAt && <p className="mb-2 text-xs text-mist">出荷日: {o.shippedAt.slice(0, 10)}</p>}
-                <div className="flex flex-wrap items-center gap-3">
-                  <button onClick={() => act('notify_shipped')} disabled={busy} className="btn-ghost">発送通知メールを送信</button>
-                  {o.shipmentEmailedAt && <span className="text-xs text-mist">最終送信: {o.shipmentEmailedAt.slice(0, 16).replace('T', ' ')}</span>}
-                </div>
+                {(o.status === 'paid' || o.status === 'shipped') && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button onClick={() => act('notify_shipped')} disabled={busy} className="btn-ghost">発送通知メールを送信</button>
+                    {o.shipmentEmailedAt && <span className="text-xs text-mist">最終送信: {o.shipmentEmailedAt.slice(0, 16).replace('T', ' ')}</span>}
+                  </div>
+                )}
               </Section>
             )}
 

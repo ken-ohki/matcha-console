@@ -12,6 +12,7 @@ interface Member {
   uid: string
   email?: string
   status?: string
+  migratedToUid?: string
   companyName?: string
   contactName?: string
   phone?: string
@@ -120,6 +121,8 @@ export default function WholesaleMembersPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return members
+      // Hide manual records that were migrated to a login account (avoid duplicates).
+      .filter(m => !m.migratedToUid)
       .filter(m => (filter === 'all' ? true : m.status === filter))
       .filter(m => (countryFilter === 'all' ? true : (m.country ?? '').trim() === countryFilter))
       .filter(m => (rankFilter === 'all' ? true : (m.rank ?? 'standard').trim() === rankFilter))

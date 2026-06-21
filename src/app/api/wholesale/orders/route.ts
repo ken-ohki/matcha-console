@@ -121,6 +121,7 @@ interface PatchBody {
   shippingPostalCode?: string
   contactName?: string
   phone?: string
+  shippingEmail?: string
   notes?: string
   paymentFeeJpy?: number
 }
@@ -455,6 +456,7 @@ export async function PATCH(request: Request) {
       ...(body.shippingPostalCode !== undefined ? { shippingPostalCode: body.shippingPostalCode || null } : {}),
       ...(body.contactName !== undefined ? { contactName: body.contactName || null } : {}),
       ...(body.phone !== undefined ? { phone: body.phone || null } : {}),
+      ...(body.shippingEmail !== undefined ? { shippingEmail: body.shippingEmail || null } : {}),
       ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
       ...(body.dueDate !== undefined ? { dueDate: body.dueDate || FieldValue.delete() } : {}),
       ecSaleIds,

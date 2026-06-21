@@ -7,7 +7,8 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { formatCurrency } from '@/lib/format'
 import { useStickyState } from '@/hooks/useStickyState'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 interface OrderItem {
   productName: string
@@ -28,6 +29,7 @@ interface Order {
   overseasCarrier?: string
   origin?: string
   transferReportedAt?: string
+  createdAtMs?: number
 }
 
 type OrdersTab = 'all' | 'ec' | 'direct'
@@ -140,6 +142,38 @@ export default function WholesaleOrdersPage() {
     }
   }, [])
 
+  // Export the currently-shown list (respects tab / bucket / search / 入金待ち filters).
+  const handleExportExcel = () => {
+    if (filtered.length === 0) {
+      window.alert('書き出す注文がありません。')
+      return
+    }
+    const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '')
+    const rows = filtered.map(o => ({
+      '注文番号': o.orderNumber,
+      '注文日時': fmt(o.createdAtMs),
+      '注文者': o.memberCompanyName || o.contactName || '',
+      'チャネル': o.origin === 'direct' ? '直販' : 'EC',
+      '商品': (o.items ?? []).map(i => `${i.productName} ${i.quantityKg}kg`).join(', '),
+      '数量(kg)': (o.items ?? []).reduce((s, i) => s + (i.quantityKg ?? 0), 0),
+      '金額(税込)': o.totalJpy ?? '',
+      '支払い方法': paymentMethodLabel(o),
+      '支払い状況': paymentStateLabel(o).label,
+      '発送方法': shippingMethod(o),
+      '発送状況': shippingStateLabel(o).label,
+      '振込報告': o.transferReportedAt ? new Date(o.transferReportedAt).toLocaleDateString('ja-JP') : '',
+    }))
+    const sheet = XLSX.utils.json_to_sheet(rows)
+    const headers = Object.keys(rows[0])
+    sheet['!cols'] = headers.map(h => {
+      const maxLen = rows.reduce((m, r) => Math.max(m, String((r as Record<string, unknown>)[h] ?? '').length), h.length)
+      return { wch: Math.min(Math.max(maxLen + 2, 8), 48) }
+    })
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, sheet, '注文一覧')
+    XLSX.writeFile(wb, `orders_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
   // Inline 入金確認 (manual bank reconciliation) — confirm without opening the order.
   const confirmPayment = async (o: Order) => {
     if (!window.confirm(`注文「${o.orderNumber}」（¥${(o.totalJpy ?? 0).toLocaleString()} / ${o.memberCompanyName ?? o.contactName ?? ''}）を入金確認済みにしますか？`)) return
@@ -176,6 +210,9 @@ export default function WholesaleOrdersPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link href="/wholesale/orders/new" className="btn-primary">＋ 新規注文</Link>
+            <button onClick={handleExportExcel} className="btn-ghost">
+              <Download size={14} /> Excel 書き出し
+            </button>
             <button onClick={load} className="btn-ghost">
               <RefreshCw size={14} /> 更新
             </button>

@@ -27,6 +27,8 @@ interface Member {
   featureConsent?: boolean
   rank?: string
   buyerId?: string
+  source?: string
+  migratedToUid?: string
   createdAtMs?: number
   adminNote?: string
   defaultShipping?: SavedAddress
@@ -219,7 +221,10 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
   }
 
   const sendPasswordReset = async () => {
-    if (!window.confirm('この会員の登録メールアドレス宛に、パスワード再設定メールを送信しますか？')) return
+    const isInvite = member?.source === 'manual' && !member?.migratedToUid
+    if (!window.confirm(isInvite
+      ? 'この会員の登録メール宛に、ログイン招待（パスワード設定メール）を送信しますか？初回ログイン時に過去の注文履歴が引き継がれます。'
+      : 'この会員の登録メールアドレス宛に、パスワード再設定メールを送信しますか？')) return
     setBusy(true)
     setError(null)
     try {
@@ -228,13 +233,19 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
         body: '{}',
       })
-      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; email?: string; error?: string }
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; email?: string; error?: string; invited?: boolean }
       window.alert(
         d.ok
-          ? `パスワード再設定メールを ${d.email} に送信しました。`
-          : d.error === 'no_password_account'
-            ? 'この会員はGoogleログイン（パスワードなし）のため、パスワード再設定はできません。「Googleでログイン」をご案内ください。'
-            : `送信に失敗しました（${d.error ?? 'error'}）`,
+          ? d.invited
+            ? `ログイン招待メールを ${d.email} に送信しました。`
+            : `パスワード再設定メールを ${d.email} に送信しました。`
+          : d.error === 'no_email'
+            ? 'メールアドレスが未登録のため送信できません。会員情報にメールを登録してください。'
+            : d.error === 'already_linked'
+              ? 'この会員は既にログインアカウントと連携済みです。'
+              : d.error === 'no_password_account'
+                ? 'この会員はGoogleログイン（パスワードなし）のため、パスワード再設定はできません。「Googleでログイン」をご案内ください。'
+                : `送信に失敗しました（${d.error ?? 'error'}）`,
       )
     } finally {
       setBusy(false)
@@ -430,13 +441,21 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
               />
             </section>
 
-            {/* Login support — for members who forgot their email / password */}
+            {/* Login support — for members who forgot their email / password, or to
+                invite a manually-registered (no-login) member to use the portal. */}
             <section className="mb-8 rounded-2xl border border-line bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mist">ログインサポート</h2>
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={fetchLoginInfo} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-bone disabled:opacity-50">ログイン情報を確認</button>
-                <button onClick={sendPasswordReset} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-50">パスワード再設定メールを送信</button>
-              </div>
+              {member.source === 'manual' && !member.migratedToUid ? (
+                <>
+                  <p className="mb-3 text-xs text-mist">この会員は手動登録（ログイン未発行）です。招待を送るとアカウントを発行し、初回ログイン時に過去の注文履歴が引き継がれます。</p>
+                  <button onClick={sendPasswordReset} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-50">ログイン招待を送る（パスワード設定メール）</button>
+                </>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={fetchLoginInfo} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-bone disabled:opacity-50">ログイン情報を確認</button>
+                  <button onClick={sendPasswordReset} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-paper hover:opacity-90 disabled:opacity-50">パスワード再設定メールを送信</button>
+                </div>
+              )}
               {loginInfo && (
                 <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
                   <Field label="ログイン用メール" value={loginInfo.email ?? '—'} />
