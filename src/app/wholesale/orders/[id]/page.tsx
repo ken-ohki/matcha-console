@@ -36,6 +36,7 @@ interface Order {
   paymentStatus?: string
   needsRefund?: boolean
   bankDueAtMs?: number
+  transferReportedAt?: string
   status?: string
   shippingCountry?: string
   shippingPostalCode?: string
@@ -432,6 +433,9 @@ export default function WholesaleOrderDetailPage() {
                   ) : (
                     <>お振込期限: <strong>{due}</strong>（未入金・銀行振込）</>
                   )}
+                  {o.transferReportedAt ? (
+                    <div className="mt-1 font-bold text-[#a87b1e]">💴 お客様より振込報告あり（{new Date(o.transferReportedAt).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}）— 入金をご確認ください。</div>
+                  ) : null}
                 </div>
               )
             })() : null}

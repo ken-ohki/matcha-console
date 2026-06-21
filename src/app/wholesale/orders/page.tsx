@@ -27,6 +27,7 @@ interface Order {
   isDomestic?: boolean
   overseasCarrier?: string
   origin?: string
+  transferReportedAt?: string
 }
 
 type OrdersTab = 'all' | 'ec' | 'direct'
@@ -278,6 +279,9 @@ export default function WholesaleOrdersPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
                         <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${paymentStateLabel(o).tone}`}>{paymentStateLabel(o).label}</span>
+                        {isBankPending(o) && o.transferReportedAt && (
+                          <span className="rounded border border-[#a87b1e] bg-[#fdf6e9] px-1.5 py-0.5 text-[10px] text-[#a87b1e]" title={`振込報告: ${o.transferReportedAt.slice(0, 10)}`}>振込報告あり</span>
+                        )}
                         {isBankPending(o) && (
                           <button
                             type="button"
