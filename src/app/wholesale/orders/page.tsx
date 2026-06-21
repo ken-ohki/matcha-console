@@ -75,6 +75,11 @@ function isClosed(o: Order): boolean {
   return o.status === 'shipped' || !!o.shippedAt || o.status === 'cancelled'
 }
 
+// Manual bank-transfer order still awaiting deposit — the rows staff reconcile by hand.
+function isBankPending(o: Order): boolean {
+  return o.paymentMethod === 'bank_transfer' && o.paymentStatus !== 'paid' && (o.status === 'pending_payment' || o.status === 'quoted')
+}
+
 type OrdersBucket = 'action' | 'done' | 'all'
 
 export default function WholesaleOrdersPage() {
@@ -83,6 +88,9 @@ export default function WholesaleOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useStickyState<OrdersTab>('orders.tab', 'all')
   const [bucket, setBucket] = useStickyState<OrdersBucket>('orders.bucket', 'action')
+  const [search, setSearch] = useState('')
+  const [bankPendingOnly, setBankPendingOnly] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   // EC = self-service web orders (origin 'self' or legacy undefined); 直販 = staff-entered/migrated.
   const shown = orders.filter(o => tab === 'all' ? true : tab === 'direct' ? o.origin === 'direct' : o.origin !== 'direct')
@@ -105,6 +113,20 @@ export default function WholesaleOrdersPage() {
         ? shown.filter(isClosed)
         : [...shown].sort((a, b) => Number(isClosed(a)) - Number(isClosed(b))) // すべて: 対応が必要を上に
 
+  // Reconciliation helpers: 銀行振込・入金待ちの絞り込み + 注文番号/会社名/金額の検索。
+  const q = search.trim().toLowerCase()
+  const nq = q.replace(/[,¥\s]/g, '')
+  const filtered = list.filter(o => {
+    if (bankPendingOnly && !isBankPending(o)) return false
+    if (!q) return true
+    return (
+      (o.orderNumber ?? '').toLowerCase().includes(q) ||
+      (o.memberCompanyName ?? '').toLowerCase().includes(q) ||
+      (o.contactName ?? '').toLowerCase().includes(q) ||
+      (nq !== '' && String(o.totalJpy ?? '').includes(nq))
+    )
+  })
+  const bankPendingCount = shown.filter(isBankPending).length
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -116,6 +138,27 @@ export default function WholesaleOrdersPage() {
       setLoading(false)
     }
   }, [])
+
+  // Inline 入金確認 (manual bank reconciliation) — confirm without opening the order.
+  const confirmPayment = async (o: Order) => {
+    if (!window.confirm(`注文「${o.orderNumber}」（¥${(o.totalJpy ?? 0).toLocaleString()} / ${o.memberCompanyName ?? o.contactName ?? ''}）を入金確認済みにしますか？`)) return
+    setBusyId(o.id)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: o.id, action: 'confirm_payment' }),
+      })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        window.alert(`入金確認に失敗しました（${d.error ?? 'error'}）`)
+        return
+      }
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -152,7 +195,7 @@ export default function WholesaleOrdersPage() {
           ))}
         </div>
 
-        <div className="mb-bl-3 flex flex-wrap gap-1.5">
+        <div className="mb-bl-3 flex flex-wrap items-center gap-1.5">
           {([['action', '対応が必要'], ['done', '取引完了済'], ['all', 'すべて']] as const).map(([key, label]) => (
             <button
               key={key}
@@ -163,13 +206,28 @@ export default function WholesaleOrdersPage() {
               {label} ({bucketCounts[key]})
             </button>
           ))}
+          <span className="mx-1 text-line">|</span>
+          <button
+            type="button"
+            onClick={() => setBankPendingOnly(v => !v)}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${bankPendingOnly ? 'border-[#a87b1e] bg-[#a87b1e] text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+          >
+            入金待ち（銀行振込）({bankPendingCount})
+          </button>
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="注文番号 / 会社名 / 金額で検索"
+            className="ml-auto w-64 rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-ink outline-none focus:border-ink"
+          />
         </div>
 
         {loading ? (
           <p className="text-sm text-mist">読み込み中…</p>
-        ) : list.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-mist">
-            {bucket === 'action' ? '対応が必要な注文はありません。' : bucket === 'done' ? '完了済みの注文はありません。' : '注文はありません。'}
+            {search || bankPendingOnly ? '該当する注文はありません。' : bucket === 'action' ? '対応が必要な注文はありません。' : bucket === 'done' ? '完了済みの注文はありません。' : '注文はありません。'}
           </p>
         ) : (
           <div className="overflow-x-auto panel">
@@ -188,7 +246,7 @@ export default function WholesaleOrdersPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.map(o => (
+                {filtered.map(o => (
                   <tr
                     key={o.id}
                     onClick={() => router.push(`/wholesale/orders/${o.id}`)}
@@ -218,7 +276,19 @@ export default function WholesaleOrdersPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{shippingMethod(o)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{paymentMethodLabel(o)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${paymentStateLabel(o).tone}`}>{paymentStateLabel(o).label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${paymentStateLabel(o).tone}`}>{paymentStateLabel(o).label}</span>
+                        {isBankPending(o) && (
+                          <button
+                            type="button"
+                            disabled={busyId === o.id}
+                            onClick={e => { e.stopPropagation(); confirmPayment(o) }}
+                            className="rounded border border-matcha px-2 py-0.5 text-[11px] font-medium text-matcha hover:bg-[#eef3eb] disabled:opacity-50"
+                          >
+                            入金確認
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${shippingStateLabel(o).tone}`}>{shippingStateLabel(o).label}</span>

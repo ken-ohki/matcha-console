@@ -35,6 +35,7 @@ interface Order {
   paymentMethod?: string
   paymentStatus?: string
   needsRefund?: boolean
+  bankDueAtMs?: number
   status?: string
   shippingCountry?: string
   shippingPostalCode?: string
@@ -420,6 +421,20 @@ export default function WholesaleOrderDetailPage() {
                 {o.paymentMethod === 'bank_transfer' ? '銀行振込の返金を手動でお振込ください。' : 'Stripeダッシュボードで手動返金を行ってください。'}
               </div>
             )}
+            {/* Bank-transfer payment deadline (7 days). No auto-cancel — staff release overdue manually. */}
+            {o.status === 'pending_payment' && o.paymentMethod === 'bank_transfer' && o.bankDueAtMs ? (() => {
+              const overdue = (o.bankDueAtMs as number) < Date.now()
+              const due = new Date(o.bankDueAtMs as number).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+              return (
+                <div className={`rounded-lg border px-4 py-3 text-sm ${overdue ? 'border-red-300 bg-red-50 text-red-800' : 'border-line bg-bone text-mist'}`}>
+                  {overdue ? (
+                    <>⚠ <strong>お振込期限超過</strong>（期限 {due}）。入金が無ければ下部の「取消・在庫解放」で手動キャンセルしてください（自動取消は行われません）。</>
+                  ) : (
+                    <>お振込期限: <strong>{due}</strong>（未入金・銀行振込）</>
+                  )}
+                </div>
+              )
+            })() : null}
             {/* Header */}
             <div className="panel p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
