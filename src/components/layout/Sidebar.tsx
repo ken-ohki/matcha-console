@@ -22,21 +22,21 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: '営業',
+    items: [
+      { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
+      { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
+      { href: '/inventory', label: '商品管理', icon: ShoppingBag },
+      { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
+      { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
+    ],
+  },
+  {
     label: '倉庫',
     items: [
       { href: '/stock', label: '在庫管理', icon: Package },
       { href: '/receiving', label: '入荷管理', icon: PackageOpen },
       { href: '/shipping', label: '発送管理', icon: Send },
-    ],
-  },
-  {
-    label: '営業',
-    items: [
-      { href: '/inventory', label: '商品管理', icon: ShoppingBag },
-      { href: '/wholesale/members', label: '会員管理', icon: UserCheck },
-      { href: '/wholesale/orders', label: '卸売注文', icon: Globe },
-      { href: '/purchase-orders', label: '仕入管理', icon: ClipboardList, match: ['/purchase-orders', '/suppliers'] },
-      { href: '/self-consumption', label: '自社消費', icon: PackageMinus },
     ],
   },
   {
