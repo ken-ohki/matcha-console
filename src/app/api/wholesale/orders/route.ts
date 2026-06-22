@@ -116,7 +116,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -236,6 +236,21 @@ export async function PATCH(request: Request) {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: auth },
         body: JSON.stringify({ orderId: body.orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+    }
+  }
+
+  // Backfill the Stripe fee/net for a paid card order — delegate to the wholesale app.
+  if (body.action === 'fetch_fee') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/orders/${encodeURIComponent(body.orderId)}/fetch-fee`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
       })
       const data = await res.json().catch(() => ({}))
       return NextResponse.json(data, { status: res.status })

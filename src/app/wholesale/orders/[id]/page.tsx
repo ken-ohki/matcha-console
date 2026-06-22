@@ -189,7 +189,7 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee', extra: Record<string, unknown> = {}) => {
     if (action === 'accept_quote' && !window.confirm('お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）')) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
@@ -247,8 +247,22 @@ export default function WholesaleOrderDetailPage() {
               : `発行に失敗しました（${d.error ?? 'error'}）`
         window.alert(msg)
       }
+      if (action === 'fetch_fee') {
+        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+        if (!d.ok) {
+          const msg =
+            d.error === 'no_payment_intent'
+              ? 'この注文にStripeの決済情報（PaymentIntent）がないため取得できません。'
+              : d.error === 'settlement_unavailable'
+                ? 'Stripeから手数料情報を取得できませんでした。時間をおいて再度お試しください。'
+                : d.error === 'not_card_order'
+                  ? 'カード決済の注文ではありません。'
+                  : `取得に失敗しました（${d.error ?? 'error'}）`
+          window.alert(msg)
+        }
+      }
       // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
-      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link') {
+      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link' && action !== 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
         window.alert(`操作に失敗しました（${d.error ?? 'error'}）`)
       }
@@ -675,12 +689,22 @@ export default function WholesaleOrderDetailPage() {
                 <Row label="発送状況" value={o.status === 'cancelled' ? '—' : (o.status === 'shipped' || o.shippedAt) ? '出荷済み' : '未発送'} />
                 {o.dueDate && <Row label="支払期日" value={o.dueDate} />}
                 {o.paidAtMs && <Row label="入金日" value={new Date(o.paidAtMs).toLocaleDateString('ja-JP')} />}
-                {/* Stripe settlement — fee charged + net actually deposited (card only). */}
-                {o.paymentMethod === 'stripe' && typeof o.stripeFeeJpy === 'number' && (
-                  <>
-                    <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
-                    <Row label="入金額（手数料差引後）" value={`¥${(o.stripeNetJpy ?? (o.totalJpy ?? 0) - o.stripeFeeJpy).toLocaleString()}`} strong />
-                  </>
+                {/* Stripe settlement — fee charged + net actually deposited (card only).
+                    Shown for paid card orders; if not yet captured, offer a fetch button. */}
+                {o.paymentMethod === 'stripe' && (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') && (
+                  typeof o.stripeFeeJpy === 'number' ? (
+                    <>
+                      <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
+                      <Row label="入金額（手数料差引後）" value={`¥${(o.stripeNetJpy ?? (o.totalJpy ?? 0) - o.stripeFeeJpy).toLocaleString()}`} strong />
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <dt className="text-mist">Stripe手数料</dt>
+                      <dd>
+                        <button onClick={() => act('fetch_fee')} disabled={busy} className="text-xs text-matchaDeep underline disabled:opacity-50">未取得 — Stripeから取得</button>
+                      </dd>
+                    </div>
+                  )
                 )}
               </dl>
             </Section>
