@@ -191,6 +191,7 @@ export default function FinancialsPage() {
   const kpis = useMemo(() => {
     const ecTotal = filteredEc.reduce((s, ec) => s + ecRevenue(ec), 0)
     const directRevenue = filteredSales.reduce((s, r) => s + saleIncome(r), 0)
+    const sampleRevenue = filteredSales.reduce((s, r) => s + (r.sampleRevenue ?? 0), 0)
     const totalRevenue = directRevenue + ecTotal
     // EC sales are collected on the sale date.
     const collected = filteredSales
@@ -213,6 +214,7 @@ export default function FinancialsPage() {
     return {
       totalRevenue,
       ecRevenue: ecTotal,
+      sampleRevenue,
       collected,
       stripeFees,
       netDeposited: collected - stripeFees,
@@ -330,6 +332,7 @@ export default function FinancialsPage() {
     const map = new Map<string, ProductRow>()
     for (const r of filteredSales) {
       for (const item of r.items ?? []) {
+        if (item.isSample) continue // sample sales are tallied separately, not per product
         const key = item.productId || item.productName
         const row = map.get(key) ?? {
           productId: item.productId,
@@ -488,6 +491,7 @@ export default function FinancialsPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
           <KPICard title="うち EC売上" value={formatCurrency(kpis.ecRevenue)} color="default" icon={<ShoppingBag size={16} />} />
+          <KPICard title="うち サンプル売上" value={formatCurrency(kpis.sampleRevenue)} color="default" icon={<ShoppingBag size={16} />} />
           <KPICard title="入金済" value={formatCurrency(kpis.collected)} color="green" icon={<ArrowDownCircle size={16} />} />
           <KPICard title="Stripe手数料" value={formatCurrency(kpis.stripeFees)} color="amber" icon={<Wallet size={16} />} />
           <KPICard title="入金額（手数料差引後）" value={formatCurrency(kpis.netDeposited)} color="green" icon={<ArrowDownCircle size={16} />} />

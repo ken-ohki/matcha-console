@@ -175,6 +175,9 @@ export interface SaleRecord {
   // Stripe settlement (card orders): processing fee + net amount deposited.
   stripeFeeJpy?: number
   stripeNetJpy?: number
+  // Sample sales (ex-tax) included in `revenue`/`invoiceAmount`, tracked separately so
+  // they can be aggregated apart from main-product sales.
+  sampleRevenue?: number
   createdAt: Date
   updatedAt: Date
 }

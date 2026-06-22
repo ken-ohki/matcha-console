@@ -124,6 +124,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
   })
 
   const subtotal = o.subtotalJpy ?? items.reduce((a, it) => a + it.revenue, 0)
+  const sampleRevenue = items.reduce((a, it) => a + (it.isSample ? it.revenue : 0), 0)
   const shippingFee = o.shippingFeeJpy ?? 0
   const optionFees = o.optionFeesJpy ?? 0
   const paymentFee = o.paymentFeeJpy ?? 0
@@ -183,6 +184,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
     shippingNote: o.shippingMemo,
     stripeFeeJpy: o.stripeFeeJpy,
     stripeNetJpy: o.stripeNetJpy,
+    sampleRevenue,
     notes: o.notes,
     createdAt,
     updatedAt: createdAt,
