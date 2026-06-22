@@ -558,6 +558,8 @@ function computeInventory(
   // in lockstep with the wholesale app's ecConsumesStock.
   const nowMs = Date.now()
   const reservedByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
+    // Samples are managed separately and never deduct product stock.
+    if (record.channel === 'WholesaleSample') return acc
     if (!ecRecordConsumesStock(record, nowMs) || !isWholesaleChannel(record.channel)) return acc
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
@@ -613,7 +615,7 @@ async function assertSufficientSelfConsumptionStock(
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const nowMs = Date.now()
   const ecSoldKg = ecSales
-    .filter(record => record.productId === input.productId && ecRecordConsumesStock(record, nowMs))
+    .filter(record => record.productId === input.productId && record.channel !== 'WholesaleSample' && ecRecordConsumesStock(record, nowMs))
     .reduce((sum, record) => sum + record.quantityKg, 0)
   const availableKg = product.initialStockKg
     + deriveInventoryAdjustmentKg(product.inventoryChecks)

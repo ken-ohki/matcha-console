@@ -103,7 +103,8 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
   // Goods tax rate follows the destination: domestic matcha = 8%, export = 免税(0%).
   const lineTaxRate = defaultTaxRateForCountry(o.shippingCountry)
   const items: SaleLineItem[] = (o.items ?? []).map(it => {
-    const costPerKg = costByProduct[it.productId] ?? 0
+    const isSample = it.kind === 'sample'
+    const costPerKg = isSample ? 0 : (costByProduct[it.productId] ?? 0)
     const quantityKg = Number(it.quantityKg) || 0
     const revenue = Number(it.lineTotalJpy) || 0
     const costAmount = costPerKg * quantityKg
@@ -118,6 +119,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
       costAmount,
       grossProfit: revenue - costAmount,
       taxRate: lineTaxRate,
+      isSample,
     }
   })
 

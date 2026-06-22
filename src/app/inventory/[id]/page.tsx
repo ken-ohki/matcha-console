@@ -167,6 +167,7 @@ export default function ProductDetailPage() {
       if (sale.status !== 'confirmed') continue
       sale.items.forEach((item, i) => {
         if (item.productId !== pid) return
+        if (item.isSample) return // samples are managed separately — exclude from product history
         rows.push({
           key: `sale-${sale.id}-${i}`,
           date: sale.dueDate || sale.createdAt.toISOString().slice(0, 10),

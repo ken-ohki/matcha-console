@@ -94,6 +94,7 @@ export interface SaleLineItem {
   costAmount: number
   grossProfit: number
   taxRate: TaxRate
+  isSample?: boolean // sample line — excluded from per-product stock/transaction history
 }
 
 export interface SaleLineInput {
