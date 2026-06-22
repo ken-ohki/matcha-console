@@ -657,13 +657,31 @@ export default function WholesaleOrderDetailPage() {
               </dl>
             </Section>
 
-            {/* Cost / gross profit — staff only */}
-            <Section title="原価・粗利（社内）">
+            {/* Finance — staff only */}
+            <Section title="財務">
               <dl className="space-y-1 text-sm">
                 <Row label="売上（税抜）" value={`¥${revenueExTax.toLocaleString()}`} />
+                <Row label="税込み売上" value={`¥${(o.totalJpy ?? 0).toLocaleString()}`} />
                 <Row label="原価" value={`¥${Math.round(totalCost).toLocaleString()}`} />
                 {paymentFee > 0 && <Row label="支払手数料" value={`¥${paymentFee.toLocaleString()}`} />}
                 <Row label="粗利" value={`¥${Math.round(grossProfit).toLocaleString()}${marginRate != null ? `（${marginRate.toFixed(1)}%）` : ''}`} strong />
+                {/* Stripe settlement — fee charged + net actually deposited (card only).
+                    Shown for paid card orders; if not yet captured, offer a fetch button. */}
+                {o.paymentMethod === 'stripe' && (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') && (
+                  typeof o.stripeFeeJpy === 'number' ? (
+                    <>
+                      <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
+                      <Row label="入金額（手数料差引後）" value={`¥${(o.stripeNetJpy ?? (o.totalJpy ?? 0) - o.stripeFeeJpy).toLocaleString()}`} strong />
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <dt className="text-mist">Stripe手数料</dt>
+                      <dd>
+                        <button onClick={() => act('fetch_fee')} disabled={busy} className="text-xs text-matchaDeep underline disabled:opacity-50">未取得 — Stripeから取得</button>
+                      </dd>
+                    </div>
+                  )
+                )}
               </dl>
               <p className="mt-2 text-[11px] text-mist">{o.costAmountJpy != null ? '※移行時の原価スナップショット' : '※現在の仕入単価から自動計算'}</p>
             </Section>
@@ -689,23 +707,6 @@ export default function WholesaleOrderDetailPage() {
                 <Row label="発送状況" value={o.status === 'cancelled' ? '—' : (o.status === 'shipped' || o.shippedAt) ? '出荷済み' : '未発送'} />
                 {o.dueDate && <Row label="支払期日" value={o.dueDate} />}
                 {o.paidAtMs && <Row label="入金日" value={new Date(o.paidAtMs).toLocaleDateString('ja-JP')} />}
-                {/* Stripe settlement — fee charged + net actually deposited (card only).
-                    Shown for paid card orders; if not yet captured, offer a fetch button. */}
-                {o.paymentMethod === 'stripe' && (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') && (
-                  typeof o.stripeFeeJpy === 'number' ? (
-                    <>
-                      <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
-                      <Row label="入金額（手数料差引後）" value={`¥${(o.stripeNetJpy ?? (o.totalJpy ?? 0) - o.stripeFeeJpy).toLocaleString()}`} strong />
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <dt className="text-mist">Stripe手数料</dt>
-                      <dd>
-                        <button onClick={() => act('fetch_fee')} disabled={busy} className="text-xs text-matchaDeep underline disabled:opacity-50">未取得 — Stripeから取得</button>
-                      </dd>
-                    </div>
-                  )
-                )}
               </dl>
             </Section>
 
