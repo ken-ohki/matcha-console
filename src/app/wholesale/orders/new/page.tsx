@@ -244,7 +244,7 @@ export default function NewWholesaleOrderPage() {
               <L label="お届け先名（任意）"><input className="field-input" value={ship.contactName} onChange={e => setShip({ ...ship, contactName: e.target.value })} /></L>
               <L label="電話（任意）"><input className="field-input" value={ship.phone} onChange={e => setShip({ ...ship, phone: e.target.value })} /></L>
               {ship.country !== 'JP' && (
-                <L label="海外発送業者"><select className="field-input" value={ship.overseasCarrier} onChange={e => setShip({ ...ship, overseasCarrier: e.target.value })}><option value="ems">EMS</option><option value="dhl">DHL</option><option value="designated">御社指定業者</option></select></L>
+                <L label="海外発送業者"><select className="field-input" value={ship.overseasCarrier} onChange={e => setShip({ ...ship, overseasCarrier: e.target.value })}><option value="ems">EMS</option><option value="epacket">国際エアパケット</option><option value="dhl">DHL</option><option value="designated">御社指定業者</option></select></L>
               )}
               <L label="送料(¥・税抜) 空欄=自動/0"><input type="number" min="0" step="1" className="field-input" value={shippingFeeJpy} onChange={e => setShippingFeeJpy(e.target.value)} /></L>
             </div>

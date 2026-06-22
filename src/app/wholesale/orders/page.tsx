@@ -55,6 +55,7 @@ async function token(): Promise<string> {
 
 const CARRIER_LABEL: Record<string, string> = {
   ems: 'EMS',
+  epacket: '国際エアパケット',
   dhl: 'DHL',
   designated: '御社指定業者',
 }

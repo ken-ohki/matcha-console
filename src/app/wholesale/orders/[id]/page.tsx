@@ -101,6 +101,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 const CARRIER_LABEL: Record<string, string> = {
   ems: 'EMS（国際スピード郵便）',
+  epacket: '国際エアパケット',
   dhl: 'DHL',
   designated: '御社指定業者',
 }
@@ -900,6 +901,7 @@ function QuoteForm({
           発送業者
           <select value={carrier} onChange={e => setCarrier(e.target.value)} className="field-input mt-1 block">
             <option value="ems">EMS（国際スピード郵便）</option>
+            <option value="epacket">国際エアパケット</option>
             <option value="dhl">DHL</option>
             <option value="designated">御社指定業者</option>
           </select>

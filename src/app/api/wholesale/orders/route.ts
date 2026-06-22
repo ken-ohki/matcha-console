@@ -118,7 +118,7 @@ interface PatchBody {
   orderId?: string
   action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order'
   shippingFeeJpy?: number
-  overseasCarrier?: 'ems' | 'dhl' | 'designated'
+  overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
   shippingCarrierLabel?: string
   shipped?: boolean // set_fulfillment: explicitly set/unset shipped status
