@@ -370,6 +370,8 @@ export interface Settings {
   orderingPausedMessage?: string
   // クーポンのマスタ。チェックアウトでコード入力して適用。
   wholesaleCoupons?: WholesaleCoupon[]
+  // 送信するスタッフ通知メールの種別キー一覧（未設定＝全送信）。要返金は常時送信。
+  staffEmailEvents?: string[]
 }
 
 /** クーポン定義。コード入力で対象商品の小計に割引を適用（1注文1枚）。 */

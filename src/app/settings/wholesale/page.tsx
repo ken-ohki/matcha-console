@@ -11,6 +11,19 @@ import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
 const uid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)
 
+// Toggleable staff-notification emails (key + label). 要返金 is always sent (not listed).
+const STAFF_EMAIL_EVENTS: { key: string; label: string }[] = [
+  { key: 'registration', label: '新規会員登録（承認待ち）' },
+  { key: 'order_paid', label: 'カード入金済みの新規注文' },
+  { key: 'order_bank', label: '銀行振込の新規注文（入金待ち）' },
+  { key: 'order_approval', label: '受注生産の承認待ち' },
+  { key: 'order_quote', label: '海外発送の見積依頼' },
+  { key: 'quote_sent', label: '見積（送料確定）の送付控え' },
+  { key: 'shipment', label: '発送通知の送信控え' },
+  { key: 'member_cancel', label: 'お客様によるキャンセル/辞退' },
+]
+const ALL_STAFF_EMAIL_KEYS = STAFF_EMAIL_EVENTS.map(e => e.key)
+
 export default function SettingsWholesalePage() {
   const [sampleFee, setSampleFee] = useState<number | ''>('')
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
@@ -20,6 +33,7 @@ export default function SettingsWholesalePage() {
   const [products, setProducts] = useState<{ id: string; name: string; sku?: string }[]>([])
   const [orderingPaused, setOrderingPaused] = useState(false)
   const [pausedMessage, setPausedMessage] = useState('')
+  const [staffEmailEvents, setStaffEmailEvents] = useState<string[]>(ALL_STAFF_EMAIL_KEYS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
@@ -37,6 +51,8 @@ export default function SettingsWholesalePage() {
     setCoupons(stored.wholesaleCoupons ?? [])
     setOrderingPaused(stored.orderingPaused ?? false)
     setPausedMessage(stored.orderingPausedMessage ?? '')
+    // Unset = all enabled (backward compatible).
+    setStaffEmailEvents(stored.staffEmailEvents ?? ALL_STAFF_EMAIL_KEYS)
     try {
       const prods = await services.inventory.getProductsWithInventory()
       setProducts(prods.map(p => ({ id: p.id, name: p.name, sku: p.sku })))
@@ -92,6 +108,7 @@ export default function SettingsWholesalePage() {
         wholesaleOptions: cleanOptions,
         orderingPaused,
         orderingPausedMessage: pausedMessage.trim(),
+        staffEmailEvents: STAFF_EMAIL_EVENTS.filter(e => staffEmailEvents.includes(e.key)).map(e => e.key),
       }
       await services.settings.updateSettings(input)
       setTiers(cleanTiers)
@@ -169,6 +186,26 @@ export default function SettingsWholesalePage() {
               className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-ink"
             />
             {orderingPaused && <p className="mt-2 text-xs font-bold text-alert">⚠ 現在、新規注文の受付を停止しています（保存後に反映）。</p>}
+          </div>
+
+          {/* Staff notification emails */}
+          <div className="mb-5 rounded-3xl border border-line bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-ink">スタッフ通知メール</h2>
+            <p className="mt-1 text-[11px] text-mist">スタッフ宛（{`wholesale@sabo-matcha.jp`}）に送る通知メールを選びます。チェックを外すと送信しません（送信数の節約に）。多くの内容はダッシュボード・注文一覧でも確認できます。</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {STAFF_EMAIL_EVENTS.map(e => (
+                <label key={e.key} className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={staffEmailEvents.includes(e.key)}
+                    onChange={ev => setStaffEmailEvents(prev => (ev.target.checked ? [...new Set([...prev, e.key])] : prev.filter(k => k !== e.key)))}
+                    className="h-4 w-4 accent-[#174c33]"
+                  />
+                  {e.label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-3 text-[11px] text-mist">※「要返金アラート」（取消済み注文への入金）は事故防止のため常時送信されます（設定不可）。</p>
           </div>
 
           {/* Coupons */}
