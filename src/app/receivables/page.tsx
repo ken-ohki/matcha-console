@@ -543,7 +543,10 @@ function SaleDetailModal({ sale, onClose }: { sale: SaleRecord | null; onClose: 
             <DetailRow label="商品代金（税抜）" value={formatCurrency(sale.revenue)} />
             <DetailRow label="送料" value={formatCurrency(sale.shippingFee ?? 0)} />
             <DetailRow label="諸費用" value={formatCurrency(sumSaleFees(sale.fees))} />
-            <DetailRow label="決済手数料" value={formatCurrency(sale.paymentFee ?? 0)} />
+            <DetailRow label="決済手数料" value={formatCurrency((sale.stripeFeeJpy ?? 0) || (sale.paymentFee ?? 0))} />
+            {(sale.stripeFeeJpy ?? 0) > 0 && (
+              <DetailRow label="入金額（手数料差引後）" value={formatCurrency(sale.stripeNetJpy ?? (inclTotal - (sale.stripeFeeJpy ?? 0)))} />
+            )}
             <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
             <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
             <DetailRow label="請求額（税抜）" value={formatCurrency(exclTotal)} />
