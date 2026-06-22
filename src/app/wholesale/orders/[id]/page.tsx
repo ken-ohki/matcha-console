@@ -204,6 +204,7 @@ export default function WholesaleOrderDetailPage() {
     }
     if (action === 'approve' && !window.confirm('この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？')) return
     if (action === 'resend_payment_link' && !window.confirm('新しいStripeカード決済リンクを発行しますか？（メールは送信されません。発行後、画面に表示されるリンクをお客様にお伝えください）')) return
+    if (action === 'notify_shipped' && order?.shipmentEmailedAt && !window.confirm('発送通知メールは既に送信済みです。もう一度送信しますか？')) return
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {

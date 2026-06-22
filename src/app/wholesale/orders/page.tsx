@@ -30,6 +30,19 @@ interface Order {
   origin?: string
   transferReportedAt?: string
   createdAtMs?: number
+  bankDueAtMs?: number
+  acceptanceExpiresAtMs?: number
+}
+
+// Orders whose hold/deadline has lapsed and need staff to release (cancel) the stock.
+const STALE_DAYS = 30
+function isOverdue(o: Order, now: number): boolean {
+  if (isClosed(o) || o.paymentStatus === 'paid' || o.status === 'paid') return false
+  if (o.paymentMethod === 'bank_transfer' && o.status === 'pending_payment' && o.bankDueAtMs && o.bankDueAtMs < now) return true
+  if (o.status === 'pending_acceptance' && o.acceptanceExpiresAtMs && o.acceptanceExpiresAtMs < now) return true
+  const ageMs = now - (o.createdAtMs ?? now)
+  if ((o.status === 'pending_quote' || o.status === 'pending_approval') && ageMs > STALE_DAYS * 86_400_000) return true
+  return false
 }
 
 type OrdersTab = 'all' | 'ec' | 'direct'
@@ -93,7 +106,9 @@ export default function WholesaleOrdersPage() {
   const [bucket, setBucket] = useStickyState<OrdersBucket>('orders.bucket', 'action')
   const [search, setSearch] = useState('')
   const [bankPendingOnly, setBankPendingOnly] = useState(false)
+  const [overdueOnly, setOverdueOnly] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const nowMs = Date.now()
 
   // EC = self-service web orders (origin 'self' or legacy undefined); 直販 = staff-entered/migrated.
   const shown = orders.filter(o => tab === 'all' ? true : tab === 'direct' ? o.origin === 'direct' : o.origin !== 'direct')
@@ -121,6 +136,7 @@ export default function WholesaleOrdersPage() {
   const nq = q.replace(/[,¥\s]/g, '')
   const filtered = list.filter(o => {
     if (bankPendingOnly && !isBankPending(o)) return false
+    if (overdueOnly && !isOverdue(o, nowMs)) return false
     if (!q) return true
     return (
       (o.orderNumber ?? '').toLowerCase().includes(q) ||
@@ -130,6 +146,7 @@ export default function WholesaleOrdersPage() {
     )
   })
   const bankPendingCount = shown.filter(isBankPending).length
+  const overdueCount = shown.filter(o => isOverdue(o, nowMs)).length
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -195,6 +212,27 @@ export default function WholesaleOrdersPage() {
     }
   }
 
+  // Release (cancel) an overdue order — frees its stock hold and emails the buyer.
+  const releaseOrder = async (o: Order) => {
+    if (!window.confirm(`期限超過の注文「${o.orderNumber}」（${o.memberCompanyName ?? o.contactName ?? ''}）を取消して在庫を解放しますか？\n\nお客様にキャンセル通知メールが送信されます。`)) return
+    setBusyId(o.id)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: o.id, action: 'cancel' }),
+      })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        window.alert(`取消に失敗しました（${d.error ?? 'error'}）`)
+        return
+      }
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   useEffect(() => {
     load()
   }, [load])
@@ -251,6 +289,14 @@ export default function WholesaleOrdersPage() {
             className={`rounded-full border px-2.5 py-1 text-xs transition ${bankPendingOnly ? 'border-[#a87b1e] bg-[#a87b1e] text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
           >
             入金待ち（銀行振込）({bankPendingCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setOverdueOnly(v => !v)}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${overdueOnly ? 'border-alert bg-alert text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+            title="支払期限/見積期限の超過、未見積/未承認が30日以上の注文"
+          >
+            期限超過 ({overdueCount})
           </button>
           <input
             type="search"
@@ -327,6 +373,17 @@ export default function WholesaleOrdersPage() {
                             className="rounded border border-matcha px-2 py-0.5 text-[11px] font-medium text-matcha hover:bg-[#eef3eb] disabled:opacity-50"
                           >
                             入金確認
+                          </button>
+                        )}
+                        {isOverdue(o, nowMs) && (
+                          <button
+                            type="button"
+                            disabled={busyId === o.id}
+                            onClick={e => { e.stopPropagation(); releaseOrder(o) }}
+                            className="rounded border border-alert px-2 py-0.5 text-[11px] font-medium text-alert hover:bg-[#fdecec] disabled:opacity-50"
+                            title="期限超過 — 取消して在庫を解放"
+                          >
+                            期限超過・解放
                           </button>
                         )}
                       </div>

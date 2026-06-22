@@ -79,6 +79,20 @@ async function cancelOrder(database: Firestore, orderId: string): Promise<void> 
   })
 }
 
+/** Trigger an order notification email via the wholesale app (it owns Resend). Best-effort. */
+async function sendOrderEmail(orderId: string, kind: 'cancelled' | 'paid', request: Request): Promise<void> {
+  const auth = request.headers.get('authorization') ?? ''
+  try {
+    await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/order-email`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: auth },
+      body: JSON.stringify({ orderId, kind }),
+    })
+  } catch (err) {
+    console.error('[orders] order-email failed', orderId, kind, err)
+  }
+}
+
 /** Mark an order paid and firm any 'reserved' stock holds (overseas quoted bank). */
 async function confirmOrderPaid(database: Firestore, orderId: string): Promise<void> {
   const orderRef = database.collection('wholesale_orders').doc(orderId)
@@ -271,7 +285,7 @@ export async function PATCH(request: Request) {
   // Inline billing edits from 入金管理 (due date / paid state / method).
   if (body.action === 'set_billing') {
     const snap = await ref.get()
-    const cur = snap.data() as { status?: string } | undefined
+    const cur = snap.data() as { status?: string; paymentStatus?: string } | undefined
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
     if (body.dueDate !== undefined) patch.dueDate = body.dueDate || FieldValue.delete()
     if (body.paymentMethod !== undefined) patch.paymentMethod = body.paymentMethod || FieldValue.delete()
@@ -303,6 +317,11 @@ export async function PATCH(request: Request) {
       }
     }
     await ref.set(patch, { merge: true })
+    // Notify the buyer when a manual confirmation first transitions the order to paid
+    // (e.g. bank-transfer reconciliation) — the card webhook path already emails.
+    if (patch.paymentStatus === 'paid' && cur?.paymentStatus !== 'paid') {
+      await sendOrderEmail(body.orderId, 'paid', request)
+    }
     return NextResponse.json({ ok: true })
   }
   // Edit tracking / shipping status on an already-shipped (or paid) order.
@@ -494,7 +513,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: true })
   }
   if (body.action === 'cancel') {
+    const before = (await ref.get()).data() as { status?: string } | undefined
     await cancelOrder(database, body.orderId)
+    // Tell the buyer their order was cancelled (only on a real transition).
+    if (before && before.status !== 'cancelled') await sendOrderEmail(body.orderId, 'cancelled', request)
     return NextResponse.json({ ok: true, status: 'cancelled' })
   }
   // Permanently delete an order (test-data cleanup). Hard-deletes the order doc AND
