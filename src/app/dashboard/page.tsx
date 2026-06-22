@@ -28,7 +28,9 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   shipped: '出荷済み',
   cancelled: '取消',
 }
-const ATTENTION_STATUSES = ['pending_acceptance', 'pending_approval', 'pending_quote', 'quoted', 'pending_payment']
+// Needs staff action: awaiting acceptance/approval/quote/payment, plus 'paid' (= paid
+// but not yet shipped → awaiting shipment). 'shipped' / 'cancelled' are done.
+const ATTENTION_STATUSES = ['pending_acceptance', 'pending_approval', 'pending_quote', 'quoted', 'pending_payment', 'paid']
 
 async function token(): Promise<string> {
   const current = getFirebaseAuthInstance().currentUser
@@ -160,7 +162,7 @@ export default function DashboardPage() {
                     <tr key={o.id} className="whitespace-nowrap border-t border-line">
                       <td className="py-2.5 pr-4 font-mono text-ink">{o.orderNumber ?? o.id}</td>
                       <td className="py-2.5 pr-4 text-graphite">{o.memberCompanyName ?? '—'}</td>
-                      <td className="py-2.5 pr-4"><span className="inline-block rounded border border-[#a87b1e] px-2 py-0.5 text-[11px] text-[#a87b1e]">{ORDER_STATUS_LABEL[o.status ?? ''] ?? o.status}</span></td>
+                      <td className="py-2.5 pr-4"><span className="inline-block rounded border border-[#a87b1e] px-2 py-0.5 text-[11px] text-[#a87b1e]">{o.status === 'paid' ? '発送待ち' : (ORDER_STATUS_LABEL[o.status ?? ''] ?? o.status)}</span></td>
                       <td className="py-2.5 pr-4 text-mist">{fmtDate(o.createdAtMs)}</td>
                       <td className="py-2.5 pr-4 text-right font-semibold text-ink">{yen(o.totalJpy ?? 0)}</td>
                     </tr>
