@@ -11,6 +11,7 @@ import {
   Filter,
   Link2,
   Plus,
+  Undo2,
   Wallet,
   X,
 } from 'lucide-react'
@@ -63,6 +64,14 @@ const TAB_LABELS: Record<Tab, string> = { ...BUCKET_LABELS, pending: '請求待�
 const TABS: Tab[] = [...BUCKET_ORDER_OPEN, 'pending', 'paid']
 
 // A unified payable: a received supplier invoice OR a legacy (pre-cutover) PO.
+interface UndoState {
+  kind: 'invoice' | 'po'
+  id: string
+  paymentId: string
+  label: string
+  amount: number
+}
+
 interface PayableRow {
   kind: 'invoice' | 'po'
   id: string
@@ -94,11 +103,15 @@ export default function PayablesPage() {
   const [unbilled, setUnbilled] = useState<UnbilledPoLine[]>([])
   const [bankInfoBySupplier, setBankInfoBySupplier] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingKey, setSavingKey] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [detailPo, setDetailPo] = useState<PurchaseOrder | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('actionNeeded')
+  // Misclick guard: a row whose 支払確認 is awaiting a second (確定) click.
+  const [confirmKey, setConfirmKey] = useState<string | null>(null)
+  // Just-confirmed payment, surfaced with an inline 元に戻す affordance.
+  const [lastUndo, setLastUndo] = useState<UndoState | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -187,44 +200,72 @@ export default function PayablesPage() {
     return { outstanding, actionNeeded, pendingTotal, paidThisMonth }
   }, [rows, grouped, unbilled, invoices, legacyPos])
 
-  const markPaidInvoice = async (inv: PurchaseInvoice) => {
-    setSavingId(inv.id)
+  // Commit the payment (second step of the 確定 guard). Records a single payment for
+  // the remaining amount and surfaces an 元に戻す affordance referencing it.
+  const performMarkPaid = async (r: PayableRow) => {
+    setConfirmKey(null)
+    const key = `${r.kind}:${r.id}`
+    setSavingKey(key)
     setFeedback(null)
+    const payId = `pay-${Date.now()}`
     try {
       const svc = await getServices()
-      const remaining = invoiceRemaining(inv)
-      const next: PurchaseOrderPayment[] = [
-        ...(inv.payments ?? []),
-        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : inv.totalAmount, paidDate: todayIso() },
-      ]
-      const updated = await svc.purchaseInvoices.updateInvoicePayments(inv.id, next)
-      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x))
-      setFeedback('支払確認しました')
+      if (r.kind === 'invoice' && r.invoice) {
+        const inv = r.invoice
+        const amount = r.remaining > 0 ? r.remaining : inv.totalAmount
+        const next: PurchaseOrderPayment[] = [...(inv.payments ?? []), { id: payId, amount, paidDate: todayIso() }]
+        const updated = await svc.purchaseInvoices.updateInvoicePayments(inv.id, next)
+        setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x))
+        setLastUndo({ kind: 'invoice', id: inv.id, paymentId: payId, label: inv.supplierName, amount })
+      } else if (r.kind === 'po' && r.po) {
+        const o = r.po
+        const amount = r.remaining > 0 ? r.remaining : computePoTaxIncluded(o)
+        const next: PurchaseOrderPayment[] = [...(o.payments ?? []), { id: payId, amount, paidDate: todayIso() }]
+        const updated = await svc.purchaseOrders.updatePurchaseOrder(o.id, { payments: next, paidDate: todayIso() })
+        setLegacyPos(prev => prev.map(x => x.id === o.id ? updated : x))
+        setLastUndo({ kind: 'po', id: o.id, paymentId: payId, label: o.supplierName, amount })
+      }
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally { setSavingId(null) }
+    } finally { setSavingKey(null) }
   }
 
-  const markPaidPo = async (o: PurchaseOrder) => {
-    setSavingId(o.id)
+  // Undo a payment: a specific one (元に戻す, by paymentId) or the most recent
+  // (入金取消, no paymentId). Recomputes status from the remaining payments.
+  const removePayment = async (kind: 'invoice' | 'po', id: string, paymentId?: string) => {
+    const key = `${kind}:${id}`
+    setSavingKey(key)
     setFeedback(null)
     try {
       const svc = await getServices()
-      const remaining = poRemaining(o)
-      const next = [
-        ...(o.payments ?? []),
-        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : computePoTaxIncluded(o), paidDate: todayIso() },
-      ]
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(o.id, { payments: next, paidDate: todayIso() })
-      setLegacyPos(prev => prev.map(x => x.id === o.id ? updated : x))
-      setFeedback('支払確認しました')
+      if (kind === 'invoice') {
+        const inv = invoices.find(x => x.id === id)
+        if (!inv) return
+        const cur = inv.payments ?? []
+        const next = paymentId ? cur.filter(p => p.id !== paymentId) : cur.slice(0, -1)
+        const updated = await svc.purchaseInvoices.updateInvoicePayments(id, next)
+        setInvoices(prev => prev.map(x => x.id === id ? updated : x))
+      } else {
+        const o = legacyPos.find(x => x.id === id)
+        if (!o) return
+        const cur = o.payments ?? []
+        const next = paymentId ? cur.filter(p => p.id !== paymentId) : cur.slice(0, -1)
+        const updated = await svc.purchaseOrders.updatePurchaseOrder(id, {
+          payments: next,
+          paidDate: '',
+          ...(next.length === 0 ? { paymentStatus: 'unpaid' as const } : {}),
+        })
+        setLegacyPos(prev => prev.map(x => x.id === id ? updated : x))
+      }
+      setLastUndo(null)
+      setFeedback('支払いを取り消しました')
     } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally { setSavingId(null) }
+      setFeedback(err instanceof Error ? err.message : '取り消しに失敗しました')
+    } finally { setSavingKey(null) }
   }
 
   const savePoPayments = async (id: string, payments: PurchaseOrderPayment[]) => {
-    setSavingId(id)
+    setSavingKey(`po:${id}`)
     setFeedback(null)
     try {
       const svc = await getServices()
@@ -233,7 +274,7 @@ export default function PayablesPage() {
       setDetailPo(updated)
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally { setSavingId(null) }
+    } finally { setSavingKey(null) }
   }
 
   const renderRow = (r: PayableRow) => {
@@ -269,16 +310,49 @@ export default function PayablesPage() {
           )}
         </td>
         <td className="px-3 py-2 text-right">
-          {!r.isPaid && (
-            <button
-              type="button"
-              onClick={() => r.kind === 'invoice' ? (r.invoice && markPaidInvoice(r.invoice)) : (r.po && markPaidPo(r.po))}
-              disabled={savingId === r.id}
-              className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
-            >
-              <CheckCircle2 size={12} /> 支払確認
-            </button>
-          )}
+          <div className="flex items-center justify-end gap-1.5">
+            {!r.isPaid && (
+              confirmKey === `${r.kind}:${r.id}` ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-[10px] text-mist">支払済に？</span>
+                  <button
+                    type="button"
+                    onClick={() => performMarkPaid(r)}
+                    disabled={savingKey === `${r.kind}:${r.id}`}
+                    className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
+                  >
+                    <CheckCircle2 size={12} /> 確定
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmKey(null)}
+                    className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone"
+                  >
+                    取消
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setConfirmKey(`${r.kind}:${r.id}`); setLastUndo(null) }}
+                  disabled={savingKey === `${r.kind}:${r.id}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-matchaDeep shadow-sm hover:bg-[#eef3eb] disabled:opacity-60"
+                >
+                  <CheckCircle2 size={12} /> 支払確認
+                </button>
+              )
+            )}
+            {r.paid > 0 && (
+              <button
+                type="button"
+                onClick={() => removePayment(r.kind, r.id)}
+                disabled={savingKey === `${r.kind}:${r.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
+              >
+                <Undo2 size={12} /> 入金取消
+              </button>
+            )}
+          </div>
         </td>
       </tr>
     )
@@ -422,6 +496,28 @@ export default function PayablesPage() {
           {feedback && <span className="text-xs text-matchaDeep">{feedback}</span>}
         </div>
 
+        {lastUndo && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5 text-sm">
+            <span className="text-ink">
+              <CheckCircle2 size={14} className="mr-1 inline text-matcha" />
+              「{lastUndo.label}」を支払確認しました（{formatCurrency(lastUndo.amount)}）
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => removePayment(lastUndo.kind, lastUndo.id, lastUndo.paymentId)}
+                disabled={savingKey === `${lastUndo.kind}:${lastUndo.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-medium text-matchaDeep hover:bg-white disabled:opacity-60"
+              >
+                <Undo2 size={13} /> 元に戻す
+              </button>
+              <button type="button" onClick={() => setLastUndo(null)} aria-label="閉じる" className="rounded p-1 text-gray-400 hover:text-mist">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
         {!loading && (() => {
@@ -440,7 +536,7 @@ export default function PayablesPage() {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => setActiveTab(t)}
+                      onClick={() => { setActiveTab(t); setConfirmKey(null) }}
                       className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
                         active === t ? 'border-[#174c33] text-ink' : 'border-transparent text-mist hover:text-ink'
                       }`}
