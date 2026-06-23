@@ -28,6 +28,7 @@ export default function SettingsWholesalePage() {
   const [sampleFee, setSampleFee] = useState<number | ''>('')
   const [sampleLimitDays, setSampleLimitDays] = useState<number | ''>(30)
   const [sampleLimitPerProduct, setSampleLimitPerProduct] = useState<number | ''>(2)
+  const [paymentThreshold, setPaymentThreshold] = useState<number | ''>(0)
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [options, setOptions] = useState<WholesaleOption[]>([])
@@ -49,6 +50,7 @@ export default function SettingsWholesalePage() {
     setSampleFee(stored.wholesaleSampleFeeJpy ?? 100)
     setSampleLimitDays(stored.sampleLimitWindowDays ?? 30)
     setSampleLimitPerProduct(stored.sampleLimitPerProduct ?? 2)
+    setPaymentThreshold(stored.paymentMethodThresholdJpy ?? 0)
     setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
     setOptions(stored.wholesaleOptions ?? [])
@@ -105,6 +107,7 @@ export default function SettingsWholesalePage() {
         wholesaleSampleFeeJpy: sampleFee === '' ? 0 : Math.max(0, Number(sampleFee)),
         sampleLimitWindowDays: sampleLimitDays === '' ? 30 : Math.max(1, Math.round(Number(sampleLimitDays))),
         sampleLimitPerProduct: sampleLimitPerProduct === '' ? 2 : Math.max(1, Math.round(Number(sampleLimitPerProduct))),
+        paymentMethodThresholdJpy: paymentThreshold === '' ? 0 : Math.max(0, Math.round(Number(paymentThreshold))),
         wholesaleRankDiscounts: {
           standard: Math.min(100, Math.max(0, Number(rankDiscounts.standard) || 0)),
           premium: Math.min(100, Math.max(0, Number(rankDiscounts.premium) || 0)),
@@ -330,6 +333,19 @@ export default function SettingsWholesalePage() {
                   <span className="text-sm text-mist">個まで</span>
                 </div>
                 <p className="mt-1 text-[11px] text-mist">同一会員が同じ商品のサンプルを期間内に買える上限個数。複数注文に分けた買い増しを防ぎます（初期値 30日 / 2個 = 20g）。</p>
+              </div>
+              <div className="max-w-xs">
+                <label className="mb-1 block text-sm font-medium text-ink">決済手段の分岐点 (円・税込)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={paymentThreshold}
+                  onChange={e => setPaymentThreshold(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                  placeholder="0"
+                />
+                <p className="mt-1 text-[11px] text-mist">注文金額がこの金額<strong>未満</strong>ならクレジットカードのみ、<strong>以上</strong>なら銀行振込のみを表示します。<strong>0</strong> で分岐なし（両方選択可）。海外注文は送料確定前の金額で判定されます。</p>
               </div>
             </div>
           </div>

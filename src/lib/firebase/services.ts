@@ -236,6 +236,7 @@ function getDefaultSettings(): Settings {
     wholesaleSampleFeeJpy: 100,
     sampleLimitWindowDays: 30,
     sampleLimitPerProduct: 2,
+    paymentMethodThresholdJpy: 0,
     wholesaleRankDiscounts: { standard: 0, premium: 0, exclusive: 0 },
     wholesaleCoupons: [],
     staffEmailEvents: undefined,
@@ -488,6 +489,8 @@ function mapSettings(data?: DocumentData): Settings {
       data.sampleLimitWindowDays != null ? Number(data.sampleLimitWindowDays) : defaults.sampleLimitWindowDays,
     sampleLimitPerProduct:
       data.sampleLimitPerProduct != null ? Number(data.sampleLimitPerProduct) : defaults.sampleLimitPerProduct,
+    paymentMethodThresholdJpy:
+      data.paymentMethodThresholdJpy != null ? Number(data.paymentMethodThresholdJpy) : defaults.paymentMethodThresholdJpy,
     wholesaleRankDiscounts: mapRankDiscounts(data.wholesaleRankDiscounts),
     wholesaleCoupons: mapWholesaleCoupons(data.wholesaleCoupons),
     staffEmailEvents: Array.isArray(data.staffEmailEvents) ? data.staffEmailEvents.map(String) : undefined,

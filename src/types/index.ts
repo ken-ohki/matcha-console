@@ -370,6 +370,9 @@ export interface Settings {
   // sampleLimitPerProduct 個まで（複数注文に分けた買い増しを防ぐ）。未設定時は 30日 / 2個。
   sampleLimitWindowDays?: number
   sampleLimitPerProduct?: number
+  // 決済手段の分岐点(税込・円)。注文金額がこの金額未満ならカード決済のみ、
+  // この金額以上なら銀行振込のみ。0 または未設定で分岐なし(両方選択可)。
+  paymentMethodThresholdJpy?: number
   // 顧客ランク別の割引率(%)。卸売商品価格に適用。
   wholesaleRankDiscounts?: WholesaleRankDiscounts
   // トラブル時などに卸売サイトの新規注文受付を一時停止するフラグ。
