@@ -10,6 +10,7 @@ import {
   FileText,
   Filter,
   Link2,
+  Pencil,
   Plus,
   Undo2,
   Wallet,
@@ -36,6 +37,7 @@ import {
   poRemaining,
 } from '@/lib/cashflow'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
+import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
 import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, type Bucket } from '@/lib/payment-buckets'
@@ -70,6 +72,17 @@ interface UndoState {
   paymentId: string
   label: string
   amount: number
+}
+
+interface PayModalState {
+  kind: 'invoice' | 'po'
+  id: string
+  label: string
+  mode: 'pay' | 'edit'
+  amount: number          // remaining to pay (pay) / the payment amount (edit)
+  paymentId?: string      // edit: which payment to change
+  paidDate: string
+  method: string
 }
 
 interface PayableRow {
@@ -115,8 +128,9 @@ export default function PayablesPage() {
   const [query, setQuery] = useState('')
   const [detailPo, setDetailPo] = useState<PurchaseOrder | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('actionNeeded')
-  // Misclick guard: a row whose 支払確認 is awaiting a second (確定) click.
-  const [confirmKey, setConfirmKey] = useState<string | null>(null)
+  // Payment confirm/edit dialog (also serves as the misclick guard — a single
+  // stray click only opens it; committing needs an explicit 確定/更新).
+  const [payModal, setPayModal] = useState<PayModalState | null>(null)
   // Just-confirmed payment, surfaced with an inline 元に戻す affordance.
   const [lastUndo, setLastUndo] = useState<UndoState | null>(null)
 
@@ -209,31 +223,82 @@ export default function PayablesPage() {
     return { outstanding, actionNeeded, pendingTotal, paidThisMonth }
   }, [rows, grouped, unbilled, invoices, legacyPos])
 
-  // Commit the payment (second step of the 確定 guard). Records a single payment for
-  // the remaining amount and surfaces an 元に戻す affordance referencing it.
-  const performMarkPaid = async (r: PayableRow) => {
-    setConfirmKey(null)
-    const key = `${r.kind}:${r.id}`
+  // Open the confirm dialog for an unpaid/partial row (record a new payment).
+  const openPay = (r: PayableRow) => {
+    setLastUndo(null)
+    setPayModal({
+      kind: r.kind,
+      id: r.id,
+      label: r.supplierName,
+      mode: 'pay',
+      amount: r.remaining > 0 ? r.remaining : r.totalIncl,
+      paidDate: todayIso(),
+      method: '',
+    })
+  }
+
+  // Open the dialog to change the recorded 入金日 / 支払方法 of the latest payment.
+  const openEdit = (r: PayableRow) => {
+    const payments = r.kind === 'invoice' ? r.invoice?.payments : r.po?.payments
+    const last = (payments ?? [])[(payments?.length ?? 0) - 1]
+    if (!last) return
+    setLastUndo(null)
+    setPayModal({
+      kind: r.kind,
+      id: r.id,
+      label: r.supplierName,
+      mode: 'edit',
+      amount: last.amount,
+      paymentId: last.id,
+      paidDate: last.paidDate || todayIso(),
+      method: last.method || '',
+    })
+  }
+
+  // Commit the dialog: append a new payment (pay) or update the chosen one (edit).
+  const submitPayModal = async () => {
+    if (!payModal) return
+    const m = payModal
+    const key = `${m.kind}:${m.id}`
     setSavingKey(key)
     setFeedback(null)
-    const payId = `pay-${Date.now()}`
     try {
       const svc = await getServices()
-      if (r.kind === 'invoice' && r.invoice) {
-        const inv = r.invoice
-        const amount = r.remaining > 0 ? r.remaining : inv.totalAmount
-        const next: PurchaseOrderPayment[] = [...(inv.payments ?? []), { id: payId, amount, paidDate: todayIso() }]
-        const updated = await svc.purchaseInvoices.updateInvoicePayments(inv.id, next)
-        setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x))
-        setLastUndo({ kind: 'invoice', id: inv.id, paymentId: payId, label: inv.supplierName, amount })
-      } else if (r.kind === 'po' && r.po) {
-        const o = r.po
-        const amount = r.remaining > 0 ? r.remaining : computePoTaxIncluded(o)
-        const next: PurchaseOrderPayment[] = [...(o.payments ?? []), { id: payId, amount, paidDate: todayIso() }]
-        const updated = await svc.purchaseOrders.updatePurchaseOrder(o.id, { payments: next, paidDate: todayIso() })
-        setLegacyPos(prev => prev.map(x => x.id === o.id ? updated : x))
-        setLastUndo({ kind: 'po', id: o.id, paymentId: payId, label: o.supplierName, amount })
+      const paidDate = m.paidDate || todayIso()
+      const method = m.method || undefined
+      if (m.mode === 'pay') {
+        const payId = `pay-${Date.now()}`
+        const payment: PurchaseOrderPayment = { id: payId, amount: m.amount, paidDate, ...(method ? { method } : {}) }
+        if (m.kind === 'invoice') {
+          const inv = invoices.find(x => x.id === m.id)
+          if (!inv) return
+          const updated = await svc.purchaseInvoices.updateInvoicePayments(m.id, [...(inv.payments ?? []), payment])
+          setInvoices(prev => prev.map(x => x.id === m.id ? updated : x))
+        } else {
+          const o = legacyPos.find(x => x.id === m.id)
+          if (!o) return
+          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: [...(o.payments ?? []), payment], paidDate })
+          setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
+        }
+        setLastUndo({ kind: m.kind, id: m.id, paymentId: payId, label: m.label, amount: m.amount })
+      } else {
+        // Edit the chosen payment's date/method (amount unchanged).
+        const apply = (payments: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] =>
+          (payments ?? []).map(p => p.id === m.paymentId ? { ...p, paidDate, method } : p)
+        if (m.kind === 'invoice') {
+          const inv = invoices.find(x => x.id === m.id)
+          if (!inv) return
+          const updated = await svc.purchaseInvoices.updateInvoicePayments(m.id, apply(inv.payments))
+          setInvoices(prev => prev.map(x => x.id === m.id ? updated : x))
+        } else {
+          const o = legacyPos.find(x => x.id === m.id)
+          if (!o) return
+          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: apply(o.payments), paidDate })
+          setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
+        }
+        setFeedback('入金情報を更新しました')
       }
+      setPayModal(null)
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingKey(null) }
@@ -322,45 +387,34 @@ export default function PayablesPage() {
         <td className="px-3 py-2 text-right">
           <div className="flex items-center justify-end gap-1.5">
             {!r.isPaid && (
-              confirmKey === `${r.kind}:${r.id}` ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-[10px] text-mist">支払済に？</span>
-                  <button
-                    type="button"
-                    onClick={() => performMarkPaid(r)}
-                    disabled={savingKey === `${r.kind}:${r.id}`}
-                    className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
-                  >
-                    <CheckCircle2 size={12} /> 確定
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmKey(null)}
-                    className="rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone"
-                  >
-                    取消
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setConfirmKey(`${r.kind}:${r.id}`); setLastUndo(null) }}
-                  disabled={savingKey === `${r.kind}:${r.id}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-matchaDeep shadow-sm hover:bg-[#eef3eb] disabled:opacity-60"
-                >
-                  <CheckCircle2 size={12} /> 支払確認
-                </button>
-              )
-            )}
-            {r.paid > 0 && (
               <button
                 type="button"
-                onClick={() => removePayment(r.kind, r.id)}
+                onClick={() => openPay(r)}
                 disabled={savingKey === `${r.kind}:${r.id}`}
-                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
+                className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
               >
-                <Undo2 size={12} /> 入金取消
+                <CheckCircle2 size={12} /> 支払確認
               </button>
+            )}
+            {r.paid > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => openEdit(r)}
+                  disabled={savingKey === `${r.kind}:${r.id}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb] disabled:opacity-60"
+                >
+                  <Pencil size={12} /> 入金日・方法
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removePayment(r.kind, r.id)}
+                  disabled={savingKey === `${r.kind}:${r.id}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
+                >
+                  <Undo2 size={12} /> 入金取消
+                </button>
+              </>
             )}
           </div>
         </td>
@@ -547,7 +601,7 @@ export default function PayablesPage() {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => { setActiveTab(t); setConfirmKey(null) }}
+                      onClick={() => setActiveTab(t)}
                       className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
                         active === t ? 'border-[#174c33] text-ink' : 'border-transparent text-mist hover:text-ink'
                       }`}
@@ -586,6 +640,55 @@ export default function PayablesPage() {
         onClose={() => setDetailPo(null)}
         onSavePayments={savePoPayments}
       />
+
+      {payModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={() => setPayModal(null)}>
+          <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">{payModal.mode === 'pay' ? '支払確認' : '入金日・支払方法の変更'}</h2>
+              <button onClick={() => setPayModal(null)} className="rounded-full p-1.5 text-gray-400 hover:bg-bone hover:text-mist"><X size={16} /></button>
+            </div>
+            <p className="mb-3 text-sm text-mist">{payModal.label}</p>
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-line bg-bone px-3 py-2 text-sm">
+              <span className="text-mist">{payModal.mode === 'pay' ? '支払額（税込）' : '入金額（税込）'}</span>
+              <span className="font-semibold text-ink">{formatCurrency(payModal.amount)}</span>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-xs text-mist">
+                <span className="mb-1 block">入金日</span>
+                <input
+                  type="date"
+                  value={payModal.paidDate}
+                  onChange={e => setPayModal(m => m && { ...m, paidDate: e.target.value })}
+                  className="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                />
+              </label>
+              <label className="block text-xs text-mist">
+                <span className="mb-1 block">支払方法</span>
+                <select
+                  value={payModal.method}
+                  onChange={e => setPayModal(m => m && { ...m, method: e.target.value })}
+                  className="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                >
+                  <option value="">未設定</option>
+                  {PAYMENT_METHODS.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setPayModal(null)} className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm text-mist hover:bg-bone">取消</button>
+              <button
+                type="button"
+                onClick={submitPayModal}
+                disabled={savingKey === `${payModal.kind}:${payModal.id}`}
+                className="inline-flex items-center gap-1 rounded-lg bg-ink px-4 py-1.5 text-sm font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
+              >
+                <CheckCircle2 size={14} /> {payModal.mode === 'pay' ? '支払確認' : '更新'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   )
 }
