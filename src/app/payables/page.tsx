@@ -237,7 +237,7 @@ export default function PayablesPage() {
     })
   }
 
-  // Open the dialog to change the recorded 入金日 / 支払方法 of the latest payment.
+  // Open the dialog to change the recorded 支払日 / 支払方法 of the latest payment.
   const openEdit = (r: PayableRow) => {
     const payments = r.kind === 'invoice' ? r.invoice?.payments : r.po?.payments
     const last = (payments ?? [])[(payments?.length ?? 0) - 1]
@@ -296,7 +296,7 @@ export default function PayablesPage() {
           const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: apply(o.payments), paidDate })
           setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
         }
-        setFeedback('入金情報を更新しました')
+        setFeedback('支払情報を更新しました')
       }
       setPayModal(null)
     } catch (err) {
@@ -305,7 +305,7 @@ export default function PayablesPage() {
   }
 
   // Undo a payment: a specific one (元に戻す, by paymentId) or the most recent
-  // (入金取消, no paymentId). Recomputes status from the remaining payments.
+  // (支払取消, no paymentId). Recomputes status from the remaining payments.
   const removePayment = async (kind: 'invoice' | 'po', id: string, paymentId?: string) => {
     const key = `${kind}:${id}`
     setSavingKey(key)
@@ -404,7 +404,7 @@ export default function PayablesPage() {
                   disabled={savingKey === `${r.kind}:${r.id}`}
                   className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb] disabled:opacity-60"
                 >
-                  <Pencil size={12} /> 入金日・方法
+                  <Pencil size={12} /> 支払日・方法
                 </button>
                 <button
                   type="button"
@@ -412,7 +412,7 @@ export default function PayablesPage() {
                   disabled={savingKey === `${r.kind}:${r.id}`}
                   className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
                 >
-                  <Undo2 size={12} /> 入金取消
+                  <Undo2 size={12} /> 支払取消
                 </button>
               </>
             )}
@@ -645,17 +645,17 @@ export default function PayablesPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={() => setPayModal(null)}>
           <div className="w-full max-w-sm rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-ink">{payModal.mode === 'pay' ? '支払確認' : '入金日・支払方法の変更'}</h2>
+              <h2 className="text-base font-semibold text-ink">{payModal.mode === 'pay' ? '支払確認' : '支払日・支払方法の変更'}</h2>
               <button onClick={() => setPayModal(null)} className="rounded-full p-1.5 text-gray-400 hover:bg-bone hover:text-mist"><X size={16} /></button>
             </div>
             <p className="mb-3 text-sm text-mist">{payModal.label}</p>
             <div className="mb-3 flex items-center justify-between rounded-xl border border-line bg-bone px-3 py-2 text-sm">
-              <span className="text-mist">{payModal.mode === 'pay' ? '支払額（税込）' : '入金額（税込）'}</span>
+              <span className="text-mist">{payModal.mode === 'pay' ? '支払額（税込）' : '支払額（税込）'}</span>
               <span className="font-semibold text-ink">{formatCurrency(payModal.amount)}</span>
             </div>
             <div className="space-y-3">
               <label className="block text-xs text-mist">
-                <span className="mb-1 block">入金日</span>
+                <span className="mb-1 block">支払日</span>
                 <input
                   type="date"
                   value={payModal.paidDate}
