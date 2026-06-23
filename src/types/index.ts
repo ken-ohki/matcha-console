@@ -366,6 +366,10 @@ export interface Settings {
   wholesaleOptions?: WholesaleOption[]
   // サンプル手数料(税抜・円)。サンプル価格 = 卸売単価×0.01(10g相当) + この手数料。
   wholesaleSampleFeeJpy?: number
+  // サンプル購入の期間制限。同一会員が同一商品のサンプルを直近 sampleLimitWindowDays 日で
+  // sampleLimitPerProduct 個まで（複数注文に分けた買い増しを防ぐ）。未設定時は 30日 / 2個。
+  sampleLimitWindowDays?: number
+  sampleLimitPerProduct?: number
   // 顧客ランク別の割引率(%)。卸売商品価格に適用。
   wholesaleRankDiscounts?: WholesaleRankDiscounts
   // トラブル時などに卸売サイトの新規注文受付を一時停止するフラグ。

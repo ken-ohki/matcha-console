@@ -45,6 +45,7 @@ import type {
   SelfConsumptionUsageType,
   Settings,
   ShippingTierJp,
+  WholesaleCoupon,
   WholesaleOption,
   WholesaleRankDiscounts,
   StockStatus,
@@ -233,10 +234,33 @@ function getDefaultSettings(): Settings {
     shippingRatesJp: [],
     wholesaleOptions: [],
     wholesaleSampleFeeJpy: 100,
+    sampleLimitWindowDays: 30,
+    sampleLimitPerProduct: 2,
     wholesaleRankDiscounts: { standard: 0, premium: 0, exclusive: 0 },
+    wholesaleCoupons: [],
+    staffEmailEvents: undefined,
     orderingPaused: false,
     orderingPausedMessage: '',
   }
+}
+
+function mapWholesaleCoupons(value: unknown): WholesaleCoupon[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(v => {
+      const c = v as Record<string, unknown>
+      return {
+        id: String(c.id ?? c.code ?? ''),
+        code: String(c.code ?? ''),
+        name: String(c.name ?? ''),
+        discountType: c.discountType === 'fixed' ? 'fixed' : 'percentage',
+        discountValue: Number(c.discountValue) || 0,
+        eligibleProductIds: Array.isArray(c.eligibleProductIds) ? c.eligibleProductIds.map(String) : undefined,
+        expiresAt: typeof c.expiresAt === 'string' && c.expiresAt ? c.expiresAt : undefined,
+        active: c.active !== false,
+      } as WholesaleCoupon
+    })
+    .filter(c => c.code && c.name)
 }
 
 function mapShippingRatesJp(value: unknown): ShippingTierJp[] {
@@ -460,7 +484,13 @@ function mapSettings(data?: DocumentData): Settings {
     wholesaleOptions: mapWholesaleOptions(data.wholesaleOptions),
     wholesaleSampleFeeJpy:
       data.wholesaleSampleFeeJpy != null ? Number(data.wholesaleSampleFeeJpy) : defaults.wholesaleSampleFeeJpy,
+    sampleLimitWindowDays:
+      data.sampleLimitWindowDays != null ? Number(data.sampleLimitWindowDays) : defaults.sampleLimitWindowDays,
+    sampleLimitPerProduct:
+      data.sampleLimitPerProduct != null ? Number(data.sampleLimitPerProduct) : defaults.sampleLimitPerProduct,
     wholesaleRankDiscounts: mapRankDiscounts(data.wholesaleRankDiscounts),
+    wholesaleCoupons: mapWholesaleCoupons(data.wholesaleCoupons),
+    staffEmailEvents: Array.isArray(data.staffEmailEvents) ? data.staffEmailEvents.map(String) : undefined,
     orderingPaused: data.orderingPaused === true,
     orderingPausedMessage: typeof data.orderingPausedMessage === 'string' ? data.orderingPausedMessage : '',
   }

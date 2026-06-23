@@ -26,6 +26,8 @@ const ALL_STAFF_EMAIL_KEYS = STAFF_EMAIL_EVENTS.map(e => e.key)
 
 export default function SettingsWholesalePage() {
   const [sampleFee, setSampleFee] = useState<number | ''>('')
+  const [sampleLimitDays, setSampleLimitDays] = useState<number | ''>(30)
+  const [sampleLimitPerProduct, setSampleLimitPerProduct] = useState<number | ''>(2)
   const [rankDiscounts, setRankDiscounts] = useState<WholesaleRankDiscounts>({ standard: 0, premium: 0, exclusive: 0 })
   const [tiers, setTiers] = useState<ShippingTierJp[]>([])
   const [options, setOptions] = useState<WholesaleOption[]>([])
@@ -45,6 +47,8 @@ export default function SettingsWholesalePage() {
     const services = await getServices()
     const stored = await services.settings.getSettings()
     setSampleFee(stored.wholesaleSampleFeeJpy ?? 100)
+    setSampleLimitDays(stored.sampleLimitWindowDays ?? 30)
+    setSampleLimitPerProduct(stored.sampleLimitPerProduct ?? 2)
     setRankDiscounts(stored.wholesaleRankDiscounts ?? { standard: 0, premium: 0, exclusive: 0 })
     setTiers(stored.shippingRatesJp ?? [])
     setOptions(stored.wholesaleOptions ?? [])
@@ -99,6 +103,8 @@ export default function SettingsWholesalePage() {
       const input: Partial<Settings> = {
         wholesaleCoupons: cleanCoupons,
         wholesaleSampleFeeJpy: sampleFee === '' ? 0 : Math.max(0, Number(sampleFee)),
+        sampleLimitWindowDays: sampleLimitDays === '' ? 30 : Math.max(1, Math.round(Number(sampleLimitDays))),
+        sampleLimitPerProduct: sampleLimitPerProduct === '' ? 2 : Math.max(1, Math.round(Number(sampleLimitPerProduct))),
         wholesaleRankDiscounts: {
           standard: Math.min(100, Math.max(0, Number(rankDiscounts.standard) || 0)),
           premium: Math.min(100, Math.max(0, Number(rankDiscounts.premium) || 0)),
@@ -297,6 +303,33 @@ export default function SettingsWholesalePage() {
                   placeholder="100"
                 />
                 <p className="mt-1 text-[11px] text-mist">サンプル価格 ＝ 卸売単価 × 0.01（10g相当）＋ この手数料。全商品共通（初期値 100円）。</p>
+              </div>
+              <div className="max-w-xs">
+                <label className="mb-1 block text-sm font-medium text-ink">サンプル購入制限</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-mist">直近</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={sampleLimitDays}
+                    onChange={e => setSampleLimitDays(e.target.value ? Number(e.target.value) : '')}
+                    className="w-20 rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                    placeholder="30"
+                  />
+                  <span className="text-sm text-mist">日で、同一商品</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={sampleLimitPerProduct}
+                    onChange={e => setSampleLimitPerProduct(e.target.value ? Number(e.target.value) : '')}
+                    className="w-20 rounded-xl border border-line bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                    placeholder="2"
+                  />
+                  <span className="text-sm text-mist">個まで</span>
+                </div>
+                <p className="mt-1 text-[11px] text-mist">同一会員が同じ商品のサンプルを期間内に買える上限個数。複数注文に分けた買い増しを防ぎます（初期値 30日 / 2個 = 20g）。</p>
               </div>
             </div>
           </div>
