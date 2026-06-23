@@ -92,6 +92,14 @@ function isClosed(o: Order): boolean {
   return o.status === 'shipped' || !!o.shippedAt || o.status === 'cancelled'
 }
 
+// Date-only formatter for the list (createdAtMs is epoch-ms; shippedAt is ISO).
+function fmtDay(value?: number | string): string {
+  if (value == null || value === '') return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
+}
+
 // Manual bank-transfer order still awaiting deposit — the rows staff reconcile by hand.
 function isBankPending(o: Order): boolean {
   return o.paymentMethod === 'bank_transfer' && o.paymentStatus !== 'paid' && (o.status === 'pending_payment' || o.status === 'quoted')
@@ -320,6 +328,7 @@ export default function WholesaleOrdersPage() {
               <thead>
                 <tr className="border-b border-line bg-bone text-left text-xs text-mist">
                   <th className="whitespace-nowrap px-4 py-3 font-medium">注文番号</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium">注文日</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">注文者名</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">商品名</th>
                   <th className="whitespace-nowrap px-4 py-3 text-right font-medium">購入数量</th>
@@ -328,6 +337,7 @@ export default function WholesaleOrdersPage() {
                   <th className="whitespace-nowrap px-4 py-3 font-medium">支払い方法</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">支払い状況</th>
                   <th className="whitespace-nowrap px-4 py-3 font-medium">発送状況</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium">出荷日</th>
                 </tr>
               </thead>
               <tbody>
@@ -338,6 +348,7 @@ export default function WholesaleOrdersPage() {
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-bone"
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-ink">{o.orderNumber}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-mist">{fmtDay(o.createdAtMs)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-ink">{o.memberCompanyName || o.contactName || '—'}</td>
                     <td className="px-4 py-3 text-mist">
                       {(() => {
@@ -392,6 +403,7 @@ export default function WholesaleOrdersPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${shippingStateLabel(o).tone}`}>{shippingStateLabel(o).label}</span>
                     </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-mist">{fmtDay(o.shippedAt)}</td>
                   </tr>
                 ))}
               </tbody>
