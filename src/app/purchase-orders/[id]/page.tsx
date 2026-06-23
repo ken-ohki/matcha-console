@@ -9,12 +9,13 @@ import { getServices } from '@/lib/services'
 import type {
   InventoryGroup,
   ProductWithInventory,
+  PurchaseInvoice,
   PurchaseOrder,
   PurchaseOrderInput,
   Supplier,
 } from '@/types'
-import { ArrowLeft, FileText, Trash2 } from 'lucide-react'
-import { computePoTaxIncluded, poPaidTotal, poRemaining } from '@/lib/cashflow'
+import { ArrowLeft, FileText, Plus, Trash2 } from 'lucide-react'
+import { computePoTaxIncluded, isLegacyPayablePo, poLineBillableRemaining, poLineSubtotal, poPaidTotal, poRemaining } from '@/lib/cashflow'
 import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 import {
   StatusBadge,
@@ -46,6 +47,7 @@ export default function PurchaseOrderDetailPage() {
   const canEdit = user?.role === 'admin'
 
   const [order, setOrder] = useState<PurchaseOrder | null>(null)
+  const [linkedInvoices, setLinkedInvoices] = useState<PurchaseInvoice[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
   const [inventoryGroups, setInventoryGroups] = useState<InventoryGroup[]>([])
@@ -73,7 +75,12 @@ export default function PurchaseOrderDetailPage() {
       setSuppliers(nextSuppliers)
       setProducts(nextProducts)
       setInventoryGroups(nextGroups)
-      if (found) setForm(buildPoFormState(found, nextProducts, todayIso()))
+      if (found) {
+        setForm(buildPoFormState(found, nextProducts, todayIso()))
+        if (!isLegacyPayablePo(found)) {
+          services.purchaseInvoices.getPurchaseInvoicesByPo(found.id).then(inv => { if (active) setLinkedInvoices(inv) }).catch(() => {})
+        }
+      }
       setLoading(false)
     }
     void load()
@@ -94,6 +101,24 @@ export default function PurchaseOrderDetailPage() {
       setMessage('保存しました')
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleBillingComplete = async (next: boolean) => {
+    if (!order) return
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const services = await getServices()
+      const updated = await services.purchaseOrders.setPurchaseOrderBillingComplete(order.id, next)
+      setOrder(updated)
+      setForm(buildPoFormState(updated, products, todayIso()))
+      setMessage(next ? '請求完了にしました' : '請求完了を解除しました')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新に失敗しました')
     } finally {
       setSaving(false)
     }
@@ -131,6 +156,7 @@ export default function PurchaseOrderDetailPage() {
   const taxIncl = computePoTaxIncluded(order)
   const paid = poPaidTotal(order)
   const remaining = poRemaining(order)
+  const isInvoiceFlow = !isLegacyPayablePo(order)
 
   return (
     <AppLayout>
@@ -239,7 +265,87 @@ export default function PurchaseOrderDetailPage() {
           </fieldset>
         )}
 
-        {tab === 'payment' && (
+        {tab === 'payment' && isInvoiceFlow && (
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/40 p-4 text-sm text-mist">
+              この発注は<strong className="text-ink">請求書ベース</strong>で管理します。仕入先から請求書が届いたら登録し、下記の明細を消し込みます。支払いは請求書側で記録します。
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-[#e6dfcf] bg-white">
+              <div className="flex items-center justify-between px-4 py-3">
+                <p className="text-sm font-semibold text-ink">請求状況（明細ごと）</p>
+                {canEdit && (
+                  <Link
+                    href={`/purchase-invoices/new?supplier=${encodeURIComponent(order.supplierName)}`}
+                    className="inline-flex items-center gap-1 rounded-xl border border-line bg-white px-3 py-1.5 text-xs font-medium text-matchaDeep hover:bg-[#eef3eb]"
+                  >
+                    <Plus size={14} /> この発注から請求書を作成
+                  </Link>
+                )}
+              </div>
+              <table className="min-w-full border-t border-[#f0ebdf] text-sm">
+                <thead className="bg-bone text-left text-[11px] uppercase tracking-wider text-mist">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">商品</th>
+                    <th className="px-4 py-2 font-medium text-right">金額(税抜)</th>
+                    <th className="px-4 py-2 font-medium text-right">請求済</th>
+                    <th className="px-4 py-2 font-medium text-right">請求残</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.items.map((item, i) => {
+                    const rem = poLineBillableRemaining(item)
+                    return (
+                      <tr key={i} className="border-t border-[#f0ebdf] text-ink">
+                        <td className="px-4 py-2">{item.productName}{item.productSku ? `（${item.productSku}）` : ''}</td>
+                        <td className="px-4 py-2 text-right">{formatCurrency(poLineSubtotal(item))}</td>
+                        <td className="px-4 py-2 text-right text-mist">{formatCurrency(item.billedAmount ?? 0)}</td>
+                        <td className={`px-4 py-2 text-right ${rem > 0.5 ? 'text-[#a87b1e]' : 'text-matcha'}`}>{order.billingComplete ? '—' : formatCurrency(rem)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
+              <p className="mb-2 text-sm font-semibold text-ink">紐付く請求書</p>
+              {linkedInvoices.length === 0 ? (
+                <p className="text-xs text-mist">まだ請求書が登録されていません。</p>
+              ) : (
+                <ul className="space-y-1.5 text-sm">
+                  {linkedInvoices.map(inv => (
+                    <li key={inv.id} className="flex items-center justify-between">
+                      <Link href={`/purchase-invoices/${inv.id}`} className="text-matchaDeep hover:underline">
+                        {inv.invoiceNumber || '請求書'}（{inv.invoiceDate || '日付未設定'}）
+                      </Link>
+                      <span className="text-mist">{formatCurrency(inv.totalAmount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {canEdit && (
+              <div className="flex items-center justify-between rounded-2xl border border-[#e6dfcf] bg-bone p-4">
+                <div>
+                  <p className="text-sm font-medium text-ink">請求完了</p>
+                  <p className="text-xs text-mist">これ以上この発注に対する請求が来ない場合、残りを締めて予測・請求待ちから除外します。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleBillingComplete(!order.billingComplete)}
+                  disabled={saving}
+                  className={`rounded-xl px-3 py-2 text-sm font-medium transition disabled:opacity-60 ${order.billingComplete ? 'border border-line bg-white text-ink hover:bg-bone' : 'bg-ink text-paper hover:bg-matchaDeep'}`}
+                >
+                  {order.billingComplete ? '請求完了を解除' : '請求完了にする'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'payment' && !isInvoiceFlow && (
           <fieldset disabled={!canEdit} className="space-y-5">
             <PoBillingSection form={form} setForm={setForm as React.Dispatch<React.SetStateAction<PurchaseOrderInput>>} poId={order.id} />
             <div className="grid gap-3 rounded-2xl border border-line bg-bone p-4 sm:grid-cols-3">

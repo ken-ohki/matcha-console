@@ -1,10 +1,15 @@
 import type {
   EcSaleRecord,
+  PurchaseInvoice,
+  PurchaseInvoicePaymentStatus,
   PurchaseOrder,
+  PurchaseOrderBillingStatus,
+  PurchaseOrderLineItem,
   PurchaseOrderPaymentStatus,
   SaleRecord,
+  TaxRate,
 } from '@/types'
-import { computeSaleTaxBuckets, computeTax, saleFeesToTaxLines } from '@/lib/tax'
+import { computeSaleTaxBuckets, computeTax, computeTaxBuckets, saleFeesToTaxLines } from '@/lib/tax'
 
 export type CashFlowMode = 'actual' | 'plan'
 
@@ -65,6 +70,98 @@ export function derivePoPaymentStatus(
   return 'partial'
 }
 
+// ===== Invoice-driven AP helpers =====
+
+/** 税抜 subtotal of a PO line (stored lineTotal, else qty×price). */
+export function poLineSubtotal(l: PurchaseOrderLineItem): number {
+  return l.lineTotal != null ? Number(l.lineTotal) : (Number(l.quantityKg) || 0) * (Number(l.unitPrice) || 0)
+}
+
+/** 税抜 amount on a PO line still awaiting an invoice (never negative). */
+export function poLineBillableRemaining(l: PurchaseOrderLineItem): number {
+  return Math.max(0, poLineSubtotal(l) - (Number(l.billedAmount) || 0))
+}
+
+/**
+ * Tax-inclusive UNBILLED remainder of a PO, grossed up per rate bucket (floor once
+ * per bucket, mirroring computeTaxBuckets / tax.ts). New-flow header fees (送料/諸費用)
+ * are NOT forecast here — they re-enter as adhoc invoice lines when the bill arrives.
+ * Returns 0 once billingComplete. Used only for new-flow (non-legacy) POs.
+ */
+export function poUnbilledTaxIncl(po: PurchaseOrder): number {
+  if (po.billingComplete) return 0
+  let exempt = 0
+  let reduced = 0
+  let standard = 0
+  for (const l of po.items ?? []) {
+    const rem = poLineBillableRemaining(l)
+    if (rem <= 0) continue
+    const r = l.taxRate == null ? 8 : Number(l.taxRate)
+    if (r === 0) exempt += rem
+    else if (r === 8) reduced += rem
+    else standard += rem
+  }
+  return exempt + reduced + standard + Math.floor(reduced * 0.08) + Math.floor(standard * 0.1)
+}
+
+/** Recompute an invoice's 税抜/税/税込 from its lines (per-bucket floor). */
+export function computeInvoiceTotals(
+  lines: { quantity: number; unitPrice: number; taxRate: TaxRate }[],
+): { subtotal: number; tax: number; total: number } {
+  const b = computeTaxBuckets(
+    lines.map(l => ({ quantityKg: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0, taxRate: l.taxRate })),
+    0,
+  )
+  return { subtotal: b.subtotal, tax: b.tax, total: b.total }
+}
+
+/** Sum of recorded invoice payments (税込 cash actually paid). */
+export function invoicePaidTotal(inv: { payments?: { amount: number }[] }): number {
+  return poPaidTotal(inv)
+}
+
+/** Outstanding amount on an invoice (payable − paid), never negative. */
+export function invoiceRemaining(inv: PurchaseInvoice): number {
+  return Math.max(0, (inv.totalAmount ?? 0) - invoicePaidTotal(inv))
+}
+
+/** Derive an invoice's payment status from its payments vs the payable total. */
+export function deriveInvoicePaymentStatus(inv: {
+  totalAmount: number
+  payments?: { amount: number }[]
+}): PurchaseInvoicePaymentStatus {
+  const paid = invoicePaidTotal(inv)
+  if (paid <= 0) return 'unpaid'
+  if (paid >= (inv.totalAmount ?? 0)) return 'paid'
+  return 'partial'
+}
+
+/** Derive a PO's billing status from its line ledger. */
+export function derivePoBillingStatus(po: PurchaseOrder): PurchaseOrderBillingStatus {
+  if (po.billingComplete) return 'billed'
+  const items = po.items ?? []
+  const anyBilled = items.some(l => (Number(l.billedAmount) || 0) > 0)
+  const anyRemaining = items.some(l => poLineBillableRemaining(l) > 0.5)
+  if (!anyBilled) return 'unbilled'
+  return anyRemaining ? 'partial' : 'billed'
+}
+
+/**
+ * Single coexistence predicate: is this PO on the LEGACY (PO-is-payable) flow?
+ * The explicit flowVersion stamp wins; absent stamp (pre-cutover docs) falls back
+ * to "any legacy payment marker is present". Used identically by the forecast,
+ * the payables page, the financials overdue surface, and the PO detail screen.
+ */
+export function isLegacyPayablePo(po: PurchaseOrder): boolean {
+  if (po.flowVersion === 'invoice') return false
+  if (po.flowVersion === 'legacy') return true
+  return (po.payments?.length ?? 0) > 0
+    || !!po.paidDate
+    || po.paymentStatus !== 'uninvoiced'
+    || !!po.paymentDueDate
+    || !!po.invoice?.url
+}
+
 export interface MonthlyCashFlow {
   key: string                 // YYYY-MM
   inActual: number
@@ -79,6 +176,7 @@ export interface BuildCashFlowOpts {
   sales: SaleRecord[]
   ecSales: EcSaleRecord[]
   purchaseOrders: PurchaseOrder[]
+  purchaseInvoices?: PurchaseInvoice[]  // invoice-driven AP payables
   startMonth: string          // YYYY-MM (inclusive)
   endMonth: string            // YYYY-MM (inclusive)
   openingBalance: number
@@ -92,7 +190,7 @@ function nextMonth(key: string): string {
 }
 
 export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] {
-  const { sales, ecSales, purchaseOrders, startMonth, endMonth, openingBalance, mode } = opts
+  const { sales, ecSales, purchaseOrders, purchaseInvoices = [], startMonth, endMonth, openingBalance, mode } = opts
 
   const buckets = new Map<string, MonthlyCashFlow>()
   const ensure = (key: string): MonthlyCashFlow => {
@@ -122,27 +220,52 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
     ensure(monthKey(ec.soldOn)).inActual += amount
   }
 
+  // Any PO referenced by a received invoice flows through the invoice loop ONLY —
+  // never also as a legacy payable (guards against pre-cutover / manual-edit states
+  // where a PO carries a legacy marker yet was billed via an invoice).
+  const invoicedPoIds = new Set(purchaseInvoices.flatMap(inv => inv.linkedPoIds ?? []))
+
   for (const po of purchaseOrders) {
     if (po.status === 'cancelled') continue
-    const amount = computePoTaxIncluded(po)
-    if (amount <= 0) continue
-    const payments = po.payments ?? []
-    if (payments.length > 0) {
-      // Split payments: each recorded payment is actual cash on its date.
-      for (const p of payments) {
-        if (!p.paidDate || !(p.amount > 0)) continue
-        ensure(monthKey(p.paidDate)).outActual += p.amount
+    if (isLegacyPayablePo(po) && !invoicedPoIds.has(po.id)) {
+      // LEGACY flow: the PO itself is the payable (unchanged behaviour).
+      const amount = computePoTaxIncluded(po)
+      if (amount <= 0) continue
+      const payments = po.payments ?? []
+      if (payments.length > 0) {
+        // Split payments: each recorded payment is actual cash on its date.
+        for (const p of payments) {
+          if (!p.paidDate || !(p.amount > 0)) continue
+          ensure(monthKey(p.paidDate)).outActual += p.amount
+        }
+        // The unpaid remainder is expected on the due date.
+        const remaining = Math.max(0, amount - poPaidTotal(po))
+        if (remaining > 0 && po.paymentDueDate) {
+          ensure(monthKey(po.paymentDueDate)).outExpected += remaining
+        }
+      } else if (po.paymentStatus === 'paid' && po.paidDate) {
+        ensure(monthKey(po.paidDate)).outActual += amount
+      } else if (po.paymentDueDate) {
+        ensure(monthKey(po.paymentDueDate)).outExpected += amount
       }
-      // The unpaid remainder is expected on the due date.
-      const remaining = Math.max(0, amount - poPaidTotal(po))
-      if (remaining > 0 && po.paymentDueDate) {
-        ensure(monthKey(po.paymentDueDate)).outExpected += remaining
-      }
-    } else if (po.paymentStatus === 'paid' && po.paidDate) {
-      ensure(monthKey(po.paidDate)).outActual += amount
-    } else if (po.paymentDueDate) {
-      ensure(monthKey(po.paymentDueDate)).outExpected += amount
+      continue
     }
+    // NEW (invoice-driven) flow: forecast only the still-unbilled remainder.
+    // Billed portions move into the invoice loop below — no double count.
+    const unbilled = poUnbilledTaxIncl(po)
+    if (unbilled <= 0) continue
+    const dueMonth = po.paymentDueDate || po.expectedDeliveryDate || po.orderDate
+    if (dueMonth) ensure(monthKey(dueMonth)).outExpected += unbilled
+  }
+
+  for (const inv of purchaseInvoices) {
+    const amount = inv.totalAmount ?? 0
+    if (amount <= 0) continue
+    for (const p of inv.payments ?? []) {
+      if (p.paidDate && p.amount > 0) ensure(monthKey(p.paidDate)).outActual += p.amount
+    }
+    const remaining = Math.max(0, amount - invoicePaidTotal(inv))
+    if (remaining > 0 && inv.paymentDueDate) ensure(monthKey(inv.paymentDueDate)).outExpected += remaining
   }
 
   // Build dense series from startMonth to endMonth.

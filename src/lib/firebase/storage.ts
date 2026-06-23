@@ -71,6 +71,19 @@ export async function uploadPurchaseOrderInvoice(file: File, orderKey: string): 
   return getDownloadURL(storageRef)
 }
 
+export async function uploadPurchaseInvoiceFile(file: File, invoiceKey: string): Promise<string> {
+  const storage = getFirebaseStorageInstance()
+  const safeKey = invoiceKey || 'unsorted'
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const path = `purchase-invoices/${safeKey}/invoice-${Date.now()}.${ext}`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/pdf',
+    cacheControl: 'public, max-age=31536000, immutable',
+  })
+  return getDownloadURL(storageRef)
+}
+
 export async function uploadShippingSlip(file: File, saleKey: string): Promise<string> {
   const storage = getFirebaseStorageInstance()
   const safeKey = saleKey || 'unsorted'

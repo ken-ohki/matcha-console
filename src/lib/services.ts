@@ -8,8 +8,12 @@ import type {
   ProductInput,
   ProductWithInventory,
   EcSaleRecord,
+  PurchaseInvoice,
+  PurchaseInvoiceInput,
   PurchaseOrder,
   PurchaseOrderInput,
+  PurchaseOrderPayment,
+  UnbilledPoLine,
   SelfConsumptionRecord,
   SelfConsumptionRecordInput,
   Settings,
@@ -117,6 +121,7 @@ export interface IPurchaseOrdersService {
     },
   ): Promise<void>
   unreceivePurchaseOrderLine(orderId: string, lineIndex: number): Promise<void>
+  setPurchaseOrderBillingComplete(orderId: string, complete: boolean): Promise<PurchaseOrder>
   convertOrphanArrivalToPo(
     productId: string,
     arrivalId: string,
@@ -135,12 +140,24 @@ export interface ISuppliersService {
   updateSupplier(id: string, input: SupplierDetailsInput): Promise<Supplier>
 }
 
+export interface IPurchaseInvoicesService {
+  getPurchaseInvoices(): Promise<PurchaseInvoice[]>
+  getPurchaseInvoice(id: string): Promise<PurchaseInvoice | null>
+  getPurchaseInvoicesByPo(poId: string): Promise<PurchaseInvoice[]>
+  createPurchaseInvoice(input: PurchaseInvoiceInput): Promise<PurchaseInvoice>
+  updatePurchaseInvoice(id: string, input: Partial<PurchaseInvoiceInput>): Promise<PurchaseInvoice>
+  deletePurchaseInvoice(id: string, opts?: { force?: boolean }): Promise<void>
+  updateInvoicePayments(id: string, payments: PurchaseOrderPayment[]): Promise<PurchaseInvoice>
+  getUnbilledReceivedPoLines(): Promise<UnbilledPoLine[]>
+}
+
 export interface IServices {
   inventory: IInventoryService
   selfConsumption: ISelfConsumptionService
   ecSales: IEcSalesService
   purchaseOrders: IPurchaseOrdersService
   suppliers: ISuppliersService
+  purchaseInvoices: IPurchaseInvoicesService
   settings: ISettingsService
   masters: IMastersService
   auth: IAuthService

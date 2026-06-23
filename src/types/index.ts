@@ -473,6 +473,10 @@ export interface PurchaseOrderLineItem {
   lineTotal: number
   receivedKg: number       // cumulative quantity received so far
   taxRate: TaxRate
+  // --- invoice-billing ledger (cumulative, mirrors receivedKg). All optional → backward compatible.
+  lineId?: string          // stable id, persisted; matches PurchaseInvoiceLine.poLineId
+  billedKg?: number        // cumulative kg billed by received invoices (advisory display only)
+  billedAmount?: number    // cumulative 税抜 billed by received invoices (AUTHORITATIVE ledger)
 }
 
 export interface PurchaseOrderLineInput {
@@ -484,7 +488,12 @@ export interface PurchaseOrderLineInput {
   unitPrice: number
   receivedKg?: number
   taxRate?: TaxRate
+  lineId?: string          // round-trips the stable id across edits
 }
+
+// 'unbilled' = no invoice references this PO yet; 'partial' = some lines billed;
+// 'billed' = every line fully billed (or billingComplete set).
+export type PurchaseOrderBillingStatus = 'unbilled' | 'partial' | 'billed'
 
 export interface PurchaseOrder {
   id: string
@@ -505,6 +514,10 @@ export interface PurchaseOrder {
   payments: PurchaseOrderPayment[]   // 分割支払いの明細（空なら未払/単一払い）
   invoice?: PurchaseOrderInvoice
   notes?: string
+  // --- invoice-driven AP (all optional → backward compatible) ---
+  flowVersion?: 'legacy' | 'invoice'  // explicit, set once on first consume / at creation; never derived
+  billingComplete?: boolean           // terminal: retire any unbilled remainder from forecast/worklist
+  billingStatus?: PurchaseOrderBillingStatus  // derived in mapPurchaseOrder; never trusted from client
   createdAt: Date
   updatedAt: Date
 }
@@ -525,6 +538,101 @@ export interface PurchaseOrderInput {
   invoice?: PurchaseOrderInvoice | null
   status: PurchaseOrderStatus
   notes?: string
+  billingComplete?: boolean   // mark an invoice-flow PO as fully billed (retire remainder)
+}
+
+// ===== Invoice-driven AP (受領請求書 / 消し込み) =====
+// A received supplier invoice is the payable unit. Its lines either reference a PO
+// line ('po' = 消し込み against the order) or are entered free-hand ('adhoc' =
+// 一時商品 for samples / options / 諸費用 / 送料 not on any PO).
+export type PurchaseInvoicePaymentStatus = 'unpaid' | 'partial' | 'paid'
+export type PurchaseInvoiceLineKind = 'po' | 'adhoc'
+
+export interface PurchaseInvoiceLine {
+  id: string
+  kind: PurchaseInvoiceLineKind
+  purchaseOrderId?: string   // kind==='po'
+  poLineId?: string          // kind==='po' → PurchaseOrderLineItem.lineId (NOT positional index)
+  productId?: string
+  productName: string        // required; free text for adhoc
+  category?: string          // adhoc only: free text (諸費用 / 送料 / サンプル…)
+  quantity: number           // kg for po lines; arbitrary for adhoc
+  unit?: string              // 'kg' for po; free for adhoc
+  unitPrice: number          // 税抜単価 as billed (may differ from the PO price)
+  lineTotal: number          // 税抜 = quantity*unitPrice (recomputed server-side)
+  taxRate: TaxRate
+  note?: string
+}
+
+export interface PurchaseInvoice {
+  id: string
+  flowVersion: 'invoice'           // discriminator constant
+  supplierName: string
+  supplierNormalizedName?: string  // for picker scoping
+  invoiceNumber?: string
+  invoiceDate: string              // 請求日 ISO YYYY-MM-DD
+  receivedDate: string             // 受領日 (defaults today)
+  paymentDueDate?: string          // drives forecast + aging bucket
+  lines: PurchaseInvoiceLine[]
+  // DERIVED from lines, recomputed on every write:
+  computedSubtotal: number         // Σ line 税抜
+  computedTax: number              // per-bucket floored
+  computedTotal: number            // 税込 from lines
+  // PAPER total — the human source of truth; when set this is the payable:
+  totalOverride?: number           // 税込 printed on the paper
+  totalAmount: number              // = totalOverride ?? computedTotal (the payable)
+  paymentStatus: PurchaseInvoicePaymentStatus  // derived from payments
+  payments: PurchaseOrderPayment[] // REUSE shape → PaymentsEditor works unchanged
+  file?: PurchaseOrderInvoice      // REUSE the PDF-attachment shape
+  linkedPoIds: string[]            // distinct PO ids among 'po' lines (denormalized)
+  notes?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface PurchaseInvoiceLineInput {
+  id?: string
+  kind: PurchaseInvoiceLineKind
+  purchaseOrderId?: string
+  poLineId?: string
+  productId?: string
+  productName?: string
+  category?: string
+  quantity: number
+  unit?: string
+  unitPrice: number
+  taxRate?: TaxRate                // default: PO line's rate for 'po'; 10 for 'adhoc'
+  note?: string
+}
+
+export interface PurchaseInvoiceInput {
+  supplierName: string
+  invoiceNumber?: string
+  invoiceDate: string
+  receivedDate?: string
+  paymentDueDate?: string
+  lines: PurchaseInvoiceLineInput[]
+  totalOverride?: number | null    // null clears
+  payments?: PurchaseOrderPayment[]
+  file?: PurchaseOrderInvoice | null
+  notes?: string
+  allowOverBill?: boolean          // confirm-through for price increases over PO subtotal
+}
+
+// One received-but-not-yet-invoiced PO line (請求待ち worklist row).
+export interface UnbilledPoLine {
+  poId: string
+  supplierName: string
+  orderDate: string
+  expectedDeliveryDate?: string
+  lineId: string
+  productName: string
+  orderedKg: number
+  receivedKg: number
+  unitPrice: number                // PO line's 税抜 unit price (for accurate prefill)
+  taxRate: TaxRate                 // PO line's tax rate (8/10/免税)
+  billedAmount: number
+  billableRemainingAmount: number  // AUTHORITATIVE (税抜) — single number shown
 }
 
 export interface SupplierAttachment {

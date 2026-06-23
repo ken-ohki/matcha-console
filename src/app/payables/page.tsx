@@ -2,26 +2,42 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  CircleDollarSign,
+  Clock,
   FileText,
   Filter,
+  Link2,
+  Plus,
   Wallet,
   X,
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
-import type { PurchaseOrder, PurchaseOrderPayment, PurchaseOrderPaymentStatus, PurchaseOrderStatus } from '@/types'
-import { computePoTaxIncluded, poPaidTotal, poRemaining } from '@/lib/cashflow'
+import type {
+  PurchaseInvoice,
+  PurchaseInvoicePaymentStatus,
+  PurchaseOrder,
+  PurchaseOrderPayment,
+  PurchaseOrderPaymentStatus,
+  PurchaseOrderStatus,
+  UnbilledPoLine,
+} from '@/types'
+import {
+  computePoTaxIncluded,
+  invoicePaidTotal,
+  invoiceRemaining,
+  isLegacyPayablePo,
+  poPaidTotal,
+  poRemaining,
+} from '@/lib/cashflow'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
-import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_ALL, type Bucket } from '@/lib/payment-buckets'
+import { bucketOf, makeBucketLabels, BUCKET_COLORS, BUCKET_ORDER_OPEN, type Bucket } from '@/lib/payment-buckets'
 
 const PAY_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
   uninvoiced: '未請求',
@@ -29,7 +45,11 @@ const PAY_LABELS: Record<PurchaseOrderPaymentStatus, string> = {
   partial: '一部支払',
   paid: '支払済',
 }
-
+const INV_PAY_LABELS: Record<PurchaseInvoicePaymentStatus, string> = {
+  unpaid: '未払',
+  partial: '一部支払',
+  paid: '支払済',
+}
 const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   placed: '発注済',
   shipped: '発送中',
@@ -37,188 +57,223 @@ const PO_STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   cancelled: '取消',
 }
 
+type Tab = Bucket | 'pending'
 const BUCKET_LABELS = makeBucketLabels('支払済')
+const TAB_LABELS: Record<Tab, string> = { ...BUCKET_LABELS, pending: '請求待ち' }
+const TABS: Tab[] = [...BUCKET_ORDER_OPEN, 'pending', 'paid']
+
+// A unified payable: a received supplier invoice OR a legacy (pre-cutover) PO.
+interface PayableRow {
+  kind: 'invoice' | 'po'
+  id: string
+  supplierName: string
+  dueDate?: string
+  totalIncl: number
+  paid: number
+  remaining: number
+  isPaid: boolean
+  statusLabel: string
+  docUrl?: string
+  sub: string
+  invoice?: PurchaseInvoice
+  po?: PurchaseOrder
+}
+
+function invLineSummary(inv: PurchaseInvoice): string {
+  const first = inv.lines[0]?.productName ?? ''
+  return first + (inv.lines.length > 1 ? ` 他${inv.lines.length - 1}件` : '')
+}
+function poLineSummary(o: PurchaseOrder): string {
+  return (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
+}
 
 export default function PayablesPage() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const router = useRouter()
+  const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
+  const [legacyPos, setLegacyPos] = useState<PurchaseOrder[]>([])
+  const [unbilled, setUnbilled] = useState<UnbilledPoLine[]>([])
   const [bankInfoBySupplier, setBankInfoBySupplier] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [detailOrder, setDetailOrder] = useState<PurchaseOrder | null>(null)
-  const [activeBucket, setActiveBucket] = useState<Bucket>('actionNeeded')
+  const [detailPo, setDetailPo] = useState<PurchaseOrder | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('actionNeeded')
 
   const load = async () => {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [all, suppliers] = await Promise.all([
+      const [allPos, invs, pending, suppliers] = await Promise.all([
         svc.purchaseOrders.getPurchaseOrders(),
+        svc.purchaseInvoices.getPurchaseInvoices(),
+        svc.purchaseInvoices.getUnbilledReceivedPoLines(),
         svc.suppliers.getSuppliers(),
       ])
-      setOrders(all.filter(o => o.status !== 'cancelled'))
+      setLegacyPos(allPos.filter(o => o.status !== 'cancelled' && isLegacyPayablePo(o)))
+      setInvoices(invs)
+      setUnbilled(pending)
       const map: Record<string, string> = {}
-      for (const s of suppliers) {
-        if (s.bankInfo) map[s.name] = s.bankInfo
-      }
+      for (const s of suppliers) if (s.bankInfo) map[s.name] = s.bankInfo
       setBankInfoBySupplier(map)
     } finally { setLoading(false) }
   }
-
   useEffect(() => { void load() }, [])
+
+  const rows = useMemo<PayableRow[]>(() => {
+    const invRows: PayableRow[] = invoices.map(inv => ({
+      kind: 'invoice',
+      id: inv.id,
+      supplierName: inv.supplierName,
+      dueDate: inv.paymentDueDate,
+      totalIncl: inv.totalAmount,
+      paid: invoicePaidTotal(inv),
+      remaining: invoiceRemaining(inv),
+      isPaid: inv.paymentStatus === 'paid',
+      statusLabel: INV_PAY_LABELS[inv.paymentStatus],
+      docUrl: inv.file?.url,
+      sub: invLineSummary(inv),
+      invoice: inv,
+    }))
+    const poRows: PayableRow[] = legacyPos.map(o => ({
+      kind: 'po',
+      id: o.id,
+      supplierName: o.supplierName,
+      dueDate: o.paymentDueDate,
+      totalIncl: computePoTaxIncluded(o),
+      paid: poPaidTotal(o),
+      remaining: poRemaining(o),
+      isPaid: o.paymentStatus === 'paid',
+      statusLabel: PAY_LABELS[o.paymentStatus],
+      docUrl: o.invoice?.url,
+      sub: poLineSummary(o),
+      po: o,
+    }))
+    return [...invRows, ...poRows]
+  }, [invoices, legacyPos])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return orders.filter(o => !q || o.supplierName.toLowerCase().includes(q) || o.items.some(i => i.productName.toLowerCase().includes(q)))
-  }, [orders, query])
+    if (!q) return rows
+    return rows.filter(r => r.supplierName.toLowerCase().includes(q) || r.sub.toLowerCase().includes(q))
+  }, [rows, query])
 
   const grouped = useMemo(() => {
-    const groups: Record<Bucket, PurchaseOrder[]> = { actionNeeded: [], nextMonth: [], later: [], noDate: [], paid: [] }
-    for (const o of filtered) groups[bucketOf(o.paymentDueDate, o.paymentStatus === 'paid')].push(o)
+    const groups: Record<Bucket, PayableRow[]> = { actionNeeded: [], nextMonth: [], later: [], noDate: [], paid: [] }
+    for (const r of filtered) groups[bucketOf(r.dueDate, r.isPaid)].push(r)
     for (const k of Object.keys(groups) as Bucket[]) {
-      groups[k].sort((a, b) => (a.paymentDueDate || '9999').localeCompare(b.paymentDueDate || '9999'))
+      groups[k].sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'))
     }
     return groups
   }, [filtered])
 
-  const kpis = useMemo(() => {
-    // Outstanding/aging use the remaining (unpaid) amount so partial payments
-    // reduce the balance correctly.
-    const outstanding = orders.reduce((s, o) => s + poRemaining(o), 0)
-    const actionNeeded = grouped.actionNeeded.reduce((s, o) => s + poRemaining(o), 0)
-    const ym = todayIso().slice(0, 7)
-    // Paid this month = split payments dated this month + legacy single payments.
-    const paidThisMonth = orders.reduce((s, o) => {
-      const splits = (o.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0)
-      const legacy = (o.payments ?? []).length === 0 && o.paymentStatus === 'paid' && (o.paidDate ?? '').startsWith(ym)
-        ? computePoTaxIncluded(o) : 0
-      return s + splits + legacy
-    }, 0)
-    return { outstanding, actionNeeded, paidThisMonth }
-  }, [orders, grouped])
+  const filteredPending = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return unbilled.filter(u => !q || u.supplierName.toLowerCase().includes(q) || u.productName.toLowerCase().includes(q))
+  }, [unbilled, query])
 
-  const markPaid = async (id: string) => {
-    const order = orders.find(o => o.id === id)
-    if (!order) return
-    setSavingId(id)
+  const kpis = useMemo(() => {
+    const outstanding = rows.filter(r => !r.isPaid).reduce((s, r) => s + r.remaining, 0)
+    const actionNeeded = grouped.actionNeeded.reduce((s, r) => s + r.remaining, 0)
+    const pendingTotal = unbilled.reduce((s, u) => s + u.billableRemainingAmount, 0)
+    const ym = todayIso().slice(0, 7)
+    const paidThisMonth =
+      invoices.reduce((s, inv) => s + (inv.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0), 0) +
+      legacyPos.reduce((s, o) => {
+        const splits = (o.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0)
+        const legacy = (o.payments ?? []).length === 0 && o.paymentStatus === 'paid' && (o.paidDate ?? '').startsWith(ym) ? computePoTaxIncluded(o) : 0
+        return s + splits + legacy
+      }, 0)
+    return { outstanding, actionNeeded, pendingTotal, paidThisMonth }
+  }, [rows, grouped, unbilled, invoices, legacyPos])
+
+  const markPaidInvoice = async (inv: PurchaseInvoice) => {
+    setSavingId(inv.id)
     setFeedback(null)
     try {
       const svc = await getServices()
-      // Record the remaining amount as a payment dated today (full settlement).
-      const remaining = poRemaining(order)
-      const nextPayments = [
-        ...(order.payments ?? []),
-        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : computePoTaxIncluded(order), paidDate: todayIso() },
+      const remaining = invoiceRemaining(inv)
+      const next: PurchaseOrderPayment[] = [
+        ...(inv.payments ?? []),
+        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : inv.totalAmount, paidDate: todayIso() },
       ]
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments: nextPayments, paidDate: todayIso() })
-      setOrders(prev => prev.map(o => o.id === id ? updated : o))
+      const updated = await svc.purchaseInvoices.updateInvoicePayments(inv.id, next)
+      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x))
       setFeedback('支払確認しました')
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingId(null) }
   }
 
-  const savePayments = async (id: string, payments: PurchaseOrderPayment[]) => {
+  const markPaidPo = async (o: PurchaseOrder) => {
+    setSavingId(o.id)
+    setFeedback(null)
+    try {
+      const svc = await getServices()
+      const remaining = poRemaining(o)
+      const next = [
+        ...(o.payments ?? []),
+        { id: `pay-${Date.now()}`, amount: remaining > 0 ? remaining : computePoTaxIncluded(o), paidDate: todayIso() },
+      ]
+      const updated = await svc.purchaseOrders.updatePurchaseOrder(o.id, { payments: next, paidDate: todayIso() })
+      setLegacyPos(prev => prev.map(x => x.id === o.id ? updated : x))
+      setFeedback('支払確認しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
+    } finally { setSavingId(null) }
+  }
+
+  const savePoPayments = async (id: string, payments: PurchaseOrderPayment[]) => {
     setSavingId(id)
     setFeedback(null)
     try {
       const svc = await getServices()
       const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments })
-      setOrders(prev => prev.map(o => o.id === id ? updated : o))
-      setDetailOrder(updated)
+      setLegacyPos(prev => prev.map(o => o.id === id ? updated : o))
+      setDetailPo(updated)
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingId(null) }
   }
 
-  const updateInline = async (id: string, patch: { paymentStatus?: PurchaseOrderPaymentStatus; paymentDueDate?: string; paidDate?: string }) => {
-    setSavingId(id)
-    setFeedback(null)
-    try {
-      const svc = await getServices()
-      // Keep status and paidDate consistent: entering a paid date marks the PO
-      // paid; clearing it on a paid PO reverts to 未払.
-      const coupledStatus: Partial<Record<'paymentStatus', PurchaseOrderPaymentStatus>> = {}
-      if (patch.paidDate !== undefined && patch.paymentStatus === undefined) {
-        coupledStatus.paymentStatus = patch.paidDate ? 'paid' : 'unpaid'
-      }
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, {
-        ...(patch.paymentStatus !== undefined && { paymentStatus: patch.paymentStatus }),
-        ...coupledStatus,
-        ...(patch.paymentDueDate !== undefined && { paymentDueDate: patch.paymentDueDate || undefined }),
-        ...(patch.paidDate !== undefined && { paidDate: patch.paidDate || undefined }),
-      })
-      setOrders(prev => prev.map(o => o.id === id ? updated : o))
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally { setSavingId(null) }
-  }
-
-  const bucketsToRender: Bucket[] = BUCKET_ORDER_ALL
-
-  const renderPoRow = (o: PurchaseOrder) => {
-    const productLabel = (o.items[0]?.productName ?? '') + (o.items.length > 1 ? ` 他${o.items.length - 1}件` : '')
-    const isOverdue = !!o.paymentDueDate && o.paymentDueDate < todayIso()
+  const renderRow = (r: PayableRow) => {
+    const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
     return (
-      <tr key={o.id} className="border-t border-white/60">
+      <tr key={`${r.kind}:${r.id}`} className="border-t border-white/60">
         <td className="px-3 py-2">
-          <input
-            type="date"
-            value={o.paymentDueDate ?? ''}
-            onChange={e => updateInline(o.id, { paymentDueDate: e.target.value })}
-            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-alert/40 text-alert' : 'border-line'}`}
-          />
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${r.kind === 'invoice' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-700'}`}>
+            {r.kind === 'invoice' ? '請求書' : '発注(旧)'}
+          </span>
         </td>
+        <td className={`px-3 py-2 ${overdue ? 'text-alert' : 'text-mist'}`}>{r.dueDate || '—'}</td>
         <td className="px-3 py-2 text-ink">
-          <button type="button" onClick={() => setDetailOrder(o)} className="text-left hover:underline">{o.supplierName}</button>
-        </td>
-        <td className="px-3 py-2 text-mist">{productLabel}</td>
-        <td className="px-3 py-2 text-right">
-          <div className="font-medium">{formatCurrency(computePoTaxIncluded(o))}</div>
-          <div className="text-[10px] text-mist">税抜 {formatCurrency((o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0))}</div>
-          {poPaidTotal(o) > 0 && poRemaining(o) > 0 && (
-            <div className="text-[10px] text-alert">残額 {formatCurrency(poRemaining(o))}</div>
-          )}
-        </td>
-        <td className="px-3 py-2">
-          {(o.payments ?? []).length > 0 ? (
-            <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{PAY_LABELS[o.paymentStatus]}</span>
+          {r.kind === 'invoice' ? (
+            <Link href={`/purchase-invoices/${r.id}`} className="text-left hover:underline">{r.supplierName}</Link>
           ) : (
-            <select
-              value={o.paymentStatus === 'partial' ? 'unpaid' : o.paymentStatus}
-              onChange={e => updateInline(o.id, { paymentStatus: e.target.value as PurchaseOrderPaymentStatus })}
-              className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
-            >
-              <option value="uninvoiced">{PAY_LABELS.uninvoiced}</option>
-              <option value="unpaid">{PAY_LABELS.unpaid}</option>
-              <option value="paid">{PAY_LABELS.paid}</option>
-            </select>
+            <button type="button" onClick={() => r.po && setDetailPo(r.po)} className="text-left hover:underline">{r.supplierName}</button>
           )}
         </td>
-        <td className="px-3 py-2">
-          <input
-            type="date"
-            value={o.paidDate ?? ''}
-            onChange={e => updateInline(o.id, { paidDate: e.target.value })}
-            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
-          />
+        <td className="px-3 py-2 text-mist">{r.sub}</td>
+        <td className="px-3 py-2 text-right">
+          <div className="font-medium">{formatCurrency(r.totalIncl)}</div>
+          {r.paid > 0 && r.remaining > 0 && <div className="text-[10px] text-alert">残額 {formatCurrency(r.remaining)}</div>}
         </td>
         <td className="px-3 py-2">
-          {o.invoice ? (
-            <a href={o.invoice.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-matchaDeep hover:underline">
-              <FileText size={12} /> PDF
-            </a>
+          <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{r.statusLabel}</span>
+        </td>
+        <td className="px-3 py-2">
+          {r.docUrl ? (
+            <a href={r.docUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-matchaDeep hover:underline"><FileText size={12} /> PDF</a>
           ) : (
             <span className="text-mist text-xs">未添付</span>
           )}
         </td>
         <td className="px-3 py-2 text-right">
-          {o.paymentStatus !== 'paid' && (
+          {!r.isPaid && (
             <button
               type="button"
-              onClick={() => markPaid(o.id)}
-              disabled={savingId === o.id}
+              onClick={() => r.kind === 'invoice' ? (r.invoice && markPaidInvoice(r.invoice)) : (r.po && markPaidPo(r.po))}
+              disabled={savingId === r.id}
               className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
             >
               <CheckCircle2 size={12} /> 支払確認
@@ -229,33 +284,103 @@ export default function PayablesPage() {
     )
   }
 
-  const renderPoCard = (label: string, colorClass: string, list: PurchaseOrder[]) => (
+  const renderCard = (label: string, colorClass: string, list: PayableRow[]) => (
     <div className={`rounded-2xl border-2 ${colorClass}`}>
       <div className="flex items-center gap-2 px-4 py-3">
         <h2 className="text-sm font-semibold text-ink">{label}</h2>
         <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
-          {list.length}件 / {formatCurrency(list.reduce((s, o) => s + computePoTaxIncluded(o), 0))}
+          {list.length}件 / {formatCurrency(list.reduce((s, r) => s + r.remaining, 0))}
         </span>
       </div>
       <div className="overflow-x-auto border-t border-white/60">
         <table className="min-w-[920px] text-sm">
           <thead className="bg-white/60 text-ink">
             <tr>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">期日</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">種別</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">支払期日</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">仕入先</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">商品</th>
+              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">明細</th>
               <th className="whitespace-nowrap px-3 py-2 text-right font-medium">支払額(税込)</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">状態</th>
-              <th className="whitespace-nowrap px-3 py-2 text-left font-medium">支払日</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">請求書</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
-          <tbody>{list.map(renderPoRow)}</tbody>
+          <tbody>{list.map(renderRow)}</tbody>
         </table>
       </div>
     </div>
   )
+
+  const renderPending = () => {
+    // Group unbilled-received PO lines by supplier for a tidy worklist.
+    const bySupplier = new Map<string, UnbilledPoLine[]>()
+    for (const u of filteredPending) {
+      const arr = bySupplier.get(u.supplierName) ?? []
+      arr.push(u)
+      bySupplier.set(u.supplierName, arr)
+    }
+    const suppliers = [...bySupplier.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    if (suppliers.length === 0) {
+      return <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">請求待ち（入荷済み・未請求）の発注はありません。</p>
+    }
+    return (
+      <div className="space-y-4">
+        <p className="rounded-xl border border-sky-200 bg-sky-50/50 px-3 py-2 text-xs text-mist">
+          入荷済みでまだ請求書が届いていない発注です。請求書が届いたら「請求書に紐付け」から登録・消し込みします（支払い対象にはまだ含まれません）。
+        </p>
+        {suppliers.map(([supplier, lines]) => (
+          <div key={supplier} className="rounded-2xl border-2 border-sky-200 bg-sky-50/30">
+            <div className="flex items-center justify-between gap-2 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-ink">{supplier}</h2>
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
+                  {lines.length}件 / 請求可能 {formatCurrency(lines.reduce((s, u) => s + u.billableRemainingAmount, 0))}
+                </span>
+              </div>
+              <Link
+                href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
+              >
+                <Plus size={12} /> まとめて請求書作成
+              </Link>
+            </div>
+            <div className="overflow-x-auto border-t border-white/60">
+              <table className="min-w-[760px] text-sm">
+                <thead className="bg-white/60 text-ink">
+                  <tr>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">発注日</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">商品</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">入荷</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">請求可能(税抜)</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map(u => (
+                    <tr key={`${u.poId}:${u.lineId}`} className="border-t border-white/60">
+                      <td className="px-3 py-2 text-mist">{u.orderDate || '—'}</td>
+                      <td className="px-3 py-2 text-ink">{u.productName}</td>
+                      <td className="px-3 py-2 text-right text-mist">{formatKg(u.receivedKg)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{formatCurrency(u.billableRemainingAmount)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Link
+                          href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}&poId=${u.poId}&lineId=${u.lineId}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper hover:bg-[#205f43]"
+                        >
+                          <Link2 size={12} /> 請求書に紐付け
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <AppLayout>
@@ -263,16 +388,26 @@ export default function PayablesPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-ink">支払管理</h1>
-            <p className="text-sm text-mist">期日が近い／超過した買掛を一目で確認し、支払を記録できます。</p>
+            <p className="text-sm text-mist">受領した請求書を支払い単位に管理します。発注は請求書を登録した時点で支払い対象になります。</p>
           </div>
-          <Link href="/financials" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">
-            収支ダッシュボード →
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push('/purchase-invoices/new')}
+              className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-[#205f43]"
+            >
+              <Plus size={14} /> 請求書を受領
+            </button>
+            <Link href="/financials" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">
+              収支ダッシュボード →
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KPICard title="未払 残高" value={formatCurrency(kpis.outstanding)} color={kpis.outstanding > 0 ? 'amber' : 'default'} icon={<Wallet size={18} />} />
           <KPICard title="要確認（超過・今月）" value={formatCurrency(kpis.actionNeeded)} color={kpis.actionNeeded > 0 ? 'red' : 'default'} icon={<AlertTriangle size={18} />} />
+          <KPICard title="請求待ち（入荷済・未請求）" value={formatCurrency(kpis.pendingTotal)} color="default" icon={<Clock size={18} />} />
           <KPICard title="今月支払 (確認済)" value={formatCurrency(kpis.paidThisMonth)} color="green" icon={<CheckCircle2 size={18} />} />
         </div>
 
@@ -290,50 +425,48 @@ export default function PayablesPage() {
         {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
         {!loading && (() => {
-          const tabs = bucketsToRender
-          const active = tabs.includes(activeBucket) ? activeBucket : tabs[0]
-          const rows = grouped[active] ?? []
-          // Within 要確認, split into 期限超過 (red) and 今月期限 (yellow) sections.
+          const active = activeTab
           const todayStr = todayIso()
-          const sortByDue = (a: PurchaseOrder, b: PurchaseOrder) => (a.paymentDueDate || '').localeCompare(b.paymentDueDate || '')
-          const overGroup = active === 'actionNeeded' ? rows.filter(o => !!o.paymentDueDate && o.paymentDueDate < todayStr).sort(sortByDue) : []
-          const dueGroup = active === 'actionNeeded' ? rows.filter(o => !(o.paymentDueDate && o.paymentDueDate < todayStr)).sort(sortByDue) : []
+          const sortByDue = (a: PayableRow, b: PayableRow) => (a.dueDate || '').localeCompare(b.dueDate || '')
+          const actionRows = grouped.actionNeeded
+          const overGroup = active === 'actionNeeded' ? actionRows.filter(r => !!r.dueDate && r.dueDate < todayStr).sort(sortByDue) : []
+          const dueGroup = active === 'actionNeeded' ? actionRows.filter(r => !(r.dueDate && r.dueDate < todayStr)).sort(sortByDue) : []
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2 border-b border-[#e6dfcf]">
-                {tabs.map(b => {
-                  const count = (grouped[b] ?? []).length
+                {TABS.map(t => {
+                  const count = t === 'pending' ? filteredPending.length : (grouped[t] ?? []).length
                   return (
                     <button
-                      key={b}
+                      key={t}
                       type="button"
-                      onClick={() => setActiveBucket(b)}
+                      onClick={() => setActiveTab(t)}
                       className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition ${
-                        active === b
-                          ? 'border-[#174c33] text-ink'
-                          : 'border-transparent text-mist hover:text-ink'
+                        active === t ? 'border-[#174c33] text-ink' : 'border-transparent text-mist hover:text-ink'
                       }`}
                     >
-                      {BUCKET_LABELS[b]}
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === b ? 'bg-ink text-paper' : 'bg-bone text-mist'}`}>{count}</span>
+                      {TAB_LABELS[t]}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active === t ? 'bg-ink text-paper' : 'bg-bone text-mist'}`}>{count}</span>
                     </button>
                   )
                 })}
               </div>
 
-              {active === 'actionNeeded' ? (
+              {active === 'pending' ? (
+                renderPending()
+              ) : active === 'actionNeeded' ? (
                 overGroup.length === 0 && dueGroup.length === 0 ? (
-                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の買掛はありません。</p>
+                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の支払いはありません。</p>
                 ) : (
                   <div className="space-y-4">
-                    {overGroup.length > 0 && renderPoCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
-                    {dueGroup.length > 0 && renderPoCard('今月期限', 'border-[#a87b1e]/40 bg-bone', dueGroup)}
+                    {overGroup.length > 0 && renderCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
+                    {dueGroup.length > 0 && renderCard('今月期限', 'border-[#a87b1e]/40 bg-bone', dueGroup)}
                   </div>
                 )
-              ) : rows.length === 0 ? (
-                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{BUCKET_LABELS[active]}の買掛はありません。</p>
+              ) : (grouped[active] ?? []).length === 0 ? (
+                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{TAB_LABELS[active]}の支払いはありません。</p>
               ) : (
-                renderPoCard(BUCKET_LABELS[active], BUCKET_COLORS[active], rows)
+                renderCard(TAB_LABELS[active], BUCKET_COLORS[active], grouped[active])
               )}
             </div>
           )
@@ -341,10 +474,10 @@ export default function PayablesPage() {
       </main>
 
       <PoDetailModal
-        order={detailOrder}
-        bankInfo={detailOrder ? bankInfoBySupplier[detailOrder.supplierName] : undefined}
-        onClose={() => setDetailOrder(null)}
-        onSavePayments={savePayments}
+        order={detailPo}
+        bankInfo={detailPo ? bankInfoBySupplier[detailPo.supplierName] : undefined}
+        onClose={() => setDetailPo(null)}
+        onSavePayments={savePoPayments}
       />
     </AppLayout>
   )
@@ -376,7 +509,7 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-ink">{order.supplierName}</h2>
-            <p className="mt-1 text-xs text-mist">発注の詳細（読み取り専用）</p>
+            <p className="mt-1 text-xs text-mist">発注の詳細（旧フロー・読み取り専用）</p>
           </div>
           <div className="flex items-center gap-2">
             <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">発注書 →</Link>

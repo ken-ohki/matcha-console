@@ -21,12 +21,15 @@ import { getServices } from '@/lib/services'
 import type {
   EcSaleRecord,
   PaymentStatus,
+  PurchaseInvoice,
   PurchaseOrder,
   PurchaseOrderPaymentStatus,
   SaleRecord,
 } from '@/types'
 import {
   buildCashFlowSeries,
+  invoiceRemaining,
+  isLegacyPayablePo,
   todayMonthKey,
   type CashFlowMode,
   type MonthlyCashFlow,
@@ -98,6 +101,7 @@ const editInputCls =
 export default function FinancialsPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>([])
   const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
   const [costByProduct, setCostByProduct] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -116,11 +120,12 @@ export default function FinancialsPage() {
     setLoading(true)
     try {
       const svc = await getServices()
-      const [o, ec, products, wholesaleOrders] = await Promise.all([
+      const [o, ec, products, wholesaleOrders, invoices] = await Promise.all([
         svc.purchaseOrders.getPurchaseOrders(),
         svc.ecSales.getEcSaleRecords(),
         svc.inventory.getProductsWithInventory(),
         fetchWholesaleOrders(),
+        svc.purchaseInvoices.getPurchaseInvoices(),
       ])
       const costMap: Record<string, number> = {}
       for (const p of products) costMap[p.id] = p.purchaseUnitPrice ?? 0
@@ -128,6 +133,7 @@ export default function FinancialsPage() {
       // Direct sales are now wholesale_orders; map them into the SaleRecord shape.
       setSales(wholesaleOrders.map(wo => orderToSale(wo, costMap)))
       setOrders(o)
+      setPurchaseInvoices(invoices)
       // Exclude wholesale stock-ledger entries — those revenues are counted via the
       // wholesale orders above; only Shopify ec_sales are EC revenue.
       setEcSales(ec.filter(e => e.channel !== 'Wholesale' && e.channel !== 'WholesaleSample'))
@@ -403,6 +409,8 @@ export default function FinancialsPage() {
     return r.dueDate < today
   }
   const isOverduePo = (o: PurchaseOrder): boolean => {
+    // Invoice-driven POs are not payables themselves — their invoices are.
+    if (!isLegacyPayablePo(o)) return false
     if (o.paymentStatus === 'paid') return false
     if (!o.paymentDueDate) return false
     return o.paymentDueDate < today
@@ -410,6 +418,9 @@ export default function FinancialsPage() {
 
   const overdueSales = filteredSales.filter(isOverdueSale)
   const overdueOrders = filteredOrders.filter(isOverduePo)
+  const overdueInvoices = purchaseInvoices.filter(
+    inv => inv.paymentStatus !== 'paid' && !!inv.paymentDueDate && inv.paymentDueDate < today && invoiceRemaining(inv) > 0,
+  )
 
   const applyPreset = (preset: 'thisMonth' | 'lastMonth' | 'thisFY' | 'all') => {
     const now = new Date()
@@ -532,10 +543,23 @@ export default function FinancialsPage() {
                 <AlertTriangle size={16} className="text-alert" />
                 <h2 className="text-sm font-semibold text-ink">アラート（期限超過）</h2>
               </div>
-              {overdueSales.length === 0 && overdueOrders.length === 0 ? (
+              {overdueSales.length === 0 && overdueOrders.length === 0 && overdueInvoices.length === 0 ? (
                 <p className="text-xs text-mist">期限超過の請求・支払いはありません。</p>
               ) : (
                 <div className="space-y-3">
+                  {overdueInvoices.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-alert">仕入請求書（未払・期限超過）</p>
+                      <ul className="space-y-1 text-xs text-ink">
+                        {overdueInvoices.map(inv => (
+                          <li key={inv.id} className="flex items-center justify-between rounded-lg bg-bone px-2 py-1.5">
+                            <span>{inv.supplierName}{inv.invoiceNumber ? ` - ${inv.invoiceNumber}` : ''}</span>
+                            <span className="text-alert">{formatCurrency(invoiceRemaining(inv))} / 期日 {inv.paymentDueDate}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {overdueSales.length > 0 && (
                     <div>
                       <p className="mb-1 text-[11px] uppercase tracking-wider text-alert">売上（未収・期限超過）</p>
@@ -590,7 +614,7 @@ export default function FinancialsPage() {
         )}
 
         {activeTab === 'cashflow' && (
-          <CashFlowTab sales={sales} ecSales={ecSales} purchaseOrders={orders} />
+          <CashFlowTab sales={sales} ecSales={ecSales} purchaseOrders={orders} purchaseInvoices={purchaseInvoices} />
         )}
 
         {loading && <p className="text-xs text-mist">読み込み中…</p>}
@@ -870,10 +894,12 @@ function CashFlowTab({
   sales,
   ecSales,
   purchaseOrders,
+  purchaseInvoices,
 }: {
   sales: SaleRecord[]
   ecSales: EcSaleRecord[]
   purchaseOrders: PurchaseOrder[]
+  purchaseInvoices: PurchaseInvoice[]
 }) {
   const todayKey = todayMonthKey()
   const [openingBalance, setOpeningBalance] = useState<number>(0)
@@ -923,11 +949,12 @@ function CashFlowTab({
     sales,
     ecSales,
     purchaseOrders,
+    purchaseInvoices,
     startMonth,
     endMonth,
     openingBalance,
     mode,
-  }), [sales, ecSales, purchaseOrders, startMonth, endMonth, openingBalance, mode])
+  }), [sales, ecSales, purchaseOrders, purchaseInvoices, startMonth, endMonth, openingBalance, mode])
 
   const currentRow = series.find(r => r.key === todayKey)
   const currentBalance = currentRow?.endBalance ?? (series[0]?.endBalance ?? openingBalance)

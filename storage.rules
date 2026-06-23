@@ -20,6 +20,10 @@ service firebase.storage {
     match /purchase-orders/{allPaths=**} {
       allow read, write: if signedIn();
     }
+    // 受領した仕入請求書PDF（消し込み用）
+    match /purchase-invoices/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
     // 発行した帳票PDF（請求書・納品書・見積書）
     match /sale-documents/{allPaths=**} {
       allow read, write: if signedIn();

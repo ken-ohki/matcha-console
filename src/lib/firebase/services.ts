@@ -6,10 +6,13 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
   type DocumentData,
 } from 'firebase/firestore'
@@ -33,6 +36,10 @@ import type {
   Product,
   ProductInput,
   ProductWithInventory,
+  PurchaseInvoice,
+  PurchaseInvoiceInput,
+  PurchaseInvoiceLine,
+  PurchaseInvoiceLineInput,
   PurchaseOrder,
   PurchaseOrderInput,
   PurchaseOrderLineInput,
@@ -40,6 +47,7 @@ import type {
   PurchaseOrderStatus,
   PurchaseOrderPaymentStatus,
   PurchaseOrderPayment,
+  UnbilledPoLine,
   SelfConsumptionRecord,
   SelfConsumptionRecordInput,
   SelfConsumptionUsageType,
@@ -58,6 +66,7 @@ import type {
   IEcSalesService,
   IInventoryService,
   IMastersService,
+  IPurchaseInvoicesService,
   IPurchaseOrdersService,
   ISelfConsumptionService,
   ISettingsService,
@@ -67,7 +76,16 @@ import type {
 } from '../services'
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
 import { ISSUER } from '../invoice'
-import { derivePoPaymentStatus } from '../cashflow'
+import {
+  computeInvoiceTotals,
+  derivePoBillingStatus,
+  derivePoPaymentStatus,
+  deriveInvoicePaymentStatus,
+  invoicePaidTotal,
+  isLegacyPayablePo,
+  poLineBillableRemaining,
+  poLineSubtotal,
+} from '../cashflow'
 import { deleteStorageObjectByUrl } from './storage'
 
 const COLLECTIONS = {
@@ -79,6 +97,7 @@ const COLLECTIONS = {
   users: 'users',
   masters: 'masters',
   purchaseOrders: 'purchase_orders',
+  purchaseInvoices: 'purchase_invoices',
   suppliers: 'suppliers',
 } as const
 
@@ -665,13 +684,19 @@ async function assertSufficientSelfConsumptionStock(
 function normalizePoPayments(raw: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] {
   if (!Array.isArray(raw)) return []
   return raw
-    .map((p, index) => ({
-      id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}-${index}`,
-      amount: Number(p.amount) || 0,
-      paidDate: (p.paidDate ?? '').trim(),
-      method: p.method?.trim() || undefined,
-      note: p.note?.trim() || undefined,
-    }))
+    .map((p, index) => {
+      // OMIT empty optional keys entirely — getFirestore has no
+      // ignoreUndefinedProperties, so a nested `undefined` would reject the write.
+      const method = p.method?.trim()
+      const note = p.note?.trim()
+      return {
+        id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}-${index}`,
+        amount: Number(p.amount) || 0,
+        paidDate: (p.paidDate ?? '').trim(),
+        ...(method ? { method } : {}),
+        ...(note ? { note } : {}),
+      }
+    })
     .filter(p => p.amount > 0)
 }
 
@@ -695,7 +720,22 @@ function normalizePurchaseOrderItem(raw: unknown): PurchaseOrderLineItem | null 
     lineTotal,
     receivedKg: Number(obj.receivedKg ?? 0),
     taxRate,
+    // Invoice-billing ledger: preserve stable id + cumulative billed across edits.
+    lineId: obj.lineId ? String(obj.lineId) : undefined,
+    billedKg: obj.billedKg != null ? Number(obj.billedKg) : 0,
+    billedAmount: obj.billedAmount != null ? Number(obj.billedAmount) : 0,
   }
+}
+
+/** Mint stable lineIds for any PO line missing one (preserves existing ids). */
+function ensurePoLineIds(items: PurchaseOrderLineItem[]): { items: PurchaseOrderLineItem[]; minted: boolean } {
+  let minted = false
+  const next = items.map(it => {
+    if (it.lineId) return it
+    minted = true
+    return { ...it, lineId: crypto.randomUUID() }
+  })
+  return { items: next, minted }
 }
 
 function isValidPurchaseOrderStatus(value: unknown): value is PurchaseOrderStatus {
@@ -764,12 +804,391 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
     payments,
     invoice,
     notes: data.notes ? String(data.notes) : undefined,
+    flowVersion: data.flowVersion === 'invoice' ? 'invoice' : data.flowVersion === 'legacy' ? 'legacy' : undefined,
+    billingComplete: data.billingComplete === true ? true : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
   // Derive status from split payments when present.
   base.paymentStatus = derivePoPaymentStatus(base, storedPaymentStatus)
+  base.billingStatus = derivePoBillingStatus(base)
   return base
+}
+
+function coerceInvoiceLineKind(value: unknown): PurchaseInvoiceLine['kind'] {
+  return value === 'po' ? 'po' : 'adhoc'
+}
+
+function mapPurchaseInvoiceLine(raw: unknown, index: number): PurchaseInvoiceLine | null {
+  if (!raw || typeof raw !== 'object') return null
+  const obj = raw as Record<string, unknown>
+  const kind = coerceInvoiceLineKind(obj.kind)
+  const quantity = Number(obj.quantity ?? 0)
+  const unitPrice = Number(obj.unitPrice ?? 0)
+  const lineTotal = obj.lineTotal != null ? Number(obj.lineTotal) : quantity * unitPrice
+  const productName = String(obj.productName ?? '')
+  if (!productName.trim() && kind === 'adhoc') return null
+  return {
+    id: String(obj.id ?? `${kind}-${index}`),
+    kind,
+    purchaseOrderId: obj.purchaseOrderId ? String(obj.purchaseOrderId) : undefined,
+    poLineId: obj.poLineId ? String(obj.poLineId) : undefined,
+    productId: obj.productId ? String(obj.productId) : undefined,
+    productName,
+    category: obj.category ? String(obj.category) : undefined,
+    quantity,
+    unit: obj.unit ? String(obj.unit) : undefined,
+    unitPrice,
+    lineTotal,
+    taxRate: coerceTaxRate(obj.taxRate),
+    note: obj.note ? String(obj.note) : undefined,
+  }
+}
+
+function mapPurchaseInvoice(id: string, data: DocumentData): PurchaseInvoice {
+  const lines: PurchaseInvoiceLine[] = (Array.isArray(data.lines) ? data.lines : [])
+    .map((raw: unknown, i: number) => mapPurchaseInvoiceLine(raw, i))
+    .filter((l: PurchaseInvoiceLine | null): l is PurchaseInvoiceLine => l !== null)
+  const totals = computeInvoiceTotals(lines)
+  const totalOverride = data.totalOverride != null && Number(data.totalOverride) >= 0 ? Number(data.totalOverride) : undefined
+  const totalAmount = totalOverride ?? totals.total
+  const payments = normalizePoPayments(
+    Array.isArray(data.payments)
+      ? data.payments.map((p: Record<string, unknown>) => ({
+          id: String(p?.id ?? ''),
+          amount: Number(p?.amount ?? 0),
+          paidDate: p?.paidDate ? toIsoDate(String(p.paidDate)) : '',
+          method: p?.method ? String(p.method) : undefined,
+          note: p?.note ? String(p.note) : undefined,
+        }))
+      : [],
+  )
+  const fileRaw = data.file as Record<string, unknown> | undefined
+  const file = fileRaw && fileRaw.url
+    ? {
+        name: String(fileRaw.name ?? '請求書'),
+        url: String(fileRaw.url),
+        uploadedAt: String(fileRaw.uploadedAt ?? ''),
+        size: fileRaw.size != null ? Number(fileRaw.size) : undefined,
+      }
+    : undefined
+  const inv: PurchaseInvoice = {
+    id,
+    flowVersion: 'invoice',
+    supplierName: String(data.supplierName ?? ''),
+    supplierNormalizedName: data.supplierNormalizedName ? String(data.supplierNormalizedName) : undefined,
+    invoiceNumber: data.invoiceNumber ? String(data.invoiceNumber) : undefined,
+    invoiceDate: String(data.invoiceDate ?? ''),
+    receivedDate: String(data.receivedDate ?? data.invoiceDate ?? ''),
+    paymentDueDate: data.paymentDueDate ? String(data.paymentDueDate) : undefined,
+    lines,
+    computedSubtotal: totals.subtotal,
+    computedTax: totals.tax,
+    computedTotal: totals.total,
+    totalOverride,
+    totalAmount,
+    paymentStatus: 'unpaid',
+    payments,
+    file,
+    linkedPoIds: Array.isArray(data.linkedPoIds)
+      ? Array.from(new Set(data.linkedPoIds.map((x: unknown) => String(x)).filter(Boolean)))
+      : Array.from(new Set(lines.filter(l => l.kind === 'po' && l.purchaseOrderId).map(l => l.purchaseOrderId as string))),
+    notes: data.notes ? String(data.notes) : undefined,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  }
+  inv.paymentStatus = deriveInvoicePaymentStatus(inv)
+  return inv
+}
+
+async function getAllPurchaseInvoices(): Promise<PurchaseInvoice[]> {
+  const db = getFirebaseDb()
+  const snap = await getDocs(collection(db, COLLECTIONS.purchaseInvoices))
+  return snap.docs.map(d => mapPurchaseInvoice(d.id, d.data()))
+}
+
+const poLineKey = (poId: string, lineId: string) => `${poId}#${lineId}`
+
+/** Normalize invoice-line inputs into stored lines (recompute totals, fill defaults). */
+function buildInvoiceLines(
+  inputLines: PurchaseInvoiceLineInput[],
+  poItemIndex: Map<string, PurchaseOrderLineItem>,
+): PurchaseInvoiceLine[] {
+  return (inputLines ?? [])
+    .map(line => {
+      const kind: PurchaseInvoiceLine['kind'] = line.kind === 'po' ? 'po' : 'adhoc'
+      const quantity = Number(line.quantity) || 0
+      const unitPrice = Number(line.unitPrice) || 0
+      if (kind === 'po') {
+        if (!line.purchaseOrderId || !line.poLineId) return null
+        const poItem = poItemIndex.get(poLineKey(line.purchaseOrderId, line.poLineId))
+        const taxRate = coerceTaxRate(line.taxRate ?? poItem?.taxRate ?? 8)
+        return {
+          id: line.id || crypto.randomUUID(),
+          kind,
+          purchaseOrderId: line.purchaseOrderId,
+          poLineId: line.poLineId,
+          productId: line.productId ?? poItem?.productId ?? undefined,
+          productName: (line.productName || poItem?.productName || '商品').trim(),
+          quantity,
+          unit: line.unit || 'kg',
+          unitPrice,
+          lineTotal: quantity * unitPrice,
+          taxRate,
+          note: line.note?.trim() || undefined,
+        } as PurchaseInvoiceLine
+      }
+      const name = (line.productName || '').trim()
+      if (!name) return null
+      return {
+        id: line.id || crypto.randomUUID(),
+        kind,
+        productName: name,
+        category: line.category?.trim() || undefined,
+        quantity,
+        unit: line.unit?.trim() || undefined,
+        unitPrice,
+        lineTotal: quantity * unitPrice,
+        taxRate: coerceTaxRate(line.taxRate ?? 10),
+        note: line.note?.trim() || undefined,
+      } as PurchaseInvoiceLine
+    })
+    .filter((l): l is PurchaseInvoiceLine => l !== null)
+}
+
+/** Signed (poId#lineId → {kg, amount}) delta between previous and next invoice lines. */
+function billingDeltas(
+  prev: PurchaseInvoiceLine[],
+  next: PurchaseInvoiceLine[],
+): Map<string, { poId: string; lineId: string; kg: number; amount: number }> {
+  const map = new Map<string, { poId: string; lineId: string; kg: number; amount: number }>()
+  const touch = (poId: string, lineId: string, kg: number, amount: number) => {
+    const key = poLineKey(poId, lineId)
+    const cur = map.get(key) ?? { poId, lineId, kg: 0, amount: 0 }
+    cur.kg += kg
+    cur.amount += amount
+    map.set(key, cur)
+  }
+  for (const l of next) if (l.kind === 'po' && l.purchaseOrderId && l.poLineId) touch(l.purchaseOrderId, l.poLineId, l.quantity, l.lineTotal)
+  for (const l of prev) if (l.kind === 'po' && l.purchaseOrderId && l.poLineId) touch(l.purchaseOrderId, l.poLineId, -l.quantity, -l.lineTotal)
+  return map
+}
+
+/** Plain item objects safe to write (no nested undefined; ledger fields present). */
+function serializePoItems(items: PurchaseOrderLineItem[]): Record<string, unknown>[] {
+  return items.map(it => ({
+    productId: it.productId ?? '',
+    productSku: it.productSku ?? '',
+    productName: it.productName ?? '',
+    quantityKg: Number(it.quantityKg) || 0,
+    unitPrice: Number(it.unitPrice) || 0,
+    lineTotal: Number(it.lineTotal) || 0,
+    receivedKg: Number(it.receivedKg) || 0,
+    taxRate: it.taxRate,
+    lineId: it.lineId || crypto.randomUUID(),
+    billedKg: Number(it.billedKg) || 0,
+    billedAmount: Number(it.billedAmount) || 0,
+  }))
+}
+
+/** Plain invoice-line objects safe to write (no nested undefined). */
+function serializeInvoiceLines(lines: PurchaseInvoiceLine[]): Record<string, unknown>[] {
+  return lines.map(l => {
+    const out: Record<string, unknown> = {
+      id: l.id,
+      kind: l.kind,
+      productName: l.productName,
+      quantity: Number(l.quantity) || 0,
+      unitPrice: Number(l.unitPrice) || 0,
+      lineTotal: Number(l.lineTotal) || 0,
+      taxRate: l.taxRate,
+    }
+    if (l.purchaseOrderId) out.purchaseOrderId = l.purchaseOrderId
+    if (l.poLineId) out.poLineId = l.poLineId
+    if (l.productId) out.productId = l.productId
+    if (l.category) out.category = l.category
+    if (l.unit) out.unit = l.unit
+    if (l.note) out.note = l.note
+    return out
+  })
+}
+
+const BILLING_EPSILON = 1 // yen
+
+/**
+ * Apply signed billing deltas to the referenced POs inside a transaction, then write
+ * the invoice doc. All txn reads (invoice + POs) happen before any write.
+ *   - billedAmount/Kg take the RAW signed delta (no max(0,…) clamp).
+ *   - underflow (billedAmount < -ε) ALWAYS aborts; over-bill (> subtotal+ε) only
+ *     allowed with allowOverBill.
+ *   - the affected POs are stamped flowVersion='invoice' (idempotent).
+ * Returns the invoice id.
+ */
+async function writePurchaseInvoice(
+  db: ReturnType<typeof getFirebaseDb>,
+  id: string | null,
+  input: Partial<PurchaseInvoiceInput>,
+): Promise<string> {
+  // Resolve referenced POs (display defaults: productName / taxRate).
+  const poIds = Array.from(
+    new Set((input.lines ?? []).filter(l => l.kind === 'po' && l.purchaseOrderId).map(l => l.purchaseOrderId as string)),
+  )
+  const poItemIndex = new Map<string, PurchaseOrderLineItem>()
+  for (const poId of poIds) {
+    const snap = await getDoc(doc(db, COLLECTIONS.purchaseOrders, poId))
+    if (!snap.exists()) continue
+    const po = mapPurchaseOrder(snap.id, snap.data() ?? {})
+    for (const it of po.items) if (it.lineId) poItemIndex.set(poLineKey(po.id, it.lineId), it)
+  }
+  const builtLines = buildInvoiceLines(input.lines ?? [], poItemIndex)
+  const allowOverBill = input.allowOverBill === true
+  const invoiceRef = id ? doc(db, COLLECTIONS.purchaseInvoices, id) : doc(collection(db, COLLECTIONS.purchaseInvoices))
+
+  await runTransaction(db, async txn => {
+    // ---- READS ----
+    let prevLines: PurchaseInvoiceLine[] = []
+    let prevData: DocumentData | null = null
+    if (id) {
+      const cur = await txn.get(invoiceRef)
+      if (!cur.exists()) throw new Error('請求書が見つかりません')
+      prevData = cur.data() ?? {}
+      prevLines = mapPurchaseInvoice(id, prevData).lines
+    }
+    // A partial update without `lines` must NOT wipe the ledger — keep prev lines.
+    const effectiveLines = input.lines !== undefined ? builtLines : prevLines
+    const totals = computeInvoiceTotals(effectiveLines)
+    // totalOverride: undefined = preserve prev; null/invalid = clear; number = set.
+    const prevOverride = prevData?.totalOverride != null ? Number(prevData.totalOverride) : undefined
+    const totalOverride = input.totalOverride === undefined
+      ? prevOverride
+      : (input.totalOverride === null || !(Number(input.totalOverride) >= 0))
+        ? undefined
+        : Number(input.totalOverride)
+    const totalAmount = totalOverride ?? totals.total
+    const deltas = billingDeltas(prevLines, effectiveLines)
+    const affectedPoIds = Array.from(new Set(Array.from(deltas.values()).map(d => d.poId)))
+    const poSnaps = new Map<string, { ref: ReturnType<typeof doc>; order: PurchaseOrder }>()
+    for (const poId of affectedPoIds) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, poId)
+      const snap = await txn.get(ref)
+      if (!snap.exists()) throw new Error('対象の発注が見つかりません')
+      poSnaps.set(poId, { ref, order: mapPurchaseOrder(snap.id, snap.data() ?? {}) })
+    }
+
+    // ---- COMPUTE + STAGE PO WRITES ----
+    const poWrites: { ref: ReturnType<typeof doc>; items: Record<string, unknown>[] }[] = []
+    for (const { ref, order } of poSnaps.values()) {
+      const { items } = ensurePoLineIds(order.items)
+      for (const d of deltas.values()) {
+        if (d.poId !== order.id) continue
+        const line = items.find(it => it.lineId === d.lineId)
+        if (!line) throw new Error('対象の発注明細が見つかりません')
+        const nextBilled = (line.billedAmount ?? 0) + d.amount
+        const subtotal = poLineSubtotal(line)
+        if (nextBilled < -BILLING_EPSILON) throw new Error('請求金額が発注を下回ります（データ不整合）')
+        // Only block when the delta INCREASES billing past the subtotal; a reduction
+        // (edit-down / partial reverse of an over-billed line) is always allowed.
+        if (d.amount > 0 && nextBilled > subtotal + BILLING_EPSILON && !allowOverBill) {
+          throw new Error('請求金額が発注額を超えています。発注超過を許可する場合は確認のうえ再実行してください。')
+        }
+        line.billedKg = Math.max(0, (line.billedKg ?? 0) + d.kg)
+        line.billedAmount = Math.max(0, nextBilled)
+      }
+      poWrites.push({ ref, items: serializePoItems(items) })
+    }
+
+    // ---- WRITES ----
+    for (const w of poWrites) {
+      txn.update(w.ref, { items: w.items, flowVersion: 'invoice', updatedAt: serverTimestamp() })
+    }
+
+    const payments = input.payments !== undefined
+      ? normalizePoPayments(input.payments)
+      : (prevData ? normalizePoPayments(mapPurchaseInvoice(id as string, prevData).payments) : [])
+    const paidTotal = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    if (id && paidTotal > totalAmount + BILLING_EPSILON && !allowOverBill) {
+      throw new Error('請求額を既入金額より小さくできません。')
+    }
+    const supplierName = (input.supplierName ?? (prevData?.supplierName as string) ?? '').trim()
+    const linkedPoIds = Array.from(new Set(effectiveLines.filter(l => l.kind === 'po' && l.purchaseOrderId).map(l => l.purchaseOrderId as string)))
+    const paymentStatus = deriveInvoicePaymentStatus({ totalAmount, payments })
+
+    const fileToWrite = input.file === null
+      ? deleteField()
+      : input.file && input.file.url
+        ? input.file
+        : (prevData?.file ?? undefined)
+
+    const scalar = sanitizeRecord({
+      supplierName,
+      supplierNormalizedName: supplierName ? normalizeBuyerName(supplierName) : undefined,
+      invoiceNumber: (input.invoiceNumber ?? (prevData?.invoiceNumber as string) ?? '').trim() || undefined,
+      invoiceDate: (input.invoiceDate ?? (prevData?.invoiceDate as string) ?? '').trim(),
+      receivedDate: (input.receivedDate ?? (prevData?.receivedDate as string) ?? input.invoiceDate ?? '').trim() || undefined,
+      paymentDueDate: (input.paymentDueDate ?? (prevData?.paymentDueDate as string) ?? '').trim() || undefined,
+      lines: serializeInvoiceLines(effectiveLines),
+      computedSubtotal: totals.subtotal,
+      computedTax: totals.tax,
+      computedTotal: totals.total,
+      totalOverride: totalOverride,
+      totalAmount,
+      paymentStatus,
+      payments,
+      linkedPoIds,
+      notes: (input.notes ?? (prevData?.notes as string) ?? '').trim() || undefined,
+      flowVersion: 'invoice' as const,
+      updatedAt: serverTimestamp(),
+    }) as Record<string, unknown>
+    scalar.file = fileToWrite
+    if (totalOverride == null) scalar.totalOverride = deleteField()
+
+    if (id) {
+      txn.update(invoiceRef, scalar)
+    } else {
+      txn.set(invoiceRef, { ...scalar, createdAt: serverTimestamp() })
+    }
+  })
+
+  return invoiceRef.id
+}
+
+/** Reverse an invoice's billing ledger and delete the doc (blocks if it has payments). */
+async function deletePurchaseInvoiceTxn(
+  db: ReturnType<typeof getFirebaseDb>,
+  id: string,
+  force: boolean,
+): Promise<void> {
+  const invoiceRef = doc(db, COLLECTIONS.purchaseInvoices, id)
+  await runTransaction(db, async txn => {
+    const cur = await txn.get(invoiceRef)
+    if (!cur.exists()) return
+    const inv = mapPurchaseInvoice(id, cur.data() ?? {})
+    if ((inv.payments?.length ?? 0) > 0 && !force) {
+      throw new Error('支払い記録があるため削除できません。先に入金を取り消してください。')
+    }
+    const deltas = billingDeltas(inv.lines, [])
+    const affectedPoIds = Array.from(new Set(Array.from(deltas.values()).map(d => d.poId)))
+    const poSnaps = new Map<string, { ref: ReturnType<typeof doc>; order: PurchaseOrder }>()
+    for (const poId of affectedPoIds) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, poId)
+      const snap = await txn.get(ref)
+      if (snap.exists()) poSnaps.set(poId, { ref, order: mapPurchaseOrder(snap.id, snap.data() ?? {}) })
+    }
+    const poWrites: { ref: ReturnType<typeof doc>; items: Record<string, unknown>[] }[] = []
+    for (const { ref, order } of poSnaps.values()) {
+      const { items } = ensurePoLineIds(order.items)
+      for (const d of deltas.values()) {
+        if (d.poId !== order.id) continue
+        const line = items.find(it => it.lineId === d.lineId)
+        if (!line) continue // line gone; nothing to reverse
+        line.billedKg = Math.max(0, (line.billedKg ?? 0) + d.kg)
+        line.billedAmount = Math.max(0, (line.billedAmount ?? 0) + d.amount)
+      }
+      poWrites.push({ ref, items: serializePoItems(items) })
+    }
+    for (const w of poWrites) txn.update(w.ref, { items: w.items, updatedAt: serverTimestamp() })
+    txn.delete(invoiceRef)
+  })
 }
 
 function mapSupplier(id: string, data: DocumentData): Supplier {
@@ -1288,9 +1707,12 @@ export function createFirebaseServices(): IServices {
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
             taxRate,
+            lineId: line.lineId || crypto.randomUUID(),
+            billedKg: 0,
+            billedAmount: 0,
           })
         } else {
-          items.push(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate))
+          items.push({ ...(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate)), lineId: line.lineId || crypto.randomUUID(), billedKg: 0, billedAmount: 0 })
         }
       }
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
@@ -1320,6 +1742,9 @@ export function createFirebaseServices(): IServices {
         paidDate: input.paidDate?.trim() || undefined,
         payments,
         invoice,
+        // New POs adopt the invoice-driven flow: they become payable only when an
+        // invoice is received. Legacy POs (pre-cutover) keep flowVersion undefined.
+        flowVersion: 'invoice',
         notes: input.notes?.trim() || undefined,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -1346,7 +1771,13 @@ export function createFirebaseServices(): IServices {
         unitPrice: item.unitPrice,
         receivedKg: item.receivedKg,
         taxRate: item.taxRate,
+        lineId: item.lineId,
       }))
+      // Carry the billing ledger across edits, matched by stable lineId (NOT index).
+      const ledgerByLineId = new Map<string, { billedKg: number; billedAmount: number }>()
+      for (const it of current.items) {
+        if (it.lineId) ledgerByLineId.set(it.lineId, { billedKg: it.billedKg ?? 0, billedAmount: it.billedAmount ?? 0 })
+      }
 
       const merged: PurchaseOrderInput = {
         supplierName: input.supplierName ?? current.supplierName,
@@ -1364,6 +1795,7 @@ export function createFirebaseServices(): IServices {
         payments: input.payments ?? current.payments,
         invoice: input.invoice === null ? null : (input.invoice ?? current.invoice),
         notes: input.notes ?? current.notes,
+        billingComplete: input.billingComplete ?? current.billingComplete,
       }
 
       if (!merged.items || merged.items.length === 0) {
@@ -1376,6 +1808,8 @@ export function createFirebaseServices(): IServices {
         const quantityKg = Number(line.quantityKg) || 0
         const unitPrice = Number(line.unitPrice) || 0
         const taxRate = coerceTaxRate(line.taxRate)
+        const lineId = line.lineId || crypto.randomUUID()
+        const ledger = (line.lineId && ledgerByLineId.get(line.lineId)) || { billedKg: 0, billedAmount: 0 }
         if (line.productId) {
           const product = products.find(p => p.id === line.productId && p.isActive)
           if (!product) throw new Error('商品が見つかりません')
@@ -1388,9 +1822,12 @@ export function createFirebaseServices(): IServices {
             lineTotal: quantityKg * unitPrice,
             receivedKg: Number(line.receivedKg ?? 0),
             taxRate,
+            lineId,
+            billedKg: ledger.billedKg,
+            billedAmount: ledger.billedAmount,
           })
         } else {
-          items.push(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate))
+          items.push({ ...(await buildPoLineForNewProduct(line, quantityKg, unitPrice, taxRate)), lineId, billedKg: ledger.billedKg, billedAmount: ledger.billedAmount })
         }
       }
       const totalQuantityKg = items.reduce((s, i) => s + i.quantityKg, 0)
@@ -1421,6 +1858,9 @@ export function createFirebaseServices(): IServices {
         paymentDueDate: merged.paymentDueDate?.trim() || undefined,
         paidDate: merged.paidDate?.trim() || undefined,
         payments,
+        // Preserve the flow stamp (never flip on a plain edit).
+        flowVersion: current.flowVersion,
+        billingComplete: !!merged.billingComplete,
       }
 
       await updateDoc(ref, sanitizeRecord({
@@ -1485,20 +1925,22 @@ export function createFirebaseServices(): IServices {
         unitPrice: line.unitPrice,
       })
 
-      const nextItems = order.items.map((item, idx) => (
-        idx === lineIndex
-          ? { ...item, productId: targetProductId, productSku: targetSku, productName: targetName, receivedKg: item.quantityKg }
-          : item
-      ))
-
-      const allReceived = nextItems.every(item => item.receivedKg >= item.quantityKg)
-      const nextStatus: PurchaseOrderStatus = allReceived && order.status !== 'cancelled' ? 'received' : order.status
-
-      await updateDoc(ref, sanitizeRecord({
-        items: nextItems,
-        status: nextStatus,
-        updatedAt: serverTimestamp(),
-      }))
+      // Transactional so a concurrent invoice consume / PO edit can't clobber the
+      // shared items array (Firestore conflict detection fires on the re-read).
+      await runTransaction(db, async txn => {
+        const cur = await txn.get(ref)
+        if (!cur.exists()) throw new Error('発注が見つかりません')
+        const curOrder = mapPurchaseOrder(cur.id, cur.data() ?? {})
+        const { items: withIds } = ensurePoLineIds(curOrder.items)
+        const nextItems = withIds.map((item, idx) => (
+          idx === lineIndex
+            ? { ...item, productId: targetProductId, productSku: targetSku, productName: targetName, receivedKg: item.quantityKg }
+            : item
+        ))
+        const allReceived = nextItems.every(item => item.receivedKg >= item.quantityKg)
+        const nextStatus: PurchaseOrderStatus = allReceived && curOrder.status !== 'cancelled' ? 'received' : curOrder.status
+        txn.update(ref, { items: nextItems, status: nextStatus, updatedAt: serverTimestamp() })
+      })
       await syncSuppliersCollection()
     },
 
@@ -1514,16 +1956,25 @@ export function createFirebaseServices(): IServices {
         await removeArrivalRecordFromProduct(line.productId, `po:${orderId}:${lineIndex}`)
       }
 
-      const nextItems = order.items.map((item, idx) => (
-        idx === lineIndex ? { ...item, receivedKg: 0 } : item
-      ))
-      const nextStatus: PurchaseOrderStatus = order.status === 'received' ? 'placed' : order.status
+      await runTransaction(db, async txn => {
+        const cur = await txn.get(ref)
+        if (!cur.exists()) throw new Error('発注が見つかりません')
+        const curOrder = mapPurchaseOrder(cur.id, cur.data() ?? {})
+        const { items: withIds } = ensurePoLineIds(curOrder.items)
+        const nextItems = withIds.map((item, idx) => (idx === lineIndex ? { ...item, receivedKg: 0 } : item))
+        const nextStatus: PurchaseOrderStatus = curOrder.status === 'received' ? 'placed' : curOrder.status
+        txn.update(ref, { items: nextItems, status: nextStatus, updatedAt: serverTimestamp() })
+      })
+    },
 
-      await updateDoc(ref, sanitizeRecord({
-        items: nextItems,
-        status: nextStatus,
-        updatedAt: serverTimestamp(),
-      }))
+    async setPurchaseOrderBillingComplete(orderId, complete) {
+      // Lightweight flag write — does NOT rebuild items / re-resolve products, so it
+      // can't fail just because a product was later deactivated.
+      const ref = doc(db, COLLECTIONS.purchaseOrders, orderId)
+      await updateDoc(ref, { billingComplete: complete, updatedAt: serverTimestamp() })
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('発注が見つかりません')
+      return mapPurchaseOrder(snap.id, snap.data() ?? {})
     },
 
     async convertOrphanArrivalToPo(productId, arrivalId, input) {
@@ -1661,6 +2112,95 @@ export function createFirebaseServices(): IServices {
       const snap = await getDoc(ref)
       if (!snap.exists()) throw new Error('仕入先が見つかりません')
       return mapSupplier(snap.id, snap.data() ?? {})
+    },
+  }
+
+  const purchaseInvoicesService: IPurchaseInvoicesService = {
+    async getPurchaseInvoices() {
+      const invoices = await getAllPurchaseInvoices()
+      return invoices.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    },
+
+    async getPurchaseInvoice(id) {
+      const snap = await getDoc(doc(db, COLLECTIONS.purchaseInvoices, id))
+      if (!snap.exists()) return null
+      return mapPurchaseInvoice(snap.id, snap.data() ?? {})
+    },
+
+    async getPurchaseInvoicesByPo(poId) {
+      const q = query(collection(db, COLLECTIONS.purchaseInvoices), where('linkedPoIds', 'array-contains', poId))
+      const snap = await getDocs(q)
+      return snap.docs.map(d => mapPurchaseInvoice(d.id, d.data())).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    },
+
+    async createPurchaseInvoice(input) {
+      const id = await writePurchaseInvoice(db, null, input)
+      const snap = await getDoc(doc(db, COLLECTIONS.purchaseInvoices, id))
+      return mapPurchaseInvoice(id, snap.data() ?? {})
+    },
+
+    async updatePurchaseInvoice(id, input) {
+      await writePurchaseInvoice(db, id, input)
+      const snap = await getDoc(doc(db, COLLECTIONS.purchaseInvoices, id))
+      if (!snap.exists()) throw new Error('請求書が見つかりません')
+      return mapPurchaseInvoice(id, snap.data() ?? {})
+    },
+
+    async deletePurchaseInvoice(id, opts) {
+      await deletePurchaseInvoiceTxn(db, id, opts?.force === true)
+    },
+
+    async updateInvoicePayments(id, payments) {
+      const ref = doc(db, COLLECTIONS.purchaseInvoices, id)
+      const snap = await getDoc(ref)
+      if (!snap.exists()) throw new Error('請求書が見つかりません')
+      const cleaned = normalizePoPayments(payments)
+      const inv = mapPurchaseInvoice(id, { ...snap.data(), payments: cleaned })
+      // Guard against stranding recorded cash below an edited-down payable.
+      await updateDoc(ref, {
+        payments: cleaned,
+        paymentStatus: inv.paymentStatus,
+        updatedAt: serverTimestamp(),
+      })
+      return mapPurchaseInvoice(id, { ...snap.data(), payments: cleaned })
+    },
+
+    async getUnbilledReceivedPoLines() {
+      const orders = await getAllPurchaseOrders()
+      const rows: UnbilledPoLine[] = []
+      for (const po of orders) {
+        if (po.status === 'cancelled') continue
+        if (isLegacyPayablePo(po)) continue
+        if (po.billingComplete) continue
+        // Self-heal: persist minted lineIds so the picker references stable ids.
+        const { items, minted } = ensurePoLineIds(po.items)
+        if (minted) {
+          await updateDoc(doc(db, COLLECTIONS.purchaseOrders, po.id), {
+            items: serializePoItems(items),
+            updatedAt: serverTimestamp(),
+          }).catch(() => {})
+        }
+        for (const line of items) {
+          if ((line.receivedKg ?? 0) <= 0) continue
+          const remaining = poLineBillableRemaining(line)
+          if (remaining <= 0.5) continue
+          rows.push({
+            poId: po.id,
+            supplierName: po.supplierName,
+            orderDate: po.orderDate,
+            expectedDeliveryDate: po.expectedDeliveryDate,
+            lineId: line.lineId as string,
+            productName: line.productName,
+            orderedKg: line.quantityKg,
+            receivedKg: line.receivedKg,
+            unitPrice: line.unitPrice,
+            taxRate: line.taxRate,
+            billedAmount: line.billedAmount ?? 0,
+            billableRemainingAmount: remaining,
+          })
+        }
+      }
+      return rows
     },
   }
 
@@ -1850,6 +2390,7 @@ export function createFirebaseServices(): IServices {
     ecSales: ecSalesService,
     purchaseOrders: purchaseOrdersService,
     suppliers: suppliersService,
+    purchaseInvoices: purchaseInvoicesService,
     settings: settingsService,
     masters: mastersService,
     auth: authService,
