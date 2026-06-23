@@ -82,10 +82,17 @@ interface PayableRow {
   remaining: number
   isPaid: boolean
   statusLabel: string
+  paidDate?: string
   docUrl?: string
   sub: string
   invoice?: PurchaseInvoice
   po?: PurchaseOrder
+}
+
+/** Most recent payment date among the records (ISO), or undefined. */
+function latestPaidDate(payments: { paidDate?: string }[] | undefined): string | undefined {
+  const ds = (payments ?? []).map(p => p.paidDate).filter((d): d is string => !!d).sort()
+  return ds[ds.length - 1]
 }
 
 function invLineSummary(inv: PurchaseInvoice): string {
@@ -144,6 +151,7 @@ export default function PayablesPage() {
       remaining: invoiceRemaining(inv),
       isPaid: inv.paymentStatus === 'paid',
       statusLabel: INV_PAY_LABELS[inv.paymentStatus],
+      paidDate: latestPaidDate(inv.payments),
       docUrl: inv.file?.url,
       sub: invLineSummary(inv),
       invoice: inv,
@@ -158,6 +166,7 @@ export default function PayablesPage() {
       remaining: poRemaining(o),
       isPaid: o.paymentStatus === 'paid',
       statusLabel: PAY_LABELS[o.paymentStatus],
+      paidDate: latestPaidDate(o.payments) || o.paidDate,
       docUrl: o.invoice?.url,
       sub: poLineSummary(o),
       po: o,
@@ -277,7 +286,7 @@ export default function PayablesPage() {
     } finally { setSavingKey(null) }
   }
 
-  const renderRow = (r: PayableRow) => {
+  const renderRow = (r: PayableRow, showPaidDate = false) => {
     const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
     return (
       <tr key={`${r.kind}:${r.id}`} className="border-t border-white/60">
@@ -302,6 +311,7 @@ export default function PayablesPage() {
         <td className="px-3 py-2">
           <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800">{r.statusLabel}</span>
         </td>
+        {showPaidDate && <td className="px-3 py-2 text-mist">{r.paidDate || '—'}</td>}
         <td className="px-3 py-2">
           {r.docUrl ? (
             <a href={r.docUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-matchaDeep hover:underline"><FileText size={12} /> PDF</a>
@@ -358,12 +368,12 @@ export default function PayablesPage() {
     )
   }
 
-  const renderCard = (label: string, colorClass: string, list: PayableRow[]) => (
+  const renderCard = (label: string, colorClass: string, list: PayableRow[], showPaidDate = false) => (
     <div className={`rounded-2xl border-2 ${colorClass}`}>
       <div className="flex items-center gap-2 px-4 py-3">
         <h2 className="text-sm font-semibold text-ink">{label}</h2>
         <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
-          {list.length}件 / {formatCurrency(list.reduce((s, r) => s + r.remaining, 0))}
+          {list.length}件 / {formatCurrency(list.reduce((s, r) => s + (showPaidDate ? r.totalIncl : r.remaining), 0))}
         </span>
       </div>
       <div className="overflow-x-auto border-t border-white/60">
@@ -376,11 +386,12 @@ export default function PayablesPage() {
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">明細</th>
               <th className="whitespace-nowrap px-3 py-2 text-right font-medium">支払額(税込)</th>
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">状態</th>
+              {showPaidDate && <th className="whitespace-nowrap px-3 py-2 text-left font-medium">支払日</th>}
               <th className="whitespace-nowrap px-3 py-2 text-left font-medium">請求書</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
-          <tbody>{list.map(renderRow)}</tbody>
+          <tbody>{list.map(r => renderRow(r, showPaidDate))}</tbody>
         </table>
       </div>
     </div>
@@ -562,7 +573,7 @@ export default function PayablesPage() {
               ) : (grouped[active] ?? []).length === 0 ? (
                 <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{TAB_LABELS[active]}の支払いはありません。</p>
               ) : (
-                renderCard(TAB_LABELS[active], BUCKET_COLORS[active], grouped[active])
+                renderCard(TAB_LABELS[active], BUCKET_COLORS[active], grouped[active], active === 'paid')
               )}
             </div>
           )
