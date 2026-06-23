@@ -647,6 +647,18 @@ export function ProductMasterSection({
       </div>
 
       <div className="mt-4">
+        <label className="mb-1 block text-sm font-medium text-graphite">商品説明</label>
+        <textarea
+          rows={4}
+          value={form.salesNote ?? ''}
+          onChange={event => setForm(prev => ({ ...prev, salesNote: event.target.value }))}
+          className={fieldCls}
+          placeholder="販売時の説明・補足"
+        />
+        <p className="mt-1 text-[11px] text-mist">カタログの商品詳細に表示されます</p>
+      </div>
+
+      <div className="mt-4">
         <label className="mb-1 block text-sm font-medium text-graphite">商品画像</label>
         <p className="mb-2 text-xs text-mist">JPG / PNG 推奨。カタログのカード・詳細に表示されます。</p>
         <ImageUploader
@@ -775,16 +787,6 @@ export function ProductPricingSection({ form, setForm }: FormProps) {
             value={form.adminNote ?? ''}
             onChange={event => setForm(prev => ({ ...prev, adminNote: event.target.value }))}
             className={fieldCls}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-graphite">備考（販売用）</label>
-          <textarea
-            rows={4}
-            value={form.salesNote ?? ''}
-            onChange={event => setForm(prev => ({ ...prev, salesNote: event.target.value }))}
-            className={fieldCls}
-            placeholder="販売時の説明・補足"
           />
         </div>
       </div>
