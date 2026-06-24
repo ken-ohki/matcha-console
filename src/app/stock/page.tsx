@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import type { ProductWithInventory } from '@/types'
-import { Package, Search, Boxes } from 'lucide-react'
+import { Package, Search, Boxes, ClipboardList } from 'lucide-react'
 
 /** Color-code a stock quantity by tier: マイナス / 0 / 10kg未満 / 10kg以上. */
 function stockColorClass(kg: number): string {
@@ -71,14 +71,23 @@ export default function StockPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-[#e6f0e8] px-3 py-1 text-sm font-medium text-matchaDeep">
-            <Package size={15} /> 倉庫
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#e6f0e8] px-3 py-1 text-sm font-medium text-matchaDeep">
+              <Package size={15} /> 倉庫
+            </div>
+            <h1 className="mt-3 text-3xl font-bold text-ink">在庫管理</h1>
+            <p className="mt-2 text-sm text-mist">
+              商品ごとの在庫数量・入荷元の商品名・仕入先を確認できます。商品名をクリックすると商品詳細を開きます。
+            </p>
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-ink">在庫管理</h1>
-          <p className="mt-2 text-sm text-mist">
-            商品ごとの在庫数量・入荷元の商品名・仕入先を確認できます。商品名をクリックすると商品詳細を開きます。
-          </p>
+          <Link
+            href="/inventory/stocktake"
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-graphite transition-colors hover:bg-bone"
+          >
+            <ClipboardList size={16} />
+            在庫管理表（PDF）
+          </Link>
         </div>
 
         <div className="grid gap-3 md:grid-cols-4">
