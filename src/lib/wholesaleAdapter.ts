@@ -32,6 +32,7 @@ export interface WholesaleOrderRow {
   trackingNumber?: string
   shippingCarrierLabel?: string
   shippedAt?: string
+  shipRequestedAt?: string
   dueDate?: string
   origin?: string
   costAmountJpy?: number
@@ -180,6 +181,7 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
     shippingPostalCode: o.shippingPostalCode,
     shippingMethod: o.shippingCarrierLabel,
     shippingDate: o.shippedAt,
+    shipRequestedAt: o.shipRequestedAt,
     trackingNumber: o.trackingNumber,
     shippingNote: o.shippingMemo,
     stripeFeeJpy: o.stripeFeeJpy,

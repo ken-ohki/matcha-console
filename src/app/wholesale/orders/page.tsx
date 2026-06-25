@@ -25,6 +25,7 @@ interface Order {
   paymentStatus?: string
   status?: string
   shippedAt?: string
+  shipRequestedAt?: string
   isDomestic?: boolean
   overseasCarrier?: string
   origin?: string
@@ -401,7 +402,12 @@ export default function WholesaleOrdersPage() {
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${shippingStateLabel(o).tone}`}>{shippingStateLabel(o).label}</span>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${shippingStateLabel(o).tone}`}>{shippingStateLabel(o).label}</span>
+                        {o.shipRequestedAt && o.status !== 'shipped' && o.status !== 'cancelled' && (
+                          <span className="inline-block rounded border border-matcha bg-[#e6f0e8] px-1.5 py-0.5 text-[10px] font-medium text-matchaDeep" title={`発送指示: ${o.shipRequestedAt.slice(0, 16).replace('T', ' ')}`}>発送指示</span>
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{fmtDay(o.shippedAt)}</td>
                   </tr>

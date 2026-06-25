@@ -54,6 +54,8 @@ interface Order {
   shippingCarrierLabel?: string
   shippedAt?: string
   shipmentEmailedAt?: string
+  shipRequestedAt?: string
+  shipRequestedBy?: string
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
   grossProfitJpy?: number
@@ -189,7 +191,7 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
     if (action === 'accept_quote' && !window.confirm('お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）')) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
@@ -787,8 +789,24 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Fulfillment — carrier/tracking + shipping status. Direct (staff-entered)
                 orders can edit the 発送 info at any (non-cancelled) status. */}
-            {(o.status === 'paid' || o.status === 'shipped' || (o.origin === 'direct' && o.status !== 'cancelled')) && (
+            {(o.status === 'paid' || o.status === 'shipped' || o.status === 'pending_payment' || (o.origin === 'direct' && o.status !== 'cancelled')) && (
               <Section title="出荷・発送通知">
+                {/* 発送指示: 入金前でも出荷したい掛け取引向け。発送管理に「要発送」として表示。 */}
+                {o.status !== 'shipped' && o.status !== 'cancelled' && (
+                  <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[#cfe0d3] bg-[#f3f7f1] px-3 py-2">
+                    {o.shipRequestedAt ? (
+                      <>
+                        <span className="text-xs text-matchaDeep">発送指示済み: {o.shipRequestedAt.slice(0, 16).replace('T', ' ')}{o.shipRequestedBy ? `（${o.shipRequestedBy}）` : ''}</span>
+                        <button onClick={() => act('cancel_shipment_request')} disabled={busy} className="btn-ghost text-xs">発送指示を取消</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-mist">入金前でも発送する場合は、発送指示を出すと発送管理に「要発送」として表示されます。</span>
+                        <button onClick={() => act('request_shipment')} disabled={busy} className="btn-primary">発送指示</button>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="mb-3 flex flex-wrap items-end gap-2">
                   <label className="text-xs text-mist">発送業者
                     <select className="mt-1 block w-44 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={carrierLabel} onChange={e => setCarrierLabel(e.target.value)}>
@@ -798,15 +816,15 @@ export default function WholesaleOrderDetailPage() {
                     </select>
                   </label>
                   <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
-                  {o.status === 'paid' ? (
-                    <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
-                  ) : o.status === 'shipped' ? (
+                  {o.status === 'shipped' ? (
                     <>
                       <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷情報を更新</button>
                       <button onClick={() => act('set_fulfillment', { shipped: false })} disabled={busy} className="btn-ghost">未出荷に戻す</button>
                     </>
+                  ) : (o.status === 'paid' || o.shipRequestedAt) ? (
+                    <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
                   ) : (
-                    // Direct order not yet paid/shipped — save carrier/tracking without changing status.
+                    // Not yet paid and no 発送指示 — save carrier/tracking without changing status.
                     <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">発送情報を保存</button>
                   )}
                 </div>

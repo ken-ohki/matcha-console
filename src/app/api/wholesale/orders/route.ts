@@ -116,7 +116,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -191,8 +191,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  let staff: { uid: string; email: string }
   try {
-    await requireAdmin(request)
+    staff = await requireAdmin(request)
   } catch (err) {
     return handleAuthError(err)
   }
@@ -357,11 +358,34 @@ export async function PATCH(request: Request) {
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }
-  if (body.action === 'mark_shipped') {
+  // 発送指示: flag the order for shipment so it surfaces to shipping staff in 発送管理
+  // even while awaiting payment (掛け取引 / 月末締め). In-app only — no email.
+  if (body.action === 'request_shipment') {
     const cur = (await ref.get()).data() as { status?: string } | undefined
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    // Only a paid order can be shipped (don't ship unpaid / cancelled / already-shipped).
-    if (cur.status !== 'paid') return NextResponse.json({ error: 'not_paid' }, { status: 400 })
+    if (cur.status === 'cancelled' || cur.status === 'shipped') return NextResponse.json({ error: 'not_requestable' }, { status: 400 })
+    await ref.set({
+      shipRequestedAt: new Date().toISOString(),
+      shipRequestedBy: staff.email || staff.uid,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
+  if (body.action === 'cancel_shipment_request') {
+    await ref.set({
+      shipRequestedAt: FieldValue.delete(),
+      shipRequestedBy: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
+  if (body.action === 'mark_shipped') {
+    const cur = (await ref.get()).data() as { status?: string; shipRequestedAt?: string } | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    // A paid order can ship; an unpaid order can ship only once 発送指示 (掛け取引) is set.
+    // Never ship a cancelled / already-shipped order.
+    if (cur.status === 'cancelled' || cur.status === 'shipped') return NextResponse.json({ error: 'not_shippable' }, { status: 400 })
+    if (cur.status !== 'paid' && !cur.shipRequestedAt) return NextResponse.json({ error: 'not_paid' }, { status: 400 })
     const now = new Date().toISOString()
     await ref.set(
       {

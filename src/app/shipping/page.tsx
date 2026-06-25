@@ -14,14 +14,13 @@ import { translateValue } from '@/lib/masters'
 import { ChevronRight, FileText, Package, PackageCheck, Search, Send, Truck } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
 
-// Action state drives the shipping workflow: an order can only be shipped once it
-// is paid. We separate "要発送" (paid, not yet shipped — the staff to-do) from
-// "入金待ち" (can't ship yet) and "発送完了".
+// Action state drives the shipping workflow. An order is "要発送" once it is paid OR
+// has a 発送指示 (掛け取引: ship before payment). "入金待ち" = not yet shippable.
 type ActionState = 'to_ship' | 'awaiting_payment' | 'shipped'
 
 function actionState(s: SaleRecord): ActionState {
   if (s.shippingStatus === 'shipped') return 'shipped'
-  return s.paymentStatus === 'paid' ? 'to_ship' : 'awaiting_payment'
+  return (s.paymentStatus === 'paid' || !!s.shipRequestedAt) ? 'to_ship' : 'awaiting_payment'
 }
 
 const ACTION_LABELS: Record<ActionState, string> = {
@@ -286,7 +285,14 @@ export default function ShippingPage() {
                         onClick={() => openDetail(sale.id)}
                         className={`cursor-pointer border-b border-[#f0ebdf] transition ${overdue ? 'bg-alert/5/50 hover:bg-alert/5' : state === 'to_ship' ? 'bg-[#fffaf0] hover:bg-[#fff3df]' : 'hover:bg-bone'}`}
                       >
-                        <td className="whitespace-nowrap px-3 py-3"><ActionBadge state={state} /></td>
+                        <td className="whitespace-nowrap px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <ActionBadge state={state} />
+                            {sale.shipRequestedAt && sale.paymentStatus !== 'paid' && sale.shippingStatus !== 'shipped' && (
+                              <span className="inline-flex items-center rounded-full bg-[#e6f0e8] px-2 py-0.5 text-[10px] font-medium text-matchaDeep" title={`発送指示: ${sale.shipRequestedAt.slice(0, 16).replace('T', ' ')}`}>発送指示</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-3">
                           <div className="font-medium text-ink">{sale.buyerName}</div>
                           <div className="text-[11px] text-mist">{sale.country || '-'}</div>

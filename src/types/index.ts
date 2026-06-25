@@ -168,6 +168,7 @@ export interface SaleRecord {
   shippingPostalCode?: string
   shippingMethod?: string
   shippingDate?: string
+  shipRequestedAt?: string   // 発送指示日時（入金前でも出荷可・発送管理に表示）
   trackingNumber?: string
   shippingNote?: string   // 発送担当者へのメモ
   shippingSlip?: ShippingSlip   // 発送伝票（送り状など）の添付
