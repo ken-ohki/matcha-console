@@ -36,8 +36,7 @@ import {
   poPaidTotal,
   poRemaining,
 } from '@/lib/cashflow'
-import { PaymentsEditor } from '@/components/PaymentsEditor'
-import { InstallmentScheduleEditor, hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
+import { hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
@@ -138,7 +137,7 @@ export default function PayablesPage() {
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [detailPo, setDetailPo] = useState<PurchaseOrder | null>(null)
+  const [detailRow, setDetailRow] = useState<PayableRow | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('actionNeeded')
   // Payment confirm/edit dialog (also serves as the misclick guard — a single
   // stray click only opens it; committing needs an explicit 確定/更新).
@@ -416,18 +415,6 @@ export default function PayablesPage() {
     } finally { setSavingKey(null) }
   }
 
-  const savePoPayments = async (id: string, payments: PurchaseOrderPayment[]) => {
-    setSavingKey(`po:${id}`)
-    setFeedback(null)
-    try {
-      const svc = await getServices()
-      const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments })
-      setLegacyPos(prev => prev.map(o => o.id === id ? updated : o))
-      setDetailPo(updated)
-    } catch (err) {
-      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
-    } finally { setSavingKey(null) }
-  }
 
   const renderRow = (r: PayableRow, showPaidDate = false) => {
     const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
@@ -440,11 +427,8 @@ export default function PayablesPage() {
         </td>
         <td className={`px-3 py-2 ${overdue ? 'text-alert' : 'text-mist'}`}>{r.dueDate || '—'}</td>
         <td className="px-3 py-2 text-ink">
-          {r.kind === 'invoice' ? (
-            <Link href={`/purchase-invoices/${r.id}`} className="text-left hover:underline">{r.supplierName}</Link>
-          ) : (
-            <button type="button" onClick={() => r.po && setDetailPo(r.po)} className="text-left hover:underline">{r.supplierName}</button>
-          )}
+          {/* 仕入先クリック → 請求書/直接支払い とも同じ読み取り専用の詳細モーダルを開く */}
+          <button type="button" onClick={() => setDetailRow(r)} className="text-left hover:underline">{r.supplierName}</button>
         </td>
         <td className="px-3 py-2 text-mist">{r.sub}</td>
         <td className="px-3 py-2 text-right">
@@ -713,11 +697,10 @@ export default function PayablesPage() {
         })()}
       </main>
 
-      <PoDetailModal
-        order={detailPo}
-        bankInfo={detailPo ? bankInfoBySupplier[detailPo.supplierName] : undefined}
-        onClose={() => setDetailPo(null)}
-        onSavePayments={savePoPayments}
+      <PayableDetailModal
+        row={detailRow}
+        bankInfo={detailRow ? bankInfoBySupplier[detailRow.supplierName] : undefined}
+        onClose={() => setDetailRow(null)}
       />
 
       {payModal && (
@@ -781,108 +764,208 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
-  order: PurchaseOrder | null
+/** 仕入先クリック時の統一・読み取り専用 詳細モーダル。請求書/発注(直接支払い)とも
+ *  同じ見た目で 内容・請求先(振込先) を表示し、「編集」で各編集画面へ遷移する。 */
+function PayableDetailModal({ row, bankInfo, onClose }: {
+  row: PayableRow | null
   bankInfo?: string
   onClose: () => void
-  onSavePayments: (id: string, payments: PurchaseOrderPayment[]) => Promise<void>
 }) {
-  if (!order) return null
-  const fees = (order.shippingFee ?? 0) + (order.otherFees ?? 0)
-  const tax = computeTaxBuckets(order.items ?? [], fees)
-  const inclTotal = computePoTaxIncluded(order)
+  if (!row) return null
+  const inv = row.invoice
+  const po = row.po
+  const editHref = inv ? `/purchase-invoices/${inv.id}` : po ? `/purchase-orders/${po.id}` : '#'
+  const taxLabel = (r: number) => (r === 0 ? '免税' : `${r}%`)
+  const poTax = po ? computeTaxBuckets(po.items ?? [], (po.shippingFee ?? 0) + (po.otherFees ?? 0)) : null
+
+  const bankBlock = (
+    <div className="mb-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
+      <p className="mb-1 text-xs font-medium text-mist">請求先・振込先（支払口座）</p>
+      {bankInfo
+        ? <p className="whitespace-pre-wrap text-ink">{bankInfo}</p>
+        : <p className="text-mist">仕入先マスタに未登録です。<Link href="/suppliers" className="text-matchaDeep hover:underline">仕入先管理</Link>で登録してください。</p>}
+    </div>
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div className="max-h-[100vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:max-h-[92vh] sm:rounded-3xl sm:p-6" onClick={e => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-ink">{order.supplierName}</h2>
-            <p className="mt-1 text-xs text-mist">発注の詳細（直接支払い）</p>
+            <h2 className="text-xl font-semibold text-ink">{row.supplierName}</h2>
+            <p className="mt-1 text-xs text-mist">{row.typeLabel} の詳細（読み取り専用）</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">発注書 →</Link>
+            <Link href={editHref} className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-matchaDeep hover:bg-[#eef3eb]"><Pencil size={12} /> 編集 →</Link>
             <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-bone hover:text-mist"><X size={18} /></button>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
-            <DetailRow label="発注ステータス" value={PO_STATUS_LABELS[order.status]} />
-            <DetailRow label="支払ステータス" value={PAY_LABELS[order.paymentStatus]} />
-            <DetailRow label="発注日" value={order.orderDate || '-'} />
-            <DetailRow label="入荷予定日" value={order.expectedDeliveryDate || '-'} />
-            <DetailRow label="入荷日" value={order.actualDeliveryDate || '-'} />
-            <DetailRow label="支払期日" value={order.paymentDueDate || '-'} />
-            <DetailRow label="支払日" value={order.paidDate || '-'} />
-          </div>
-          <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
-            <DetailRow label="商品代金（税抜）" value={formatCurrency(order.totalAmount)} />
-            <DetailRow label="送料" value={formatCurrency(order.shippingFee ?? 0)} />
-            <DetailRow label="諸経費" value={formatCurrency(order.otherFees ?? 0)} />
-            <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(tax.standardSubtotal)} / ${formatCurrency(tax.standardTax)}`} />
-            <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(tax.reducedSubtotal)} / ${formatCurrency(tax.reducedTax)}`} />
-            <DetailRow label="合計（税抜）" value={formatCurrency(order.totalAmount + (order.shippingFee ?? 0) + (order.otherFees ?? 0))} />
-            <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inclTotal)}</span>} />
-            <DetailRow label="請求書" value={order.invoice ? <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="text-matchaDeep hover:underline">PDF</a> : '未添付'} />
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
-          <p className="mb-1 text-xs font-medium text-mist">振込先（支払口座）</p>
-          {bankInfo
-            ? <p className="whitespace-pre-wrap text-ink">{bankInfo}</p>
-            : <p className="text-mist">仕入先マスタに未登録です。<Link href="/suppliers" className="text-matchaDeep hover:underline">仕入先管理</Link>で登録してください。</p>}
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-[#e6dfcf] p-3">
-          <p className="mb-2 text-xs font-medium text-mist">支払い（分割対応）</p>
-          {hasInstallmentSchedule(order.payments) ? (
-            <InstallmentScheduleEditor
-              payments={order.payments ?? []}
-              totalIncl={computePoTaxIncluded(order)}
-              onChange={next => { void onSavePayments(order.id, next) }}
-            />
-          ) : (
-            <PaymentsEditor
-              payments={order.payments ?? []}
-              totalIncl={computePoTaxIncluded(order)}
-              onChange={next => { void onSavePayments(order.id, next) }}
-            />
-          )}
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
-          <table className="min-w-full text-sm">
-            <thead className="bg-bone text-left text-ink">
-              <tr>
-                <th className="px-3 py-2 font-medium">商品</th>
-                <th className="px-3 py-2 font-medium text-right">数量</th>
-                <th className="px-3 py-2 font-medium text-right">単価(税抜)</th>
-                <th className="px-3 py-2 font-medium text-center">税率</th>
-                <th className="px-3 py-2 font-medium text-right">金額</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(order.items ?? []).map((item, i) => (
-                <tr key={i} className="border-t border-[#f0ebdf] text-ink">
-                  <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-mist">({item.productSku})</span>}</td>
-                  <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                  <td className="px-3 py-2 text-center">{(item.taxRate ?? 8) === 0 ? '免税' : `${item.taxRate ?? 8}%`}</td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(item.lineTotal)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {(order.otherFeesNote || order.notes) && (
-          <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
-            {order.otherFeesNote && <p className="text-ink"><span className="text-mist">諸経費メモ：</span>{order.otherFeesNote}</p>}
-            {order.notes && <p className="mt-1 whitespace-pre-wrap text-ink"><span className="text-mist">メモ：</span>{order.notes}</p>}
+        {/* 前払金/残金 の行から開いた場合は「今回いくら払うか」を最上部に強調表示 */}
+        {po && row.stageKind && (
+          <div className="mb-4 rounded-2xl border-2 border-matcha/50 bg-[#f1f7f1] p-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-matchaDeep">今回のお支払い（{STAGE_LABEL[row.stageKind]}）</p>
+                <p className="mt-0.5 text-2xl font-bold text-ink">{formatCurrency(row.totalIncl)}</p>
+              </div>
+              <div className="text-right text-xs text-mist">
+                <p>支払期限: <span className="text-ink">{row.dueDate || '-'}</span></p>
+                <p className="mt-0.5">状態: <span className={row.isPaid ? 'font-medium text-matcha' : 'font-medium text-alert'}>{row.isPaid ? '支払済' : '未払'}</span></p>
+              </div>
+            </div>
+            <div className="mt-3 border-t border-matcha/30 pt-2 text-xs text-mist">
+              <p className="mb-1">分割払いの内訳（発注全体 {formatCurrency(computePoTaxIncluded(po))}）</p>
+              <div className="space-y-0.5">
+                {(po.payments ?? [])
+                  .filter((p): p is typeof p & { kind: 'deposit' | 'balance' } => p.kind === 'deposit' || p.kind === 'balance')
+                  .map((p, i) => {
+                    const current = p.kind === row.stageKind
+                    return (
+                      <div key={i} className={`flex justify-between ${current ? 'font-semibold text-ink' : ''}`}>
+                        <span>{STAGE_LABEL[p.kind]}{p.dueDate ? `（期限 ${p.dueDate}）` : ''}</span>
+                        <span>{formatCurrency(Number(p.amount) || 0)}・{p.paid !== false ? '支払済' : '未払'}</span>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
           </div>
         )}
+
+        {/* 請求書の行も「お支払い額（未払い残額）」を最上部に強調表示 */}
+        {inv && (
+          <div className="mb-4 rounded-2xl border-2 border-matcha/50 bg-[#f1f7f1] p-4">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs font-medium text-matchaDeep">お支払い額（未払い残額）</p>
+                <p className="mt-0.5 text-2xl font-bold text-ink">{formatCurrency(invoiceRemaining(inv))}</p>
+              </div>
+              <div className="text-right text-xs text-mist">
+                <p>支払期限: <span className="text-ink">{inv.paymentDueDate || '-'}</span></p>
+                <p className="mt-0.5">状態: <span className={inv.paymentStatus === 'paid' ? 'font-medium text-matcha' : 'font-medium text-alert'}>{INV_PAY_LABELS[inv.paymentStatus]}</span></p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-0.5 border-t border-matcha/30 pt-2 text-xs text-mist">
+              <div className="flex justify-between"><span>合計（税込）</span><span>{formatCurrency(inv.totalAmount)}</span></div>
+              <div className="flex justify-between"><span>支払済</span><span>{formatCurrency(invoicePaidTotal(inv))}</span></div>
+              <div className="flex justify-between font-semibold text-ink"><span>未払い残額</span><span>{formatCurrency(invoiceRemaining(inv))}</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* 請求先・振込先は画面上部に表示 */}
+        {bankBlock}
+
+        {inv ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
+                <DetailRow label="種別" value={row.typeLabel} />
+                <DetailRow label="支払ステータス" value={INV_PAY_LABELS[inv.paymentStatus]} />
+                <DetailRow label="請求書番号" value={inv.invoiceNumber || '-'} />
+                <DetailRow label="請求日" value={inv.invoiceDate || '-'} />
+                <DetailRow label="受領日" value={inv.receivedDate || '-'} />
+                <DetailRow label="支払期日" value={inv.paymentDueDate || '-'} />
+              </div>
+              <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
+                <DetailRow label="税抜小計" value={formatCurrency(inv.computedSubtotal)} />
+                <DetailRow label="消費税" value={formatCurrency(inv.computedTax)} />
+                <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(inv.totalAmount)}</span>} />
+                <DetailRow label="支払済" value={formatCurrency(invoicePaidTotal(inv))} />
+                <DetailRow label="残額" value={formatCurrency(invoiceRemaining(inv))} />
+                <DetailRow label="PDF" value={inv.file?.url ? <a href={inv.file.url} target="_blank" rel="noopener noreferrer" className="text-matchaDeep hover:underline">PDF</a> : '未添付'} />
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-bone text-left text-ink">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">品目</th>
+                    <th className="px-3 py-2 font-medium text-right">数量</th>
+                    <th className="px-3 py-2 font-medium text-right">単価(税抜)</th>
+                    <th className="px-3 py-2 font-medium text-center">税率</th>
+                    <th className="px-3 py-2 font-medium text-right">金額(税抜)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(inv.lines ?? []).map((l, i) => (
+                    <tr key={l.id || i} className="border-t border-[#f0ebdf] text-ink">
+                      <td className="px-3 py-2">{l.productName}{l.category && <span className="ml-1 text-[10px] text-mist">({l.category})</span>}{l.kind === 'adhoc' && <span className="ml-1 text-[10px] text-mist">[発注外]</span>}</td>
+                      <td className="px-3 py-2 text-right">{!l.unit || l.unit === 'kg' ? formatKg(l.quantity) : `${l.quantity}${l.unit}`}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(l.unitPrice)}</td>
+                      <td className="px-3 py-2 text-center">{taxLabel(l.taxRate)}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(l.lineTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {inv.notes && (
+              <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm text-ink">
+                <span className="text-mist">メモ：</span>{inv.notes}
+              </div>
+            )}
+          </>
+        ) : po ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
+                <DetailRow label="種別" value={row.typeLabel} />
+                <DetailRow label="発注ステータス" value={PO_STATUS_LABELS[po.status]} />
+                <DetailRow label="支払ステータス" value={PAY_LABELS[po.paymentStatus]} />
+                <DetailRow label="発注日" value={po.orderDate || '-'} />
+                <DetailRow label="入荷予定日" value={po.expectedDeliveryDate || '-'} />
+                <DetailRow label="入荷日" value={po.actualDeliveryDate || '-'} />
+                <DetailRow label="支払期日" value={po.paymentDueDate || '-'} />
+              </div>
+              <div className="rounded-2xl border border-[#e6dfcf] bg-bone p-3">
+                <DetailRow label="商品代金（税抜）" value={formatCurrency(po.totalAmount)} />
+                <DetailRow label="送料" value={formatCurrency(po.shippingFee ?? 0)} />
+                <DetailRow label="諸経費" value={formatCurrency(po.otherFees ?? 0)} />
+                {poTax && <DetailRow label="10%対象 / 消費税" value={`${formatCurrency(poTax.standardSubtotal)} / ${formatCurrency(poTax.standardTax)}`} />}
+                {poTax && <DetailRow label="8%対象 / 消費税" value={`${formatCurrency(poTax.reducedSubtotal)} / ${formatCurrency(poTax.reducedTax)}`} />}
+                <DetailRow label="合計（税込）" value={<span className="text-base">{formatCurrency(computePoTaxIncluded(po))}</span>} />
+                <DetailRow label="支払済" value={formatCurrency(poPaidTotal(po))} />
+                <DetailRow label="残額" value={formatCurrency(poRemaining(po))} />
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-bone text-left text-ink">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">商品</th>
+                    <th className="px-3 py-2 font-medium text-right">数量</th>
+                    <th className="px-3 py-2 font-medium text-right">単価(税抜)</th>
+                    <th className="px-3 py-2 font-medium text-center">税率</th>
+                    <th className="px-3 py-2 font-medium text-right">金額</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(po.items ?? []).map((item, i) => (
+                    <tr key={i} className="border-t border-[#f0ebdf] text-ink">
+                      <td className="px-3 py-2">{item.productName}{item.productSku && <span className="ml-1 text-[10px] text-mist">({item.productSku})</span>}</td>
+                      <td className="px-3 py-2 text-right">{formatKg(item.quantityKg)}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
+                      <td className="px-3 py-2 text-center">{(item.taxRate ?? 8) === 0 ? '免税' : `${item.taxRate ?? 8}%`}</td>
+                      <td className="px-3 py-2 text-right">{formatCurrency(item.lineTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {(po.otherFeesNote || po.notes) && (
+              <div className="mt-4 rounded-2xl border border-[#e6dfcf] bg-bone p-3 text-sm">
+                {po.otherFeesNote && <p className="text-ink"><span className="text-mist">諸経費メモ：</span>{po.otherFeesNote}</p>}
+                {po.notes && <p className="mt-1 whitespace-pre-wrap text-ink"><span className="text-mist">メモ：</span>{po.notes}</p>}
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
     </div>
   )
