@@ -689,12 +689,18 @@ function normalizePoPayments(raw: PurchaseOrderPayment[] | undefined): PurchaseO
       // ignoreUndefinedProperties, so a nested `undefined` would reject the write.
       const method = p.method?.trim()
       const note = p.note?.trim()
+      // 2段階分割払い拡張。Firestore は undefined を書けないので存在時のみスプレッド。
+      const kind = p.kind === 'deposit' || p.kind === 'balance' ? p.kind : undefined
+      const dueDate = p.dueDate?.trim()
       return {
         id: String(p.id ?? '').trim() || `${p.paidDate ?? ''}-${p.amount}-${index}`,
         amount: Number(p.amount) || 0,
         paidDate: (p.paidDate ?? '').trim(),
         ...(method ? { method } : {}),
         ...(note ? { note } : {}),
+        ...(kind ? { kind } : {}),
+        ...(dueDate ? { dueDate } : {}),
+        ...(typeof p.paid === 'boolean' ? { paid: p.paid } : {}),
       }
     })
     .filter(p => p.amount > 0)
@@ -764,6 +770,8 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
           const amount = Number(obj.amount ?? 0)
           if (!(amount > 0)) return null
           const paidDate = obj.paidDate ? toIsoDate(String(obj.paidDate)) : ''
+          const kind: 'deposit' | 'balance' | undefined =
+            obj.kind === 'deposit' || obj.kind === 'balance' ? obj.kind : undefined
           return {
             // Deterministic fallback so the same doc maps to the same ids on
             // every read (removal-by-id depends on stability).
@@ -772,6 +780,10 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
             paidDate,
             method: obj.method ? String(obj.method) : undefined,
             note: obj.note ? String(obj.note) : undefined,
+            // 2段階分割払い拡張（前受金/残額）。旧データには無いので undefined のまま。
+            kind,
+            dueDate: obj.dueDate ? toIsoDate(String(obj.dueDate)) : undefined,
+            paid: typeof obj.paid === 'boolean' ? obj.paid : undefined,
           }
         })
         .filter((p): p is NonNullable<typeof p> => p !== null)

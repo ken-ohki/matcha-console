@@ -43,9 +43,18 @@ export function computePoTaxIncluded(po: PurchaseOrder): number {
   return (po.totalAmount ?? 0) + fees + computeTax(po.items ?? [], fees)
 }
 
-/** Sum of recorded split payments (税込 cash actually paid). */
-export function poPaidTotal(po: { payments?: { amount: number }[] }): number {
-  return (po.payments ?? []).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+/**
+ * Is this payment row confirmed (actual cash), as opposed to a scheduled-but-unpaid
+ * installment? Legacy rows have no `paid` flag and are treated as confirmed.
+ * Scheduled deposit/balance installments set `paid:false` until confirmed.
+ */
+export function isPaymentConfirmed(p: { paid?: boolean }): boolean {
+  return p.paid !== false
+}
+
+/** Sum of CONFIRMED split payments (税込 cash actually paid; excludes scheduled installments). */
+export function poPaidTotal(po: { payments?: { amount: number; paid?: boolean }[] }): number {
+  return (po.payments ?? []).reduce((s, p) => s + (isPaymentConfirmed(p) ? Number(p.amount) || 0 : 0), 0)
 }
 
 /** Outstanding amount on a PO (税込 total − paid), never negative. */
@@ -115,7 +124,9 @@ export function computeInvoiceTotals(
   return { subtotal: b.subtotal, tax: b.tax, total: b.total }
 }
 
-/** Sum of recorded invoice payments (税込 cash actually paid). */
+/** Sum of recorded invoice payments (税込 cash actually paid).
+ *  INVARIANT: invoice payments must never carry `paid:false` (the 2-stage deposit/balance
+ *  schedule is a PO-only concept), so poPaidTotal's confirmed-only filter is a no-op here. */
 export function invoicePaidTotal(inv: { payments?: { amount: number }[] }): number {
   return poPaidTotal(inv)
 }
@@ -233,15 +244,26 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
       if (amount <= 0) continue
       const payments = po.payments ?? []
       if (payments.length > 0) {
-        // Split payments: each recorded payment is actual cash on its date.
+        // Confirmed payments are actual cash on their paidDate. Scheduled-but-unpaid
+        // installments (前受金/残額, paid:false) are expected on their OWN dueDate.
         for (const p of payments) {
-          if (!p.paidDate || !(p.amount > 0)) continue
-          ensure(monthKey(p.paidDate)).outActual += p.amount
+          if (!(p.amount > 0)) continue
+          if (!isPaymentConfirmed(p)) {
+            const due = p.dueDate || po.paymentDueDate
+            if (due) ensure(monthKey(due)).outExpected += p.amount
+          } else if (p.paidDate) {
+            ensure(monthKey(p.paidDate)).outActual += p.amount
+          }
         }
-        // The unpaid remainder is expected on the due date.
-        const remaining = Math.max(0, amount - poPaidTotal(po))
-        if (remaining > 0 && po.paymentDueDate) {
-          ensure(monthKey(po.paymentDueDate)).outExpected += remaining
+        // Legacy rows have no scheduled installment → forecast the unpaid remainder on
+        // the PO-level due date (unchanged behaviour). Skip when a schedule is present:
+        // per-installment dueDates above already cover the outstanding amount.
+        const hasScheduled = payments.some(p => p.paid === false)
+        if (!hasScheduled) {
+          const remaining = Math.max(0, amount - poPaidTotal(po))
+          if (remaining > 0 && po.paymentDueDate) {
+            ensure(monthKey(po.paymentDueDate)).outExpected += remaining
+          }
         }
       } else if (po.paymentStatus === 'paid' && po.paidDate) {
         ensure(monthKey(po.paidDate)).outActual += amount

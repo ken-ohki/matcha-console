@@ -15,6 +15,7 @@ import type {
 } from '@/types'
 import { computeTaxBuckets } from '@/lib/tax'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
+import { InstallmentScheduleEditor, hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
 import { formatCurrency, formatKg } from '@/lib/format'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 
@@ -435,6 +436,12 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
   const [invoiceError, setInvoiceError] = useState('')
   const totals = computePoFormTotals(form)
   const hasPayments = (form.payments ?? []).length > 0
+  // Payment entry mode: a 2-stage 前受金+残額 schedule, or the legacy free-form list.
+  // Existing data decides; an empty PO lets the user pick.
+  const hasSchedule = hasInstallmentSchedule(form.payments)
+  const hasFreeform = (form.payments ?? []).some(p => !p.kind)
+  const [payMode, setPayMode] = useState<'free' | 'installment'>(hasSchedule ? 'installment' : 'free')
+  const effectiveMode: 'free' | 'installment' = hasSchedule ? 'installment' : hasFreeform ? 'free' : payMode
 
   return (
     <div className="rounded-2xl border border-line bg-white p-4">
@@ -541,12 +548,40 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
           {invoiceError && <p className="mt-1 text-xs text-alert">{invoiceError}</p>}
         </div>
         <div className="md:col-span-3">
-          <p className="mb-2 text-xs font-medium text-graphite">支払い（分割対応）</p>
-          <PaymentsEditor
-            payments={form.payments ?? []}
-            totalIncl={totals.totalIncl}
-            onChange={next => setForm(prev => ({ ...prev, payments: next }))}
-          />
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium text-graphite">支払い（分割対応）</p>
+            {!hasSchedule && !hasFreeform && (
+              <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setPayMode('installment')}
+                  className={`px-2.5 py-1 ${effectiveMode === 'installment' ? 'bg-ink text-paper' : 'bg-white text-mist hover:bg-bone'}`}
+                >
+                  前受金＋残額
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayMode('free')}
+                  className={`px-2.5 py-1 ${effectiveMode === 'free' ? 'bg-ink text-paper' : 'bg-white text-mist hover:bg-bone'}`}
+                >
+                  自由入力
+                </button>
+              </div>
+            )}
+          </div>
+          {effectiveMode === 'installment' ? (
+            <InstallmentScheduleEditor
+              payments={form.payments ?? []}
+              totalIncl={totals.totalIncl}
+              onChange={next => setForm(prev => ({ ...prev, payments: next }))}
+            />
+          ) : (
+            <PaymentsEditor
+              payments={form.payments ?? []}
+              totalIncl={totals.totalIncl}
+              onChange={next => setForm(prev => ({ ...prev, payments: next }))}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ import {
   poRemaining,
 } from '@/lib/cashflow'
 import { PaymentsEditor } from '@/components/PaymentsEditor'
+import { InstallmentScheduleEditor, hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
@@ -758,11 +759,19 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
 
         <div className="mt-4 rounded-2xl border border-[#e6dfcf] p-3">
           <p className="mb-2 text-xs font-medium text-mist">支払い（分割対応）</p>
-          <PaymentsEditor
-            payments={order.payments ?? []}
-            totalIncl={computePoTaxIncluded(order)}
-            onChange={next => { void onSavePayments(order.id, next) }}
-          />
+          {hasInstallmentSchedule(order.payments) ? (
+            <InstallmentScheduleEditor
+              payments={order.payments ?? []}
+              totalIncl={computePoTaxIncluded(order)}
+              onChange={next => { void onSavePayments(order.id, next) }}
+            />
+          ) : (
+            <PaymentsEditor
+              payments={order.payments ?? []}
+              totalIncl={computePoTaxIncluded(order)}
+              onChange={next => { void onSavePayments(order.id, next) }}
+            />
+          )}
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-[#e6dfcf]">
