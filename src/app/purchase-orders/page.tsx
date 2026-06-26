@@ -23,7 +23,6 @@ import {
   PoBasicSection,
   PoItemsSection,
   PoDatesSection,
-  PoBillingSection,
   PoFeesSection,
   PoNotesSection,
   PoSummarySection,
@@ -102,7 +101,8 @@ function PurchaseOrderModal({
           <PoBasicSection form={form} setForm={setForm} suppliers={suppliers} />
           <PoItemsSection form={form} setForm={setForm} products={products} inventoryGroups={inventoryGroups} />
           <PoDatesSection form={form} setForm={setForm} />
-          <PoBillingSection form={form} setForm={setForm} poId={initial?.id ?? 'new'} />
+          {/* 請求・支払いは発注登録時には扱わない（発注前に請求書は届かない）。
+              支払い方法・前受金/残額は発注詳細ページの「支払」タブで入力する。 */}
           <PoNotesSection form={form} setForm={setForm} />
           <PoFeesSection form={form} setForm={setForm} />
           <PoSummarySection form={form} />

@@ -13,10 +13,9 @@ function newId(): string {
   return `pay-${Date.now()}-${Math.round(Math.random() * 1e6)}`
 }
 
-/** True when the payments array already holds a 2-stage deposit/balance schedule. */
-export function hasInstallmentSchedule(payments: PurchaseOrderPayment[] | undefined): boolean {
-  return (payments ?? []).some(p => p.kind === 'deposit' || p.kind === 'balance')
-}
+// Single source of truth lives in lib/cashflow (server-safe pure fn); re-export so
+// existing importers of this module keep working.
+export { hasInstallmentSchedule } from '@/lib/cashflow'
 
 const KIND_LABEL: Record<'deposit' | 'balance', string> = {
   deposit: '前受金（納品前）',

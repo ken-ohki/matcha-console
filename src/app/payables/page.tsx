@@ -88,6 +88,7 @@ interface PayModalState {
 
 interface PayableRow {
   kind: 'invoice' | 'po'
+  typeLabel: string // 行種別の表示ラベル（請求書 / 発注(前受金) / 発注(残額) / 発注(直接払い)）
   id: string
   supplierName: string
   dueDate?: string
@@ -101,6 +102,9 @@ interface PayableRow {
   sub: string
   invoice?: PurchaseInvoice
   po?: PurchaseOrder
+  // 前受金＋残額スケジュールで管理される行。クイック操作（自由入力の支払追加）は
+  // スケジュールを壊すため抑止し、詳細モーダルの2段階エディタで支払確認させる。
+  scheduled?: boolean
 }
 
 /** Most recent payment date among the records (ISO), or undefined. */
@@ -108,6 +112,8 @@ function latestPaidDate(payments: { paidDate?: string }[] | undefined): string |
   const ds = (payments ?? []).map(p => p.paidDate).filter((d): d is string => !!d).sort()
   return ds[ds.length - 1]
 }
+
+const STAGE_LABEL: Record<'deposit' | 'balance', string> = { deposit: '前受金', balance: '残額' }
 
 function invLineSummary(inv: PurchaseInvoice): string {
   const first = inv.lines[0]?.productName ?? ''
@@ -120,6 +126,9 @@ function poLineSummary(o: PurchaseOrder): string {
 export default function PayablesPage() {
   const router = useRouter()
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
+  // PO-direct payables: legacy single/free-form payments AND 前受金＋残額 schedules
+  // (a schedule makes the PO PO-direct via isLegacyPayablePo). Split into per-PO rows
+  // (no schedule) and per-stage rows (schedule) when building the table below.
   const [legacyPos, setLegacyPos] = useState<PurchaseOrder[]>([])
   const [unbilled, setUnbilled] = useState<UnbilledPoLine[]>([])
   const [bankInfoBySupplier, setBankInfoBySupplier] = useState<Record<string, string>>({})
@@ -158,6 +167,7 @@ export default function PayablesPage() {
   const rows = useMemo<PayableRow[]>(() => {
     const invRows: PayableRow[] = invoices.map(inv => ({
       kind: 'invoice',
+      typeLabel: '請求書',
       id: inv.id,
       supplierName: inv.supplierName,
       dueDate: inv.paymentDueDate,
@@ -171,22 +181,56 @@ export default function PayablesPage() {
       sub: invLineSummary(inv),
       invoice: inv,
     }))
-    const poRows: PayableRow[] = legacyPos.map(o => ({
-      kind: 'po',
-      id: o.id,
-      supplierName: o.supplierName,
-      dueDate: o.paymentDueDate,
-      totalIncl: computePoTaxIncluded(o),
-      paid: poPaidTotal(o),
-      remaining: poRemaining(o),
-      isPaid: o.paymentStatus === 'paid',
-      statusLabel: PAY_LABELS[o.paymentStatus],
-      paidDate: latestPaidDate(o.payments) || o.paidDate,
-      docUrl: o.invoice?.url,
-      sub: poLineSummary(o),
-      po: o,
-    }))
-    return [...invRows, ...poRows]
+    // PO直接（分割払いスケジュール無し）: 発注1件を全額1行で表示。
+    const poRows: PayableRow[] = legacyPos
+      .filter(o => !hasInstallmentSchedule(o.payments))
+      .map(o => ({
+        kind: 'po',
+        typeLabel: '発注(直接払い)',
+        id: o.id,
+        supplierName: o.supplierName,
+        dueDate: o.paymentDueDate,
+        totalIncl: computePoTaxIncluded(o),
+        paid: poPaidTotal(o),
+        remaining: poRemaining(o),
+        isPaid: o.paymentStatus === 'paid',
+        statusLabel: PAY_LABELS[o.paymentStatus],
+        paidDate: latestPaidDate(o.payments) || o.paidDate,
+        docUrl: o.invoice?.url,
+        sub: poLineSummary(o),
+        po: o,
+      }))
+    // 分割払い（前受金／残額）のPO: 段階ごとに1行で表示。各段に支払期限があり、
+    // 詳細モーダルの2段階エディタで支払確認する。
+    const scheduleRows: PayableRow[] = legacyPos
+      .filter(o => hasInstallmentSchedule(o.payments))
+      .flatMap(o =>
+        (o.payments ?? [])
+          .filter((p): p is typeof p & { kind: 'deposit' | 'balance' } => p.kind === 'deposit' || p.kind === 'balance')
+          .map(p => {
+            const amount = Number(p.amount) || 0
+            const confirmed = p.paid !== false
+            const label = STAGE_LABEL[p.kind]
+            return {
+              kind: 'po' as const,
+              typeLabel: `発注(${label})`,
+              id: `${o.id}#${p.kind}`,
+              supplierName: o.supplierName,
+              dueDate: p.dueDate || o.paymentDueDate,
+              totalIncl: amount,
+              paid: confirmed ? amount : 0,
+              remaining: confirmed ? 0 : amount,
+              isPaid: confirmed,
+              statusLabel: `${label}・${confirmed ? '支払済' : '未払'}`,
+              paidDate: confirmed ? p.paidDate || undefined : undefined,
+              docUrl: o.invoice?.url,
+              sub: `${poLineSummary(o)} / ${label}`,
+              po: o,
+              scheduled: true,
+            }
+          }),
+      )
+    return [...invRows, ...poRows, ...scheduleRows]
   }, [invoices, legacyPos])
 
   const filtered = useMemo(() => {
@@ -204,6 +248,7 @@ export default function PayablesPage() {
     return groups
   }, [filtered])
 
+  // 請求待ち(unbilled)は getUnbilledReceivedPoLines が PO直接(legacy/schedule)を除外済み。
   const filteredPending = useMemo(() => {
     const q = query.trim().toLowerCase()
     return unbilled.filter(u => !q || u.supplierName.toLowerCase().includes(q) || u.productName.toLowerCase().includes(q))
@@ -214,6 +259,7 @@ export default function PayablesPage() {
     const actionNeeded = grouped.actionNeeded.reduce((s, r) => s + r.remaining, 0)
     const pendingTotal = unbilled.reduce((s, u) => s + u.billableRemainingAmount, 0)
     const ym = todayIso().slice(0, 7)
+    // legacyPos は分割払い(前受金/残額)POも含む。確認済み payment(paidDate)が splits に入る。
     const paidThisMonth =
       invoices.reduce((s, inv) => s + (inv.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0), 0) +
       legacyPos.reduce((s, o) => {
@@ -358,7 +404,7 @@ export default function PayablesPage() {
       <tr key={`${r.kind}:${r.id}`} className="border-t border-white/60">
         <td className="px-3 py-2">
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${r.kind === 'invoice' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-700'}`}>
-            {r.kind === 'invoice' ? '請求書' : '発注(旧)'}
+            {r.typeLabel}
           </span>
         </td>
         <td className={`px-3 py-2 ${overdue ? 'text-alert' : 'text-mist'}`}>{r.dueDate || '—'}</td>
@@ -387,6 +433,18 @@ export default function PayablesPage() {
         </td>
         <td className="px-3 py-2 text-right">
           <div className="flex items-center justify-end gap-1.5">
+            {/* 前受金＋残額スケジュール行は自由入力の支払を追加するとスケジュールを壊すため、
+                クイック操作を出さず、詳細モーダルの2段階エディタで支払確認させる。 */}
+            {r.scheduled ? (
+              <button
+                type="button"
+                onClick={() => r.po && setDetailPo(r.po)}
+                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
+              >
+                <Pencil size={12} /> 詳細で支払確認
+              </button>
+            ) : (
+              <>
             {!r.isPaid && (
               <button
                 type="button"
@@ -415,6 +473,8 @@ export default function PayablesPage() {
                 >
                   <Undo2 size={12} /> 支払取消
                 </button>
+              </>
+            )}
               </>
             )}
           </div>
@@ -720,7 +780,7 @@ function PoDetailModal({ order, bankInfo, onClose, onSavePayments }: {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-ink">{order.supplierName}</h2>
-            <p className="mt-1 text-xs text-mist">発注の詳細（旧フロー・読み取り専用）</p>
+            <p className="mt-1 text-xs text-mist">発注の詳細（直接支払い）</p>
           </div>
           <div className="flex items-center gap-2">
             <Link href={`/purchase-orders/${order.id}/document`} className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">発注書 →</Link>
