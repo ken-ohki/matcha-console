@@ -146,7 +146,7 @@ export function PoLinePicker({
                       <div className="text-xs font-semibold text-ink">
                         {formatCurrency(c.billableRemainingAmount)}
                       </div>
-                      <div className="text-[10px] text-mist">請求可能残</div>
+                      <div className="text-[10px] text-mist">請求予定残</div>
                     </div>
                     <button
                       type="button"

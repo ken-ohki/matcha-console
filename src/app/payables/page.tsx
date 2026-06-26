@@ -537,7 +537,7 @@ export default function PayablesPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-ink">{supplier}</h2>
                 <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] text-mist">
-                  {lines.length}件 / 請求可能 {formatCurrency(lines.reduce((s, u) => s + u.billableRemainingAmount, 0))}
+                  {lines.length}件 / 請求予定 {formatCurrency(lines.reduce((s, u) => s + u.billableRemainingAmount, 0))}
                 </span>
               </div>
               <Link
@@ -554,7 +554,7 @@ export default function PayablesPage() {
                     <th className="whitespace-nowrap px-3 py-2 text-left font-medium">発注日</th>
                     <th className="whitespace-nowrap px-3 py-2 text-left font-medium">商品</th>
                     <th className="whitespace-nowrap px-3 py-2 text-right font-medium">入荷</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">請求可能(税抜)</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-right font-medium">請求予定(税抜)</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
