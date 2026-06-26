@@ -18,12 +18,12 @@ function newId(): string {
 export { hasInstallmentSchedule } from '@/lib/cashflow'
 
 const KIND_LABEL: Record<'deposit' | 'balance', string> = {
-  deposit: '前受金（納品前）',
-  balance: '残額（納品後）',
+  deposit: '前払金（納品前）',
+  balance: '残金（納品後）',
 }
 
 /**
- * 前受金（納品前）＋残額（納品後）の固定2段階スケジュール editor. Fully controlled:
+ * 前払金（納品前）＋残金（納品後）の固定2段階スケジュール editor. Fully controlled:
  * emits the next payments array via onChange; the parent persists it.
  *
  * Each stage carries an amount, a due date (支払期限) and a confirmation state
@@ -81,18 +81,18 @@ export function InstallmentScheduleEditor({
   }
 
   const clearSchedule = () => {
-    if (!confirm('前受金＋残額の分割払い設定を解除します。よろしいですか？')) return
+    if (!confirm('前払金＋残金の分割払い設定を解除します。よろしいですか？')) return
     onChange(payments.filter(p => p.kind !== 'deposit' && p.kind !== 'balance'))
   }
 
   if (!hasSchedule) {
     return (
       <div className="space-y-2 rounded-xl border border-dashed border-line bg-bone p-3">
-        <p className="text-xs text-mist">分割払い（前受金＋残額）の支払スケジュールを作成します。前受金額を入力すると、残額（合計 {formatCurrency(totalIncl)} − 前受金）を自動計算します。</p>
+        <p className="text-xs text-mist">分割払い（前払金＋残金）の支払スケジュールを作成します。前払金額を入力すると、残金（合計 {formatCurrency(totalIncl)} − 前払金）を自動計算します。</p>
         {!disabled && (
           <div className="flex flex-wrap items-end gap-2">
             <label className="text-[10px] text-mist">
-              <span className="mb-0.5 block">前受金（税込）</span>
+              <span className="mb-0.5 block">前払金（税込）</span>
               <input
                 type="number" min="0" step="1"
                 value={depositDraft}
@@ -106,7 +106,7 @@ export function InstallmentScheduleEditor({
               onClick={initSchedule}
               className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-[#205f43]"
             >
-              分割払い(前受金+残額)を設定
+              分割払い(前払金+残金)を設定
             </button>
           </div>
         )}
@@ -123,7 +123,7 @@ export function InstallmentScheduleEditor({
         <span className="text-mist">支払済（確認） <span className="font-semibold text-matcha">{formatCurrency(confirmedTotal)}</span></span>
         <span className="text-mist">未払い予定 <span className={`font-semibold ${outstanding > 0 ? 'text-alert' : 'text-matcha'}`}>{formatCurrency(outstanding)}</span></span>
         {plannedTotal !== totalIncl && (
-          <span className="text-[11px] text-alert">※ 前受金＋残額（{formatCurrency(plannedTotal)}）が合計と一致しません</span>
+          <span className="text-[11px] text-alert">※ 前払金＋残金（{formatCurrency(plannedTotal)}）が合計と一致しません</span>
         )}
       </div>
 

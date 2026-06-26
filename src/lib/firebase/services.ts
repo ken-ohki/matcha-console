@@ -780,7 +780,7 @@ function mapPurchaseOrder(id: string, data: DocumentData): PurchaseOrder {
             paidDate,
             method: obj.method ? String(obj.method) : undefined,
             note: obj.note ? String(obj.note) : undefined,
-            // 2段階分割払い拡張（前受金/残額）。旧データには無いので undefined のまま。
+            // 2段階分割払い拡張（前払金/残金）。旧データには無いので undefined のまま。
             kind,
             dueDate: obj.dueDate ? toIsoDate(String(obj.dueDate)) : undefined,
             paid: typeof obj.paid === 'boolean' ? obj.paid : undefined,

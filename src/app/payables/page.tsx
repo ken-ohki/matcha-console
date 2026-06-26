@@ -73,22 +73,24 @@ interface UndoState {
   paymentId: string
   label: string
   amount: number
+  stageKind?: 'deposit' | 'balance'
 }
 
 interface PayModalState {
   kind: 'invoice' | 'po'
-  id: string
+  id: string              // invoice/po id (for stage rows = the real PO id, not the composite row id)
   label: string
   mode: 'pay' | 'edit'
   amount: number          // remaining to pay (pay) / the payment amount (edit)
   paymentId?: string      // edit: which payment to change
+  stageKind?: 'deposit' | 'balance' // set for 前払金/残金 stage rows → confirm updates that stage in place
   paidDate: string
   method: string
 }
 
 interface PayableRow {
   kind: 'invoice' | 'po'
-  typeLabel: string // 行種別の表示ラベル（請求書 / 発注(前受金) / 発注(残額) / 発注(直接払い)）
+  typeLabel: string // 行種別の表示ラベル（請求書 / 発注(前払金) / 発注(残金) / 発注(直接払い)）
   id: string
   supplierName: string
   dueDate?: string
@@ -102,9 +104,9 @@ interface PayableRow {
   sub: string
   invoice?: PurchaseInvoice
   po?: PurchaseOrder
-  // 前受金＋残額スケジュールで管理される行。クイック操作（自由入力の支払追加）は
-  // スケジュールを壊すため抑止し、詳細モーダルの2段階エディタで支払確認させる。
-  scheduled?: boolean
+  // 前払金/残金 の段階行のとき設定。支払確認/取消はこの段階(kind一致のpayment)を
+  // その場で更新する（請求書/PO直接と同じ操作に統一）。
+  stageKind?: 'deposit' | 'balance'
 }
 
 /** Most recent payment date among the records (ISO), or undefined. */
@@ -113,7 +115,7 @@ function latestPaidDate(payments: { paidDate?: string }[] | undefined): string |
   return ds[ds.length - 1]
 }
 
-const STAGE_LABEL: Record<'deposit' | 'balance', string> = { deposit: '前受金', balance: '残額' }
+const STAGE_LABEL: Record<'deposit' | 'balance', string> = { deposit: '前払金', balance: '残金' }
 
 function invLineSummary(inv: PurchaseInvoice): string {
   const first = inv.lines[0]?.productName ?? ''
@@ -126,7 +128,7 @@ function poLineSummary(o: PurchaseOrder): string {
 export default function PayablesPage() {
   const router = useRouter()
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
-  // PO-direct payables: legacy single/free-form payments AND 前受金＋残額 schedules
+  // PO-direct payables: legacy single/free-form payments AND 前払金＋残金 schedules
   // (a schedule makes the PO PO-direct via isLegacyPayablePo). Split into per-PO rows
   // (no schedule) and per-stage rows (schedule) when building the table below.
   const [legacyPos, setLegacyPos] = useState<PurchaseOrder[]>([])
@@ -200,7 +202,7 @@ export default function PayablesPage() {
         sub: poLineSummary(o),
         po: o,
       }))
-    // 分割払い（前受金／残額）のPO: 段階ごとに1行で表示。各段に支払期限があり、
+    // 分割払い（前払金／残金）のPO: 段階ごとに1行で表示。各段に支払期限があり、
     // 詳細モーダルの2段階エディタで支払確認する。
     const scheduleRows: PayableRow[] = legacyPos
       .filter(o => hasInstallmentSchedule(o.payments))
@@ -226,7 +228,7 @@ export default function PayablesPage() {
               docUrl: o.invoice?.url,
               sub: `${poLineSummary(o)} / ${label}`,
               po: o,
-              scheduled: true,
+              stageKind: p.kind,
             }
           }),
       )
@@ -259,7 +261,7 @@ export default function PayablesPage() {
     const actionNeeded = grouped.actionNeeded.reduce((s, r) => s + r.remaining, 0)
     const pendingTotal = unbilled.reduce((s, u) => s + u.billableRemainingAmount, 0)
     const ym = todayIso().slice(0, 7)
-    // legacyPos は分割払い(前受金/残額)POも含む。確認済み payment(paidDate)が splits に入る。
+    // legacyPos は分割払い(前払金/残金)POも含む。確認済み payment(paidDate)が splits に入る。
     const paidThisMonth =
       invoices.reduce((s, inv) => s + (inv.payments ?? []).filter(p => (p.paidDate ?? '').startsWith(ym)).reduce((t, p) => t + p.amount, 0), 0) +
       legacyPos.reduce((s, o) => {
@@ -270,35 +272,44 @@ export default function PayablesPage() {
     return { outstanding, actionNeeded, pendingTotal, paidThisMonth }
   }, [rows, grouped, unbilled, invoices, legacyPos])
 
-  // Open the confirm dialog for an unpaid/partial row (record a new payment).
+  // Open the confirm dialog for an unpaid/partial row (record a new payment, or for a
+  // 前払金/残金 stage row, confirm that stage). Same dialog for every row type.
   const openPay = (r: PayableRow) => {
     setLastUndo(null)
+    const poId = r.po?.id ?? r.id
     setPayModal({
       kind: r.kind,
-      id: r.id,
-      label: r.supplierName,
+      id: r.stageKind ? poId : r.id,
+      stageKind: r.stageKind,
+      label: r.stageKind ? `${r.supplierName}（${STAGE_LABEL[r.stageKind]}）` : r.supplierName,
       mode: 'pay',
-      amount: r.remaining > 0 ? r.remaining : r.totalIncl,
+      amount: r.stageKind ? r.totalIncl : (r.remaining > 0 ? r.remaining : r.totalIncl),
       paidDate: todayIso(),
       method: '',
     })
   }
 
-  // Open the dialog to change the recorded 支払日 / 支払方法 of the latest payment.
+  // Open the dialog to change the recorded 支払日 / 支払方法. For a stage row, edit that
+  // stage's payment; otherwise the latest payment on the invoice/PO.
   const openEdit = (r: PayableRow) => {
-    const payments = r.kind === 'invoice' ? r.invoice?.payments : r.po?.payments
-    const last = (payments ?? [])[(payments?.length ?? 0) - 1]
-    if (!last) return
+    const target = r.stageKind
+      ? (r.po?.payments ?? []).find(p => p.kind === r.stageKind)
+      : (() => {
+          const payments = r.kind === 'invoice' ? r.invoice?.payments : r.po?.payments
+          return (payments ?? [])[(payments?.length ?? 0) - 1]
+        })()
+    if (!target) return
     setLastUndo(null)
     setPayModal({
       kind: r.kind,
-      id: r.id,
-      label: r.supplierName,
+      id: r.stageKind ? (r.po?.id ?? r.id) : r.id,
+      stageKind: r.stageKind,
+      label: r.stageKind ? `${r.supplierName}（${STAGE_LABEL[r.stageKind]}）` : r.supplierName,
       mode: 'edit',
-      amount: last.amount,
-      paymentId: last.id,
-      paidDate: last.paidDate || todayIso(),
-      method: last.method || '',
+      amount: target.amount,
+      paymentId: target.id,
+      paidDate: target.paidDate || todayIso(),
+      method: target.method || '',
     })
   }
 
@@ -314,24 +325,36 @@ export default function PayablesPage() {
       const paidDate = m.paidDate || todayIso()
       const method = m.method || undefined
       if (m.mode === 'pay') {
-        const payId = `pay-${Date.now()}`
-        const payment: PurchaseOrderPayment = { id: payId, amount: m.amount, paidDate, ...(method ? { method } : {}) }
-        if (m.kind === 'invoice') {
-          const inv = invoices.find(x => x.id === m.id)
-          if (!inv) return
-          const updated = await svc.purchaseInvoices.updateInvoicePayments(m.id, [...(inv.payments ?? []), payment])
-          setInvoices(prev => prev.map(x => x.id === m.id ? updated : x))
-        } else {
+        if (m.stageKind) {
+          // 前払金/残金 段階の支払確認: 該当段階(kind一致)を paid:true に更新（append しない）。
           const o = legacyPos.find(x => x.id === m.id)
           if (!o) return
-          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: [...(o.payments ?? []), payment], paidDate })
+          const next = (o.payments ?? []).map(p =>
+            p.kind === m.stageKind ? { ...p, paid: true, paidDate, ...(method ? { method } : {}) } : p)
+          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: next })
           setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
+          setLastUndo({ kind: m.kind, id: m.id, paymentId: '', label: m.label, amount: m.amount, stageKind: m.stageKind })
+        } else {
+          const payId = `pay-${Date.now()}`
+          const payment: PurchaseOrderPayment = { id: payId, amount: m.amount, paidDate, ...(method ? { method } : {}) }
+          if (m.kind === 'invoice') {
+            const inv = invoices.find(x => x.id === m.id)
+            if (!inv) return
+            const updated = await svc.purchaseInvoices.updateInvoicePayments(m.id, [...(inv.payments ?? []), payment])
+            setInvoices(prev => prev.map(x => x.id === m.id ? updated : x))
+          } else {
+            const o = legacyPos.find(x => x.id === m.id)
+            if (!o) return
+            const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: [...(o.payments ?? []), payment], paidDate })
+            setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
+          }
+          setLastUndo({ kind: m.kind, id: m.id, paymentId: payId, label: m.label, amount: m.amount })
         }
-        setLastUndo({ kind: m.kind, id: m.id, paymentId: payId, label: m.label, amount: m.amount })
       } else {
-        // Edit the chosen payment's date/method (amount unchanged).
+        // Edit the chosen payment's date/method (amount unchanged). For a stage, match by kind.
         const apply = (payments: PurchaseOrderPayment[] | undefined): PurchaseOrderPayment[] =>
-          (payments ?? []).map(p => p.id === m.paymentId ? { ...p, paidDate, method } : p)
+          (payments ?? []).map(p =>
+            (m.stageKind ? p.kind === m.stageKind : p.id === m.paymentId) ? { ...p, paidDate, method } : p)
         if (m.kind === 'invoice') {
           const inv = invoices.find(x => x.id === m.id)
           if (!inv) return
@@ -340,7 +363,7 @@ export default function PayablesPage() {
         } else {
           const o = legacyPos.find(x => x.id === m.id)
           if (!o) return
-          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: apply(o.payments), paidDate })
+          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, m.stageKind ? { payments: apply(o.payments) } : { payments: apply(o.payments), paidDate })
           setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
         }
         setFeedback('支払情報を更新しました')
@@ -353,13 +376,21 @@ export default function PayablesPage() {
 
   // Undo a payment: a specific one (元に戻す, by paymentId) or the most recent
   // (支払取消, no paymentId). Recomputes status from the remaining payments.
-  const removePayment = async (kind: 'invoice' | 'po', id: string, paymentId?: string) => {
+  const removePayment = async (kind: 'invoice' | 'po', id: string, paymentId?: string, stageKind?: 'deposit' | 'balance') => {
     const key = `${kind}:${id}`
     setSavingKey(key)
     setFeedback(null)
     try {
       const svc = await getServices()
-      if (kind === 'invoice') {
+      if (stageKind) {
+        // 前払金/残金 段階の取消: 段階を消さず paid:false（予定）に戻す。
+        const o = legacyPos.find(x => x.id === id)
+        if (!o) return
+        const next = (o.payments ?? []).map(p =>
+          p.kind === stageKind ? { ...p, paid: false, paidDate: '' } : p)
+        const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments: next })
+        setLegacyPos(prev => prev.map(x => x.id === id ? updated : x))
+      } else if (kind === 'invoice') {
         const inv = invoices.find(x => x.id === id)
         if (!inv) return
         const cur = inv.payments ?? []
@@ -432,19 +463,8 @@ export default function PayablesPage() {
           )}
         </td>
         <td className="px-3 py-2 text-right">
+          {/* 請求書・PO直接・前払金・残金 すべて同じ操作（支払確認→確認ダイアログ）。 */}
           <div className="flex items-center justify-end gap-1.5">
-            {/* 前受金＋残額スケジュール行は自由入力の支払を追加するとスケジュールを壊すため、
-                クイック操作を出さず、詳細モーダルの2段階エディタで支払確認させる。 */}
-            {r.scheduled ? (
-              <button
-                type="button"
-                onClick={() => r.po && setDetailPo(r.po)}
-                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
-              >
-                <Pencil size={12} /> 詳細で支払確認
-              </button>
-            ) : (
-              <>
             {!r.isPaid && (
               <button
                 type="button"
@@ -467,14 +487,12 @@ export default function PayablesPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => removePayment(r.kind, r.id)}
+                  onClick={() => removePayment(r.kind, r.stageKind ? (r.po?.id ?? r.id) : r.id, undefined, r.stageKind)}
                   disabled={savingKey === `${r.kind}:${r.id}`}
                   className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
                 >
                   <Undo2 size={12} /> 支払取消
                 </button>
-              </>
-            )}
               </>
             )}
           </div>
@@ -631,7 +649,7 @@ export default function PayablesPage() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => removePayment(lastUndo.kind, lastUndo.id, lastUndo.paymentId)}
+                onClick={() => removePayment(lastUndo.kind, lastUndo.id, lastUndo.paymentId, lastUndo.stageKind)}
                 disabled={savingKey === `${lastUndo.kind}:${lastUndo.id}`}
                 className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-xs font-medium text-matchaDeep hover:bg-white disabled:opacity-60"
               >

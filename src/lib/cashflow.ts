@@ -157,15 +157,15 @@ export function derivePoBillingStatus(po: PurchaseOrder): PurchaseOrderBillingSt
   return anyRemaining ? 'partial' : 'billed'
 }
 
-/** True when the PO carries a 前受金＋残額 (deposit/balance) installment schedule. */
+/** True when the PO carries a 前払金＋残金 (deposit/balance) installment schedule. */
 export function hasInstallmentSchedule(payments?: { kind?: 'deposit' | 'balance' }[]): boolean {
   return (payments ?? []).some(p => p.kind === 'deposit' || p.kind === 'balance')
 }
 
 /**
- * Single coexistence predicate: is this PO paid DIRECTLY on the PO (前受金＋残額 の
+ * Single coexistence predicate: is this PO paid DIRECTLY on the PO (前払金＋残金 の
  * 分割払い、または旧来の単一/自由分割) rather than via received invoices?
- * A 前受金＋残額 schedule means the PO is the payable (PO-direct), regardless of the
+ * A 前払金＋残金 schedule means the PO is the payable (PO-direct), regardless of the
  * flowVersion stamp — it wins first. Otherwise the explicit flowVersion stamp decides;
  * absent stamp (pre-cutover docs) falls back to "any legacy payment marker is present".
  * Used identically by the forecast, the payables page, the financials overdue surface,
@@ -247,17 +247,17 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
 
   for (const po of purchaseOrders) {
     if (po.status === 'cancelled') continue
-    // A 前受金＋残額 schedule makes the PO a PO-direct payable; route it through the
+    // A 前払金＋残金 schedule makes the PO a PO-direct payable; route it through the
     // legacy branch even if it happens to be referenced by an invoice (defensive).
     const isSchedule = hasInstallmentSchedule(po.payments)
     if (isLegacyPayablePo(po) && (isSchedule || !invoicedPoIds.has(po.id))) {
-      // PO-direct flow: the PO itself is the payable (前受金/残額 or legacy payments).
+      // PO-direct flow: the PO itself is the payable (前払金/残金 or legacy payments).
       const amount = computePoTaxIncluded(po)
       if (amount <= 0) continue
       const payments = po.payments ?? []
       if (payments.length > 0) {
         // Confirmed payments are actual cash on their paidDate. Scheduled-but-unpaid
-        // installments (前受金/残額, paid:false) are expected on their OWN dueDate.
+        // installments (前払金/残金, paid:false) are expected on their OWN dueDate.
         for (const p of payments) {
           if (!(p.amount > 0)) continue
           if (!isPaymentConfirmed(p)) {

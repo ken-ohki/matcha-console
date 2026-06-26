@@ -436,7 +436,7 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
   const [invoiceError, setInvoiceError] = useState('')
   const totals = computePoFormTotals(form)
   const hasPayments = (form.payments ?? []).length > 0
-  // Payment entry mode: a 2-stage 前受金+残額 schedule, or the legacy free-form list.
+  // Payment entry mode: a 2-stage 前払金+残金 schedule, or the legacy free-form list.
   // Existing data decides; an empty PO lets the user pick.
   const hasSchedule = hasInstallmentSchedule(form.payments)
   const hasFreeform = (form.payments ?? []).some(p => !p.kind)
@@ -557,7 +557,7 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
                   onClick={() => setPayMode('installment')}
                   className={`px-2.5 py-1 ${effectiveMode === 'installment' ? 'bg-ink text-paper' : 'bg-white text-mist hover:bg-bone'}`}
                 >
-                  前受金＋残額
+                  前払金＋残金
                 </button>
                 <button
                   type="button"

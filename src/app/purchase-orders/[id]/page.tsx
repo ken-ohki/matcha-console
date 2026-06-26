@@ -55,7 +55,7 @@ export default function PurchaseOrderDetailPage() {
   const [form, setForm] = useState<PurchaseOrderInput | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('overview')
-  // Invoice-flow PO only: toggled when the user opts into 分割払い(前受金＋残額) and
+  // Invoice-flow PO only: toggled when the user opts into 分割払い(前払金＋残金) and
   // sets up the schedule. Saving it flips the PO to PO-direct (legacy) on next render.
   const [showInstallmentSetup, setShowInstallmentSetup] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -271,7 +271,7 @@ export default function PurchaseOrderDetailPage() {
 
         {tab === 'payment' && isInvoiceFlow && (
           <div className="space-y-5">
-            {/* 支払い方法の選択。既定は請求書で精算。分割払いを選ぶと前受金＋残額を
+            {/* 支払い方法の選択。既定は請求書で精算。分割払いを選ぶと前払金＋残金を
                 発注に直接記録し、保存するとこの発注はPO直接（分割払い）に切り替わる。
                 ※発注は「請求書で精算」か「分割払い(直接)」のどちらか一方に属する。 */}
             <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
@@ -292,16 +292,16 @@ export default function PurchaseOrderDetailPage() {
                   disabled={!canEdit}
                   className={`flex-1 rounded-xl border px-3 py-2 text-left text-sm transition disabled:opacity-60 ${showInstallmentSetup ? 'border-matcha bg-[#f1f7f1] text-ink' : 'border-line bg-white text-mist hover:bg-bone'}`}
                 >
-                  <span className="font-medium">分割払い（前受金＋残額）で直接支払う</span>
-                  <span className="mt-0.5 block text-[11px] text-mist">受領請求書を使わず、発注に直接 前受金・残額を記録します。</span>
+                  <span className="font-medium">分割払い（前払金＋残金）で直接支払う</span>
+                  <span className="mt-0.5 block text-[11px] text-mist">受領請求書を使わず、発注に直接 前払金・残金を記録します。</span>
                 </button>
               </div>
             </div>
 
             {showInstallmentSetup && (
               <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
-                <p className="mb-1 text-sm font-semibold text-ink">前受金・分割払い（納品前後）</p>
-                <p className="mb-3 text-xs text-mist">前受金額を入力して「分割払い(前受金+残額)を設定」を押し、上部の「保存」で確定すると、この発注は分割払い（直接支払い）に切り替わります。</p>
+                <p className="mb-1 text-sm font-semibold text-ink">前払金・分割払い（納品前後）</p>
+                <p className="mb-3 text-xs text-mist">前払金額を入力して「分割払い(前払金+残金)を設定」を押し、上部の「保存」で確定すると、この発注は分割払い（直接支払い）に切り替わります。</p>
                 <InstallmentScheduleEditor
                   payments={form.payments ?? []}
                   totalIncl={taxIncl}

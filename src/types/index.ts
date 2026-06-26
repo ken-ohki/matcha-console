@@ -456,10 +456,10 @@ export interface PurchaseOrderPayment {
   paidDate: string    // ISO YYYY-MM-DD（確認済みのとき実支払日 / 予定段階は空文字）
   method?: string
   note?: string
-  // ── 前受金＋残額の2段階分割払い拡張（すべて任意 = 後方互換）──
+  // ── 前払金＋残金の2段階分割払い拡張（すべて任意 = 後方互換）──
   // 未設定の payment は従来どおり「確認済みの実支払記録」とみなす。
   // 受領請求書(PurchaseInvoice)側の payments には付与しないこと（invoice へ波及させない）。
-  kind?: 'deposit' | 'balance' // 前受金（納品前） / 残額（納品後）
+  kind?: 'deposit' | 'balance' // 前払金（納品前） / 残金（納品後）
   dueDate?: string             // この段階の支払期限 ISO YYYY-MM-DD
   paid?: boolean               // false=予定（未確認）/ true・未設定=支払確認済み
 }
