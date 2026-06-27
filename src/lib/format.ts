@@ -15,7 +15,8 @@ export function formatKg(value: number): string {
 /** Format an ISO/date-ish string for display; empty/invalid → '-'. */
 export function formatDate(value?: string): string {
   if (!value) return '-'
-  return value
+  // 表記をYYYY-MM-DDに統一（フルISOタイムスタンプでも日付部分のみ表示）。
+  return value.length >= 10 ? value.slice(0, 10) : value
 }
 
 export function todayIso(): string {

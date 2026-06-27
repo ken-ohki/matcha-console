@@ -6,12 +6,14 @@ import { useEffect } from 'react'
 import { Megaphone, ArrowDownCircle, ArrowUpCircle, Building2, Calculator, ClipboardList, ExternalLink, Globe, LayoutDashboard, Leaf, Package, LogOut, PackageMinus, PackageOpen, Send, Settings, ShoppingBag, Truck, UserCheck, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { LucideIcon } from 'lucide-react'
+import type { UserRole } from '@/types'
 
 interface NavItem {
   href: string
   label: string
   icon: LucideIcon
   match?: string[]
+  roles?: UserRole[] // visible only to these roles (undefined = all roles)
 }
 
 const navGroups: { label: string; items: NavItem[] }[] = [
@@ -51,7 +53,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: '管理',
     items: [
-      { href: '/settings/masters', label: '設定', icon: Settings },
+      { href: '/settings/masters', label: '設定', icon: Settings, roles: ['admin'] },
     ],
   },
 ]
@@ -99,10 +101,14 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navGroups.map(group => (
+          {navGroups.map(group => {
+            // ロールで表示可能な項目だけに絞り、空になるグループは出さない。
+            const visible = group.items.filter(it => !it.roles || (!!user && it.roles.includes(user.role)))
+            if (visible.length === 0) return null
+            return (
             <div key={group.label} className="mb-3.5 last:mb-0">
               <p className="folio mb-1 px-3">{group.label}</p>
-              {group.items.map(item => {
+              {visible.map(item => {
                 const Icon = item.icon
                 const matchPaths = item.match ?? [item.href]
                 const active = matchPaths.some(p => pathname === p || pathname.startsWith(p + '/'))
@@ -111,6 +117,7 @@ export function Sidebar({
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
+                    aria-current={active ? 'page' : undefined}
                     className={`mb-px flex items-center gap-3 rounded-md border-l-2 py-1.5 pl-2.5 pr-3 text-[13px] font-bold transition-colors ${
                       active
                         ? 'border-matcha bg-paper text-ink'
@@ -123,7 +130,8 @@ export function Sidebar({
                 )
               })}
             </div>
-          ))}
+            )
+          })}
         </nav>
 
         <div className="border-t border-line px-3 py-4">
