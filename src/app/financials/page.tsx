@@ -28,6 +28,8 @@ import type {
 } from '@/types'
 import {
   buildCashFlowSeries,
+  computePoTaxIncluded,
+  computeSaleTaxIncluded,
   invoiceRemaining,
   isLegacyPayablePo,
   todayMonthKey,
@@ -53,14 +55,14 @@ function endOfFiscalYear(fy: number): string {
   return `${fy + 1}-03-31`
 }
 
-// PO expense (税抜): stored totalAmount is items-only, fees live in separate fields.
+// PO expense (税込): 入金管理・キャッシュフローと表示基準を統一するため税込で集計。
 function poExpense(o: PurchaseOrder): number {
-  return (o.totalAmount || 0) + (o.shippingFee ?? 0) + (o.otherFees ?? 0)
+  return computePoTaxIncluded(o)
 }
 
+// 売上(税込): 入金管理・キャッシュフローと一致させるため税込（請求書の実額）で集計。
 function saleIncome(sale: SaleRecord): number {
-  const inv = sale.invoiceAmount || 0
-  return inv > 0 ? inv : sale.revenue || 0
+  return computeSaleTaxIncluded(sale)
 }
 
 function ecRevenue(ec: EcSaleRecord): number {
