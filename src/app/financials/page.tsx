@@ -175,6 +175,7 @@ export default function FinancialsPage() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
+      if (o.status === 'cancelled') return false // 取消発注は費用/買掛に含めない（cashflowと一致）
       if (!o.orderDate) return true
       const t = new Date(o.orderDate).getTime()
       if (fromTime != null && t < fromTime) return false

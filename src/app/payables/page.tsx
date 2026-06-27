@@ -336,7 +336,7 @@ export default function PayablesPage() {
           if (!o) return
           const next = (o.payments ?? []).map(p =>
             p.kind === m.stageKind ? { ...p, paid: true, paidDate, ...(method ? { method } : {}) } : p)
-          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: next })
+          const updated = await svc.purchaseOrders.updatePurchaseOrderPayments(m.id, next)
           setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
           setLastUndo({ kind: m.kind, id: m.id, paymentId: '', label: m.label, amount: m.amount, stageKind: m.stageKind })
         } else {
@@ -350,7 +350,7 @@ export default function PayablesPage() {
           } else {
             const o = legacyPos.find(x => x.id === m.id)
             if (!o) return
-            const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, { payments: [...(o.payments ?? []), payment], paidDate })
+            const updated = await svc.purchaseOrders.updatePurchaseOrderPayments(m.id, [...(o.payments ?? []), payment])
             setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
           }
           setLastUndo({ kind: m.kind, id: m.id, paymentId: payId, label: m.label, amount: m.amount })
@@ -368,7 +368,7 @@ export default function PayablesPage() {
         } else {
           const o = legacyPos.find(x => x.id === m.id)
           if (!o) return
-          const updated = await svc.purchaseOrders.updatePurchaseOrder(m.id, m.stageKind ? { payments: apply(o.payments) } : { payments: apply(o.payments), paidDate })
+          const updated = await svc.purchaseOrders.updatePurchaseOrderPayments(m.id, apply(o.payments))
           setLegacyPos(prev => prev.map(x => x.id === m.id ? updated : x))
         }
         setFeedback('支払情報を更新しました')
@@ -393,7 +393,7 @@ export default function PayablesPage() {
         if (!o) return
         const next = (o.payments ?? []).map(p =>
           p.kind === stageKind ? { ...p, paid: false, paidDate: '' } : p)
-        const updated = await svc.purchaseOrders.updatePurchaseOrder(id, { payments: next })
+        const updated = await svc.purchaseOrders.updatePurchaseOrderPayments(id, next)
         setLegacyPos(prev => prev.map(x => x.id === id ? updated : x))
       } else if (kind === 'invoice') {
         const inv = invoices.find(x => x.id === id)
@@ -407,11 +407,7 @@ export default function PayablesPage() {
         if (!o) return
         const cur = o.payments ?? []
         const next = paymentId ? cur.filter(p => p.id !== paymentId) : cur.slice(0, -1)
-        const updated = await svc.purchaseOrders.updatePurchaseOrder(id, {
-          payments: next,
-          paidDate: '',
-          ...(next.length === 0 ? { paymentStatus: 'unpaid' as const } : {}),
-        })
+        const updated = await svc.purchaseOrders.updatePurchaseOrderPayments(id, next)
         setLegacyPos(prev => prev.map(x => x.id === id ? updated : x))
       }
       setLastUndo(null)

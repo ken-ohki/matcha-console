@@ -1782,6 +1782,34 @@ export function createFirebaseServices(): IServices {
       return mapPurchaseOrder(ref.id, { ...payload, createdAt: new Date(), updatedAt: new Date() })
     },
 
+    // Payments-only update inside a transaction. Unlike updatePurchaseOrder this
+    // NEVER rewrites items[], so a concurrent invoice registration that updates the
+    // billing ledger (billedKg/billedAmount) is never lost. Recomputes paymentStatus
+    // and paidDate from the (re-read) doc + the new payments.
+    async updatePurchaseOrderPayments(id, payments) {
+      const ref = doc(db, COLLECTIONS.purchaseOrders, id)
+      const po = await runTransaction(db, async txn => {
+        const snap = await txn.get(ref)
+        if (!snap.exists()) throw new Error('発注が見つかりません')
+        const cleaned = normalizePoPayments(payments)
+        const mapped = mapPurchaseOrder(id, { ...(snap.data() ?? {}), payments: cleaned })
+        const paidDate =
+          cleaned
+            .filter(p => p.paid !== false && p.paidDate)
+            .map(p => p.paidDate)
+            .sort()
+            .pop() ?? ''
+        txn.update(ref, {
+          payments: cleaned,
+          paymentStatus: mapped.paymentStatus,
+          paidDate,
+          updatedAt: serverTimestamp(),
+        })
+        return { ...mapped, paidDate }
+      })
+      return po
+    },
+
     async updatePurchaseOrder(id, input) {
       const ref = doc(db, COLLECTIONS.purchaseOrders, id)
       const snap = await getDoc(ref)

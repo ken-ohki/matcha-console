@@ -74,7 +74,11 @@ export function derivePoPaymentStatus(
   if (payments.length === 0) return stored
   const paid = poPaidTotal(po)
   const total = computePoTaxIncluded(po)
-  if (paid <= 0) return stored === 'uninvoiced' ? 'uninvoiced' : 'unpaid'
+  if (paid <= 0) {
+    // 前払金＋残金スケジュールがあるPOは支払対象(買掛)。未確認でも「未請求」でなく「未払」。
+    if (hasInstallmentSchedule(payments)) return 'unpaid'
+    return stored === 'uninvoiced' ? 'uninvoiced' : 'unpaid'
+  }
   if (paid >= total) return 'paid'
   return 'partial'
 }
@@ -228,8 +232,11 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
     if (amount <= 0) continue
     if (sale.paymentStatus === 'paid' && sale.paymentDate) {
       ensure(monthKey(sale.paymentDate)).inActual += amount
-    } else if (sale.dueDate) {
-      ensure(monthKey(sale.dueDate)).inExpected += amount
+    } else {
+      // 未入金売上は入金予定として計上。期日未設定でも受注日にフォールバックし、
+      // 入金管理の未入金残高（期日未設定バケット）と欠落なく一致させる。
+      const due = sale.dueDate || sale.orderDate
+      if (due) ensure(monthKey(due)).inExpected += amount
     }
   }
 

@@ -110,6 +110,8 @@ export interface IPurchaseOrdersService {
   getPurchaseOrders(): Promise<PurchaseOrder[]>
   createPurchaseOrder(input: PurchaseOrderInput): Promise<PurchaseOrder>
   updatePurchaseOrder(id: string, input: Partial<PurchaseOrderInput>): Promise<PurchaseOrder>
+  /** Payments-only, transactional update (does not touch items[]; avoids billing-ledger lost updates). */
+  updatePurchaseOrderPayments(id: string, payments: PurchaseOrderPayment[]): Promise<PurchaseOrder>
   deletePurchaseOrder(id: string): Promise<void>
   receivePurchaseOrderLine(
     orderId: string,
