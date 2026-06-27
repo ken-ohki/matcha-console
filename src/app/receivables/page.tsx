@@ -126,13 +126,14 @@ export default function ReceivablesPage() {
 
   const kpis = useMemo(() => {
     // All KPIs share the same population as the list below (search-filtered).
-    const outstanding = filtered.filter(s => s.paymentStatus !== 'paid').reduce((sum, s) => sum + saleIncome(s), 0)
+    // 未入金残高は検索に依存しない全件(sales)で算出（検索で残高が変動するのを防ぐ）。
+    const outstanding = sales.filter(s => s.paymentStatus !== 'paid').reduce((sum, s) => sum + saleIncome(s), 0)
     const actionNeeded = grouped.actionNeeded.reduce((s, r) => s + saleIncome(r), 0)
     const collectedThisMonth = filtered
       .filter(s => s.paymentStatus === 'paid' && (s.paymentDate ?? '').startsWith(todayIso().slice(0, 7)))
       .reduce((sum, s) => sum + saleIncome(s), 0) + ecThisMonth
     return { outstanding, actionNeeded, collectedThisMonth }
-  }, [filtered, grouped, ecThisMonth])
+  }, [sales, filtered, grouped, ecThisMonth])
 
   const openConfirm = (sale: SaleRecord) => {
     setConfirmTarget(sale)

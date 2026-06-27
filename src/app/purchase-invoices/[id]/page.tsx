@@ -77,7 +77,7 @@ export default function PurchaseInvoiceDetailPage() {
 
   return (
     <AppLayout>
-      <main className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <Link
@@ -165,7 +165,7 @@ export default function PurchaseInvoiceDetailPage() {
             </section>
           </>
         )}
-      </main>
+      </div>
     </AppLayout>
   )
 }

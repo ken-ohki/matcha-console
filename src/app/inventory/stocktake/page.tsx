@@ -71,7 +71,7 @@ export default function StocktakeSheetPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-3xl px-4 py-6 print:p-0 print:max-w-none">
+      <div className="mx-auto max-w-3xl px-4 py-6 print:p-0 print:max-w-none">
         {loading ? (
           <p className="py-20 text-center text-sm text-mist">読み込み中…</p>
         ) : total === 0 ? (
@@ -135,7 +135,7 @@ export default function StocktakeSheetPage() {
             </table>
           </div>
         )}
-      </main>
+      </div>
 
       <style jsx global>{`
         @media print {

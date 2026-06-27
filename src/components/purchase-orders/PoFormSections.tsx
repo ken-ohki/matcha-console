@@ -475,15 +475,19 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
             className={fieldCls}
           />
         </div>
-        <div>
-          <label className="mb-1 block text-[11px] uppercase tracking-wider text-mist">支払日</label>
-          <input
-            type="date"
-            value={form.paidDate ?? ''}
-            onChange={e => setForm(prev => ({ ...prev, paidDate: e.target.value }))}
-            className={fieldCls}
-          />
-        </div>
+        {/* 支払いがある(分割払い/自由入力)場合は、支払日は各支払エディタ側で管理するため
+            PO レベルの「支払日」欄は重複を避けて非表示にする。 */}
+        {!hasPayments && (
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wider text-mist">支払日</label>
+            <input
+              type="date"
+              value={form.paidDate ?? ''}
+              onChange={e => setForm(prev => ({ ...prev, paidDate: e.target.value }))}
+              className={fieldCls}
+            />
+          </div>
+        )}
         <div className="md:col-span-3">
           <label className="mb-1 block text-xs font-medium text-graphite">請求書（PDF）</label>
           {form.invoice ? (

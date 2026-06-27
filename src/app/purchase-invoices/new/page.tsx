@@ -28,7 +28,7 @@ function NewInvoiceInner() {
 export default function NewPurchaseInvoicePage() {
   return (
     <AppLayout>
-      <main className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <Link
@@ -45,7 +45,7 @@ export default function NewPurchaseInvoicePage() {
         <Suspense fallback={<p className="text-sm text-mist">読み込み中…</p>}>
           <NewInvoiceInner />
         </Suspense>
-      </main>
+      </div>
     </AppLayout>
   )
 }

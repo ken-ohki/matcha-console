@@ -177,7 +177,8 @@ export function InstallmentScheduleEditor({
                     {disabled ? (
                       p.paidDate || '-'
                     ) : (
-                      <input type="date" value={p.paidDate || ''} onChange={e => updateStage(kind, { paidDate: e.target.value })} className={fieldCls} />
+                      // 支払日を空にしたら未確認(予定)へ戻す（確認済みのまま日付なし＝CFに出ず実績現金が消えるのを防ぐ）
+                      <input type="date" value={p.paidDate || ''} onChange={e => updateStage(kind, e.target.value ? { paidDate: e.target.value } : { paidDate: '', paid: false })} className={fieldCls} />
                     )}
                   </td>
                   <td className="px-2 py-1.5">

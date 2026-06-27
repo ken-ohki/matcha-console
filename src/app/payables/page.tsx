@@ -420,6 +420,9 @@ export default function PayablesPage() {
 
   const renderRow = (r: PayableRow, showPaidDate = false) => {
     const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
+    // 段階行(前払金/残金)の id は合成値だが savingKey は実PO idで設定されるため、
+    // 無効化判定も実PO idベースに揃える（保存中の二重送信を防ぐ）。
+    const rowSaveKey = `${r.kind}:${r.stageKind ? (r.po?.id ?? r.id) : r.id}`
     return (
       <tr
         key={`${r.kind}:${r.id}`}
@@ -462,7 +465,7 @@ export default function PayablesPage() {
               <button
                 type="button"
                 onClick={() => openPay(r)}
-                disabled={savingKey === `${r.kind}:${r.id}`}
+                disabled={savingKey === rowSaveKey}
                 className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper shadow hover:bg-[#205f43] disabled:opacity-60"
               >
                 <CheckCircle2 size={12} /> 支払確認
@@ -473,7 +476,7 @@ export default function PayablesPage() {
                 <button
                   type="button"
                   onClick={() => openEdit(r)}
-                  disabled={savingKey === `${r.kind}:${r.id}`}
+                  disabled={savingKey === rowSaveKey}
                   className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb] disabled:opacity-60"
                 >
                   <Pencil size={12} /> 支払日・方法
@@ -481,7 +484,7 @@ export default function PayablesPage() {
                 <button
                   type="button"
                   onClick={() => removePayment(r.kind, r.stageKind ? (r.po?.id ?? r.id) : r.id, undefined, r.stageKind)}
-                  disabled={savingKey === `${r.kind}:${r.id}`}
+                  disabled={savingKey === rowSaveKey}
                   className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2 py-1 text-[11px] text-mist hover:bg-bone disabled:opacity-60"
                 >
                   <Undo2 size={12} /> 支払取消
