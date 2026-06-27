@@ -69,6 +69,8 @@ export default function ReceivablesPage() {
   const [detailSale, setDetailSale] = useState<SaleRecord | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<SaleRecord | null>(null)
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
+  // 入金確認直後に出す「元に戻す」用（支払管理のlastUndoバナーと体験を揃える）。
+  const [lastUndo, setLastUndo] = useState<{ id: string; name: string } | null>(null)
   const [activeBucket, setActiveBucket] = useState<Bucket | 'ec'>('actionNeeded')
 
   const load = async () => {
@@ -158,7 +160,24 @@ export default function ReceivablesPage() {
       await patchWholesaleOrder({ orderId: id, action: 'set_billing', paymentStatus: 'paid', paymentDate: date })
       setSales(prev => prev.map(s => s.id === id ? { ...s, paymentStatus: 'paid', paymentDate: date, paymentConfirmedAt: new Date().toISOString() } : s))
       setConfirmTarget(null)
+      setLastUndo({ id, name: sales.find(s => s.id === id)?.buyerName ?? '' })
       setFeedback('入金確認しました')
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
+    } finally { setSavingId(null) }
+  }
+
+  // 「元に戻す」: 直近の入金確認を確認ダイアログ無しで取り消す（バナーからの即時undo）。
+  const undoLastPaid = async () => {
+    if (!lastUndo) return
+    const { id } = lastUndo
+    setSavingId(id)
+    setFeedback(null)
+    try {
+      await patchWholesaleOrder({ orderId: id, action: 'unconfirm_payment' })
+      setSales(prev => prev.map(s => s.id === id ? { ...s, paymentStatus: 'invoiced', paymentDate: undefined, paymentConfirmedAt: undefined } : s))
+      setLastUndo(null)
+      setFeedback('入金確認を取り消しました')
     } catch (err) {
       setFeedback(err instanceof Error ? err.message : '更新に失敗しました')
     } finally { setSavingId(null) }
@@ -225,23 +244,26 @@ export default function ReceivablesPage() {
           )}
         </td>
         <td className="px-3 py-2">
+          {/* 「入金済」への遷移は必ず『入金確認』ボタン(モーダル)経由に一本化。
+              インラインselectでは paid を選べない（paid行はselect無効＝取消ボタンで戻す）。 */}
           <select
             value={s.paymentStatus}
             onChange={e => updateInline(s.id, { paymentStatus: e.target.value as PaymentStatus })}
-            disabled={!canEdit}
+            disabled={!canEdit || s.paymentStatus === 'paid'}
             className="rounded-lg border border-line bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist"
           >
             <option value="uninvoiced">{PAYMENT_LABELS.uninvoiced}</option>
             <option value="invoiced">{PAYMENT_LABELS.invoiced}</option>
-            <option value="paid">{PAYMENT_LABELS.paid}</option>
+            {s.paymentStatus === 'paid' && <option value="paid">{PAYMENT_LABELS.paid}</option>}
           </select>
         </td>
         <td className="px-3 py-2">
+          {/* 支払日は入金済の行のみ編集可（未入金行で日付だけ入れて自動paid化するのを防ぐ）。 */}
           <input
             type="date"
             value={s.paymentDate ?? ''}
             onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
-            disabled={!canEdit}
+            disabled={!canEdit || s.paymentStatus !== 'paid'}
             className="rounded-lg border border-line bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist"
           />
         </td>
@@ -356,6 +378,18 @@ export default function ReceivablesPage() {
             <span className="text-xs text-matchaDeep">{feedback}</span>
           )}
         </div>
+
+        {lastUndo && (
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-matcha/40 bg-[#f1f7f1] px-4 py-2 text-sm">
+            <span className="text-matchaDeep">{lastUndo.name ? `${lastUndo.name} の` : ''}入金を確認しました。</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={undoLastPaid} className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] text-alert hover:bg-alert/5">
+                <Undo2 size={12} /> 元に戻す
+              </button>
+              <button type="button" onClick={() => setLastUndo(null)} aria-label="閉じる" className="rounded p-1 text-gray-400 hover:text-mist"><X size={14} /></button>
+            </div>
+          </div>
+        )}
 
         {loading && <p className="text-sm text-mist">読み込み中…</p>}
 
