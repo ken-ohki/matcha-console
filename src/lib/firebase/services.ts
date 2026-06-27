@@ -550,17 +550,23 @@ async function ensureUserProfile(user: User): Promise<UserRole> {
     return normalizeRole(existing.data().role)
   }
 
-  const allUsers = await getDocs(collection(db, COLLECTIONS.users))
-  const role: UserRole = allUsers.empty ? 'admin' : 'viewer'
-
-  await setDoc(ref, {
-    email: user.email ?? '',
-    role,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  }, { merge: true })
-
-  return role
+  // No profile yet: bootstrap one. Under the hardened Firestore rules, non-admins
+  // cannot write users docs (prevents self-promotion), so this may be denied for
+  // an unprovisioned login — fall back to viewer so login still succeeds. Real
+  // staff are provisioned server-side via /api/admin/users (Admin SDK).
+  try {
+    const allUsers = await getDocs(collection(db, COLLECTIONS.users))
+    const role: UserRole = allUsers.empty ? 'admin' : 'viewer'
+    await setDoc(ref, {
+      email: user.email ?? '',
+      role,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+    return role
+  } catch {
+    return 'viewer'
+  }
 }
 
 function toAuthUser(user: User, role: UserRole): AuthUser {
