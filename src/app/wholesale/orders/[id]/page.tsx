@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { MasterEntry } from '@/types'
@@ -110,6 +111,10 @@ const CARRIER_LABEL: Record<string, string> = {
 
 export default function WholesaleOrderDetailPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  // 操作の権限: 入金確認系は admin+finance、それ以外(承認/取消/発送/書類/削除/編集)は admin 限定。viewer は閲覧のみ。
+  const isAdmin = user?.role === 'admin'
+  const canConfirmPayment = isAdmin || user?.role === 'finance'
   const { id } = useParams<{ id: string }>()
   const [order, setOrder] = useState<Order | null>(null)
   const [costByProduct, setCostByProduct] = useState<Record<string, number>>({})
@@ -467,7 +472,7 @@ export default function WholesaleOrderDetailPage() {
             <ArrowLeft size={15} /> 卸売注文一覧へ
           </Link>
           <div className="flex items-center gap-2">
-            {(o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && o?.status !== 'paid' && o?.status !== 'shipped' && (
+            {isAdmin && (o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && o?.status !== 'paid' && o?.status !== 'shipped' && (
               <button onClick={startEdit} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">内容を編集</button>
             )}
             <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
@@ -789,7 +794,7 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Fulfillment — carrier/tracking + shipping status. Direct (staff-entered)
                 orders can edit the 発送 info at any (non-cancelled) status. */}
-            {(o.status === 'paid' || o.status === 'shipped' || o.status === 'pending_payment' || (o.origin === 'direct' && o.status !== 'cancelled')) && (
+            {isAdmin && (o.status === 'paid' || o.status === 'shipped' || o.status === 'pending_payment' || (o.origin === 'direct' && o.status !== 'cancelled')) && (
               <Section title="出荷・発送通知">
                 {/* 発送指示: 入金前でも出荷したい掛け取引向け。発送管理に「要発送」として表示。 */}
                 {o.status !== 'shipped' && o.status !== 'cancelled' && (
@@ -840,55 +845,57 @@ export default function WholesaleOrderDetailPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
-              {o.status === 'pending_acceptance' && !editing && (
+              {isAdmin && o.status === 'pending_acceptance' && !editing && (
                 <button onClick={() => act('accept_quote')} disabled={busy} className="btn-primary">承諾して確定</button>
               )}
-              {o.status === 'pending_approval' && !editing && (
+              {isAdmin && o.status === 'pending_approval' && !editing && (
                 <button onClick={() => act('approve')} disabled={busy} className="btn-primary">承認して支払い案内を送る</button>
               )}
-              {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
+              {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
               )}
               {/* Card fallback: if a Stripe webhook is missed and the order stays unpaid,
                   staff can confirm manually AFTER verifying payment in the Stripe dashboard. */}
-              {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && o.paymentStatus !== 'paid' && (
+              {isAdmin && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && o.paymentStatus !== 'paid' && (
                 <button onClick={() => act('resend_payment_link')} disabled={busy} className="btn-primary">{o.checkoutUrl ? '決済リンクを再発行' : '決済リンクを発行'}</button>
               )}
-              {(o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
+              {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
                 <button
                   onClick={() => { if (window.confirm('Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。')) act('confirm_payment') }}
                   disabled={busy}
                   className="btn-ghost"
                 >入金を手動確認（カード）</button>
               )}
-              {(canQuote || canInvoice || canReceiptDelivery) && (
+              {isAdmin && (canQuote || canInvoice || canReceiptDelivery) && (
                 <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                   <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
                   <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
                 </div>
               )}
-              {canQuote && (
+              {isAdmin && canQuote && (
                 <button onClick={downloadQuotation} disabled={busy} className="btn-ghost">見積書を発行</button>
               )}
-              {canInvoice && (
+              {isAdmin && canInvoice && (
                 <button onClick={downloadInvoice} disabled={busy} className="btn-ghost">請求書を発行</button>
               )}
-              {canReceiptDelivery && (
+              {isAdmin && canReceiptDelivery && (
                 <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>
               )}
-              {canReceiptDelivery && (
+              {isAdmin && canReceiptDelivery && (
                 <button onClick={downloadDeliveryNote} disabled={busy} className="btn-ghost">納品書を発行</button>
               )}
-              {o.status !== 'cancelled' && o.status !== 'shipped' && (
+              {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
             </div>
 
-            {/* Danger zone: permanent delete (test-data cleanup) */}
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3">
-              <p className="text-xs text-red-800">テスト注文の削除：注文と在庫引当を完全に削除します（元に戻せません）。</p>
-              <button onClick={deleteOrder} disabled={busy} className="rounded-lg border border-red-400 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">注文を削除</button>
-            </div>
+            {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
+            {isAdmin && (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3">
+                <p className="text-xs text-red-800">テスト注文の削除：注文と在庫引当を完全に削除します（元に戻せません）。</p>
+                <button onClick={deleteOrder} disabled={busy} className="rounded-lg border border-red-400 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">注文を削除</button>
+              </div>
+            )}
           </div>
         )}
       </div>

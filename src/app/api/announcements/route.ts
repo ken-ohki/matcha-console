@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
-import { requireAdmin, AuthError } from '@/lib/firebase/admin-auth'
+import { requireAdmin, requireUser, AuthError } from '@/lib/firebase/admin-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,7 +28,8 @@ interface Body {
 
 /** List all announcements (staff — includes unpublished). */
 export async function GET(request: Request) {
-  try { await requireAdmin(request) } catch (err) { return handleAuthError(err) }
+  // 閲覧は任意の認証ユーザー（viewer/finance も閲覧可）。作成/削除は POST/DELETE=admin 限定。
+  try { await requireUser(request) } catch (err) { return handleAuthError(err) }
   const snap = await db().collection('announcements').get()
   const items = snap.docs
     .map(d => {

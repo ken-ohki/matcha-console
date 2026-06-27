@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { Megaphone, Plus, Trash2, Pencil } from 'lucide-react'
 
@@ -42,6 +43,8 @@ async function token(): Promise<string> {
 const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleDateString('ja-JP') : '—')
 
 export default function AnnouncementsPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' // 閲覧は全ロール、作成/編集/削除は admin 限定
   const [items, setItems] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -104,12 +107,12 @@ export default function AnnouncementsPage() {
             <h1 className="mt-3 text-2xl font-bold text-ink">お知らせ管理</h1>
             <p className="mt-1 text-sm text-mist">商品情報・重要なお知らせをブログ形式で掲載します（Markdown対応）。</p>
           </div>
-          {!draft && <button onClick={() => setDraft({ ...EMPTY })} className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-paper hover:opacity-90"><Plus size={15} /> 新規作成</button>}
+          {isAdmin && !draft && <button onClick={() => setDraft({ ...EMPTY })} className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-paper hover:opacity-90"><Plus size={15} /> 新規作成</button>}
         </div>
 
         {error && <p className="rounded-lg border border-alert/40 bg-alert/5 px-4 py-2 text-sm text-alert">{error}</p>}
 
-        {draft && (
+        {isAdmin && draft && (
           <section className="rounded-2xl border border-line bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold text-ink">{draft.id ? 'お知らせを編集' : '新しいお知らせ'}</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -159,8 +162,12 @@ export default function AnnouncementsPage() {
                     </div>
                     <p className="text-[11px] text-mist">作成: {fmt(a.createdAtMs)}{a.publishedAt ? ` ／ 公開: ${a.publishedAt.slice(0, 10)}` : ''}</p>
                   </div>
-                  <button onClick={() => edit(a)} className="rounded-lg p-2 text-mist hover:bg-bone hover:text-graphite" aria-label="編集"><Pencil size={16} /></button>
-                  <button onClick={() => remove(a)} className="rounded-lg p-2 text-alert hover:bg-alert/5" aria-label="削除"><Trash2 size={16} /></button>
+                  {isAdmin && (
+                    <>
+                      <button onClick={() => edit(a)} className="rounded-lg p-2 text-mist hover:bg-bone hover:text-graphite" aria-label="編集"><Pencil size={16} /></button>
+                      <button onClick={() => remove(a)} className="rounded-lg p-2 text-alert hover:bg-alert/5" aria-label="削除"><Trash2 size={16} /></button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
