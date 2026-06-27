@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
-import { requireAdmin, AuthError } from '@/lib/firebase/admin-auth'
+import { requireAdmin, requireUser, AuthError } from '@/lib/firebase/admin-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,7 +39,8 @@ const EDITABLE_PROFILE_FIELDS = [
 /** Member detail + purchase history for the customer page. */
 export async function GET(request: Request, context: { params: Promise<{ uid: string }> }) {
   try {
-    await requireAdmin(request)
+    // 閲覧は任意の認証ユーザー（viewer/finance も会員詳細を閲覧可）。更新は POST=admin 限定。
+    await requireUser(request)
   } catch (err) {
     return handleAuthError(err)
   }

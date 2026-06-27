@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 import { useStickyState } from '@/hooks/useStickyState'
@@ -59,6 +60,9 @@ const FILTERS: { key: string; label: string }[] = [
 ]
 
 export default function WholesaleMembersPage() {
+  const { user } = useAuth()
+  // 会員の審査・承認は admin 限定（viewer/finance は閲覧のみ）。
+  const isAdmin = user?.role === 'admin'
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -235,7 +239,7 @@ export default function WholesaleMembersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          {m.status === 'pending' && (
+                          {isAdmin && m.status === 'pending' && (
                             <>
                               <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1.5 text-xs text-paper hover:opacity-90">
                                 <Check size={13} /> 承認
@@ -245,12 +249,12 @@ export default function WholesaleMembersPage() {
                               </button>
                             </>
                           )}
-                          {m.status === 'approved' && (
+                          {isAdmin && m.status === 'approved' && (
                             <button onClick={() => act(m.uid, 'suspend')} className="flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-[#a87b1e] hover:bg-bone">
                               <Ban size={13} /> 停止
                             </button>
                           )}
-                          {(m.status === 'rejected' || m.status === 'suspended') && (
+                          {isAdmin && (m.status === 'rejected' || m.status === 'suspended') && (
                             <button onClick={() => act(m.uid, 'approve')} className="flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1.5 text-xs text-paper hover:opacity-90">
                               <Check size={13} /> 承認
                             </button>

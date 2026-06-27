@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
-import { requireAdmin, AuthError } from '@/lib/firebase/admin-auth'
+import { requireAdmin, requireUser, AuthError } from '@/lib/firebase/admin-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin(request)
+    // 閲覧は任意の認証ユーザー（viewer/finance も会員情報を閲覧可）。更新は POST=admin 限定。
+    await requireUser(request)
   } catch (err) {
     return handleAuthError(err)
   }

@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Check, X, Ban, RefreshCw } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 
@@ -103,6 +104,9 @@ function fmtDate(ms?: number): string {
 
 export default function WholesaleMemberDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = use(params)
+  const { user } = useAuth()
+  // 会員の審査・編集・ログイン支援は admin 限定（viewer/finance は閲覧のみ）。
+  const isAdmin = user?.role === 'admin'
   const [member, setMember] = useState<Member | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -302,16 +306,16 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                 <button onClick={load} className="flex items-center gap-1 rounded-xl border border-line px-3 py-2 text-sm text-ink hover:bg-bone">
                   <RefreshCw size={15} /> 更新
                 </button>
-                {member.status === 'pending' && (
+                {isAdmin && member.status === 'pending' && (
                   <>
                     <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-sm text-paper hover:opacity-90"><Check size={14} /> 承認</button>
                     <button onClick={() => act('reject')} className="flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm text-alert hover:bg-bone"><X size={14} /> 却下</button>
                   </>
                 )}
-                {member.status === 'approved' && (
+                {isAdmin && member.status === 'approved' && (
                   <button onClick={() => act('suspend')} className="flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm text-[#a87b1e] hover:bg-bone"><Ban size={14} /> 停止</button>
                 )}
-                {(member.status === 'suspended' || member.status === 'rejected') && (
+                {isAdmin && (member.status === 'suspended' || member.status === 'rejected') && (
                   <button onClick={() => act('approve')} className="flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-sm text-paper hover:opacity-90"><Check size={14} /> 承認</button>
                 )}
               </div>
@@ -323,7 +327,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
               <select
                 value={member.rank ?? 'standard'}
                 onChange={e => setRank(e.target.value)}
-                disabled={busy}
+                disabled={busy || !isAdmin}
                 className="rounded-xl border border-line px-3 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-matcha disabled:opacity-60"
               >
                 {RANKS.map(r => (
@@ -344,14 +348,14 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
             <section className="mb-8 rounded-2xl border border-line bg-white p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-mist">顧客情報</h2>
-                {!editingInfo ? (
+                {isAdmin && (!editingInfo ? (
                   <button onClick={startEditInfo} className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-bone">編集</button>
                 ) : (
                   <div className="flex gap-2">
                     <button onClick={saveInfo} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50">保存</button>
                     <button onClick={() => setEditingInfo(false)} disabled={busy} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink hover:bg-bone">キャンセル</button>
                   </div>
-                )}
+                ))}
               </div>
               {editingInfo ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -429,20 +433,21 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-[#a87b1e]">管理者メモ（社内専用）</h2>
                 <div className="flex items-center gap-2">
                   {noteSaved && <span className="text-xs text-matcha">保存しました</span>}
-                  <button onClick={saveNote} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50">保存</button>
+                  {isAdmin && <button onClick={saveNote} disabled={busy} className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50">保存</button>}
                 </div>
               </div>
               <textarea
                 rows={4}
                 value={note}
                 onChange={e => setNote(e.target.value)}
+                disabled={!isAdmin}
                 placeholder="この会員に関する社内メモ（与信・対応履歴・注意点など）。会員には表示されません。"
-                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-ink"
+                className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-ink disabled:bg-bone disabled:text-mist"
               />
             </section>
 
-            {/* Login support — for members who forgot their email / password, or to
-                invite a manually-registered (no-login) member to use the portal. */}
+            {/* Login support — admin only (invite / password reset / view login info). */}
+            {isAdmin && (
             <section className="mb-8 rounded-2xl border border-line bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mist">ログインサポート</h2>
               {member.source === 'manual' && !member.migratedToUid ? (
@@ -473,6 +478,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
                 ・Googleログインの場合：パスワードは無く、「Googleでログイン」をご案内ください。
               </p>
             </section>
+            )}
 
             {/* Purchase history */}
             <section className="rounded-2xl border border-line bg-white p-5">
