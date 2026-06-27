@@ -425,7 +425,7 @@ export default function PayablesPage() {
   const renderRow = (r: PayableRow, showPaidDate = false) => {
     const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
     return (
-      <tr key={`${r.kind}:${r.id}`} className="border-t border-white/60">
+      <tr key={`${r.kind}:${r.id}`} onClick={() => setDetailRow(r)} className="cursor-pointer border-t border-white/60 hover:bg-white/50">
         <td className="px-3 py-2">
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${r.kind === 'invoice' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-700'}`}>
             {r.typeLabel}
@@ -433,8 +433,7 @@ export default function PayablesPage() {
         </td>
         <td className={`px-3 py-2 ${overdue ? 'text-alert' : 'text-mist'}`}>{r.dueDate || '—'}</td>
         <td className="px-3 py-2 text-ink">
-          {/* 仕入先クリック → 請求書/直接支払い とも同じ読み取り専用の詳細モーダルを開く */}
-          <button type="button" onClick={() => setDetailRow(r)} className="text-left hover:underline">{r.supplierName}</button>
+          <span className="hover:underline">{r.supplierName}</span>
         </td>
         <td className="px-3 py-2 text-mist">{r.sub}</td>
         <td className="px-3 py-2 text-right">
@@ -447,14 +446,15 @@ export default function PayablesPage() {
         {showPaidDate && <td className="px-3 py-2 text-mist">{r.paidDate || '—'}</td>}
         <td className="px-3 py-2">
           {r.docUrl ? (
-            <a href={r.docUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-matchaDeep hover:underline"><FileText size={12} /> PDF</a>
+            <a href={r.docUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-matchaDeep hover:underline"><FileText size={12} /> PDF</a>
           ) : (
             <span className="text-mist text-xs">未添付</span>
           )}
         </td>
         <td className="px-3 py-2 text-right">
-          {/* 請求書・PO直接・前払金・残金 すべて同じ操作（支払確認→確認ダイアログ）。viewerは非表示。 */}
-          <div className="flex items-center justify-end gap-1.5">
+          {/* 請求書・PO直接・前払金・残金 すべて同じ操作（支払確認→確認ダイアログ）。viewerは非表示。
+              行クリックの詳細表示と二重発火しないよう伝播を止める。 */}
+          <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
             {canEdit && !r.isPaid && (
               <button
                 type="button"
