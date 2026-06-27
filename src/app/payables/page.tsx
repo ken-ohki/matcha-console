@@ -38,6 +38,7 @@ import {
   poRemaining,
 } from '@/lib/cashflow'
 import { hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
+import { useModalDismiss } from '@/hooks/useModalDismiss'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { computeTaxBuckets } from '@/lib/tax'
 import { formatCurrency, formatKg, todayIso } from '@/lib/format'
@@ -150,6 +151,7 @@ export default function PayablesPage() {
   const [payModal, setPayModal] = useState<PayModalState | null>(null)
   // Just-confirmed payment, surfaced with an inline 元に戻す affordance.
   const [lastUndo, setLastUndo] = useState<UndoState | null>(null)
+  useModalDismiss(!!payModal, () => setPayModal(null)) // 支払確認ダイアログ: Escで閉じる＋スクロールロック
 
   const load = async () => {
     setLoading(true)
@@ -789,6 +791,7 @@ function PayableDetailModal({ row, bankInfo, onClose }: {
   bankInfo?: string
   onClose: () => void
 }) {
+  useModalDismiss(!!row, onClose) // Escで閉じる＋背景スクロールロック
   if (!row) return null
   const inv = row.invoice
   const po = row.po

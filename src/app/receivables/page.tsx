@@ -17,6 +17,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import { useAuth } from '@/contexts/AuthContext'
+import { useModalDismiss } from '@/hooks/useModalDismiss'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeSaleTaxBuckets, saleFeesToTaxLines, sumSaleFees } from '@/lib/tax'
@@ -71,6 +72,8 @@ export default function ReceivablesPage() {
   const [confirmDate, setConfirmDate] = useState<string>(todayIso())
   // 入金確認直後に出す「元に戻す」用（支払管理のlastUndoバナーと体験を揃える）。
   const [lastUndo, setLastUndo] = useState<{ id: string; name: string } | null>(null)
+  useModalDismiss(!!confirmTarget, () => setConfirmTarget(null)) // 入金確認ダイアログ: Esc＋スクロールロック
+  useModalDismiss(!!detailSale, () => setDetailSale(null))
   const [activeBucket, setActiveBucket] = useState<Bucket | 'ec'>('actionNeeded')
 
   const load = async () => {
