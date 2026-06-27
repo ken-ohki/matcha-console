@@ -413,6 +413,11 @@ export default function FinancialsPage() {
     // Invoice-driven POs are not payables themselves — their invoices are.
     if (!isLegacyPayablePo(o)) return false
     if (o.paymentStatus === 'paid') return false
+    // 分割払い(前払金/残金)は段階ごとの支払期限で評価（payablesと整合）。
+    const stages = (o.payments ?? []).filter(p => p.kind === 'deposit' || p.kind === 'balance')
+    if (stages.length > 0) {
+      return stages.some(p => p.paid === false && !!p.dueDate && p.dueDate < today)
+    }
     if (!o.paymentDueDate) return false
     return o.paymentDueDate < today
   }

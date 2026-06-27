@@ -242,6 +242,7 @@ export function buildCashFlowSeries(opts: BuildCashFlowOpts): MonthlyCashFlow[] 
 
   for (const ec of ecSales) {
     if (ec.status === 'cancelled') continue
+    if (!ec.soldOn) continue // 売上日未設定は空キー月に積むとサイレント欠落するため除外（financialsと同条件）
     const amount = ec.revenue ?? ((ec.unitPrice ?? 0) * ec.quantityKg)
     if (amount <= 0) continue
     ensure(monthKey(ec.soldOn)).inActual += amount
