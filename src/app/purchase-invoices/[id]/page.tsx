@@ -57,7 +57,7 @@ export default function PurchaseInvoiceDetailPage() {
       const updated = await svc.purchaseInvoices.updateInvoicePayments(id, next)
       setInvoice(updated)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '入金の更新に失敗しました')
+      setError(e instanceof Error ? e.message : '支払の更新に失敗しました')
     }
   }
 
@@ -152,7 +152,7 @@ export default function PurchaseInvoiceDetailPage() {
             {/* Payments / 消し込み */}
             <section className="rounded-2xl border border-line bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-ink">入金（消し込み）</h2>
+                <h2 className="text-sm font-semibold text-ink">支払（消し込み）</h2>
                 <span className="text-xs text-mist">
                   請求額（税込） <span className="font-semibold text-ink">{formatCurrency(invoice.totalAmount)}</span>
                 </span>

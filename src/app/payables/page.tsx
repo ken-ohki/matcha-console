@@ -421,7 +421,14 @@ export default function PayablesPage() {
   const renderRow = (r: PayableRow, showPaidDate = false) => {
     const overdue = !!r.dueDate && !r.isPaid && r.dueDate < todayIso()
     return (
-      <tr key={`${r.kind}:${r.id}`} onClick={() => setDetailRow(r)} className="cursor-pointer border-t border-white/60 hover:bg-white/50">
+      <tr
+        key={`${r.kind}:${r.id}`}
+        onClick={() => setDetailRow(r)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailRow(r) } }}
+        role="button"
+        tabIndex={0}
+        className="cursor-pointer border-t border-white/60 hover:bg-white/50 focus:bg-white/60 focus:outline-none"
+      >
         <td className="px-3 py-2">
           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${r.kind === 'invoice' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-700'}`}>
             {r.typeLabel}
@@ -592,7 +599,7 @@ export default function PayablesPage() {
 
   return (
     <AppLayout>
-      <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-ink">支払管理</h1>
@@ -703,7 +710,7 @@ export default function PayablesPage() {
             </div>
           )
         })()}
-      </main>
+      </div>
 
       <PayableDetailModal
         row={detailRow}

@@ -355,7 +355,7 @@ export default function ShippingPage() {
                         const first = sale.items[0]
                         const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
                         return (
-                          <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] last:border-b-0 transition hover:bg-bone">
+                          <tr key={sale.id} onClick={() => openDetail(sale.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(sale.id) } }} role="button" tabIndex={0} className="cursor-pointer border-b border-[#f0ebdf] last:border-b-0 transition hover:bg-bone focus:bg-bone focus:outline-none">
                             <td className="whitespace-nowrap px-4 py-2.5 text-mist">{sale.shippingDate || '-'}</td>
                             <td className="px-4 py-2.5">
                               <div className="font-medium text-ink">{sale.buyerName}</div>
@@ -399,7 +399,7 @@ export default function ShippingPage() {
                     const first = sale.items[0]
                     const rest = sale.items.length > 1 ? ` 他${sale.items.length - 1}件` : ''
                     return (
-                      <tr key={sale.id} onClick={() => openDetail(sale.id)} className="cursor-pointer border-b border-[#f0ebdf] transition hover:bg-bone">
+                      <tr key={sale.id} onClick={() => openDetail(sale.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(sale.id) } }} role="button" tabIndex={0} className="cursor-pointer border-b border-[#f0ebdf] transition hover:bg-bone focus:bg-bone focus:outline-none">
                         <td className="whitespace-nowrap px-3 py-3 text-mist">{sale.shippingSlip?.uploadedAt || '-'}</td>
                         <td className="px-3 py-3">
                           <div className="font-medium text-ink">{sale.buyerName}</div>

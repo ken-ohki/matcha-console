@@ -312,7 +312,10 @@ function PoListRow({ order, onOpen }: { order: PurchaseOrder; onOpen: () => void
   return (
     <tr
       onClick={onOpen}
-      className="cursor-pointer border-b border-[#f0ebdf] text-ink transition hover:bg-bone"
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer border-b border-[#f0ebdf] text-ink transition hover:bg-bone focus:bg-bone focus:outline-none"
     >
       <td className="whitespace-nowrap px-3 py-3"><StatusBadge status={order.status} /></td>
       <td className={`whitespace-nowrap px-3 py-3 font-medium ${order.status === 'cancelled' ? 'text-gray-400 line-through' : ''}`}>

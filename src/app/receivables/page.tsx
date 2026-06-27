@@ -200,7 +200,14 @@ export default function ReceivablesPage() {
         const next = { ...s }
         if (patch.dueDate !== undefined) next.dueDate = patch.dueDate || undefined
         if (patch.paymentMethod !== undefined) next.paymentMethod = patch.paymentMethod || undefined
-        if (patch.paymentStatus !== undefined) next.paymentStatus = patch.paymentStatus
+        if (patch.paymentStatus !== undefined) {
+          next.paymentStatus = patch.paymentStatus
+          // 「入金済」以外へ戻したら入金日・確認日もクリア（サーバの paidAt 削除と整合）。
+          if (patch.paymentStatus !== 'paid') {
+            next.paymentDate = undefined
+            next.paymentConfirmedAt = undefined
+          }
+        }
         if (patch.paymentDate !== undefined) {
           next.paymentDate = patch.paymentDate || undefined
           if (patch.paymentStatus === undefined) next.paymentStatus = patch.paymentDate ? 'paid' : 'invoiced'
@@ -349,7 +356,7 @@ export default function ReceivablesPage() {
 
   return (
     <AppLayout>
-      <main className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-ink">入金管理</h1>
@@ -493,7 +500,7 @@ export default function ReceivablesPage() {
             </div>
           )
         })()}
-      </main>
+      </div>
 
       <SaleDetailModal sale={detailSale} onClose={() => setDetailSale(null)} />
 
