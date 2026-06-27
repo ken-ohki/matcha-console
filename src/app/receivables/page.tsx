@@ -16,6 +16,7 @@ import { X, Undo2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
+import { useAuth } from '@/contexts/AuthContext'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
 import { computeSaleTaxBuckets, saleFeesToTaxLines, sumSaleFees } from '@/lib/tax'
@@ -56,6 +57,9 @@ const SHIPPING_STATUS_LABELS: Record<ShippingStatus, string> = {
 const BUCKET_LABELS = makeBucketLabels('入金済')
 
 export default function ReceivablesPage() {
+  const { user } = useAuth()
+  // 経理ページ: admin と finance のみ編集可。viewer は閲覧のみ。
+  const canEdit = user?.role === 'admin' || user?.role === 'finance'
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -201,7 +205,8 @@ export default function ReceivablesPage() {
             type="date"
             value={s.dueDate ?? ''}
             onChange={e => updateInline(s.id, { dueDate: e.target.value })}
-            className={`rounded-lg border bg-white px-2 py-1 text-xs ${isOverdue ? 'border-alert/40 text-alert' : 'border-line'}`}
+            disabled={!canEdit}
+            className={`rounded-lg border bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist ${isOverdue ? 'border-alert/40 text-alert' : 'border-line'}`}
           />
         </td>
         <td className="px-3 py-2 text-ink">
@@ -223,7 +228,8 @@ export default function ReceivablesPage() {
           <select
             value={s.paymentStatus}
             onChange={e => updateInline(s.id, { paymentStatus: e.target.value as PaymentStatus })}
-            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
+            disabled={!canEdit}
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist"
           >
             <option value="uninvoiced">{PAYMENT_LABELS.uninvoiced}</option>
             <option value="invoiced">{PAYMENT_LABELS.invoiced}</option>
@@ -235,7 +241,8 @@ export default function ReceivablesPage() {
             type="date"
             value={s.paymentDate ?? ''}
             onChange={e => updateInline(s.id, { paymentDate: e.target.value })}
-            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
+            disabled={!canEdit}
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist"
           />
         </td>
         <td className="whitespace-nowrap px-3 py-2 text-[11px] text-mist">
@@ -245,7 +252,8 @@ export default function ReceivablesPage() {
           <select
             value={s.paymentMethod ?? ''}
             onChange={e => updateInline(s.id, { paymentMethod: e.target.value })}
-            className="rounded-lg border border-line bg-white px-2 py-1 text-xs"
+            disabled={!canEdit}
+            className="rounded-lg border border-line bg-white px-2 py-1 text-xs disabled:bg-bone disabled:text-mist"
           >
             <option value="">未設定</option>
             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
@@ -255,7 +263,7 @@ export default function ReceivablesPage() {
           </select>
         </td>
         <td className="px-3 py-2 text-right">
-          {s.paymentStatus !== 'paid' ? (
+          {canEdit && (s.paymentStatus !== 'paid' ? (
             <button
               type="button"
               onClick={() => openConfirm(s)}
@@ -273,7 +281,7 @@ export default function ReceivablesPage() {
             >
               <Undo2 size={12} /> 入金取消
             </button>
-          )}
+          ))}
           {s.paymentStatus !== 'paid' && isOverdue && (
             <a
               href={`mailto:?subject=${encodeURIComponent('お支払いのお願い')}&body=${encodeURIComponent(`${s.buyerName} 様\n\n下記の請求につきまして、ご入金状況をご確認ください。\n金額: ${formatCurrency(saleIncome(s))}\n期日: ${s.dueDate ?? ''}`)}`}

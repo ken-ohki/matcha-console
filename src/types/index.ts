@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'viewer'
+export type UserRole = 'admin' | 'viewer' | 'finance'
 export type StockStatus = 'normal' | 'low' | 'out'
 export type SaleStatus = 'negotiating' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'uninvoiced' | 'invoiced' | 'paid'

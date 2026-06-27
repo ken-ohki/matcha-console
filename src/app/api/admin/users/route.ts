@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     return handleAuthError(err)
   }
 
-  let body: { email?: string; password?: string; role?: 'admin' | 'viewer'; displayName?: string } = {}
+  let body: { email?: string; password?: string; role?: 'admin' | 'viewer' | 'finance'; displayName?: string } = {}
   try {
     body = await request.json()
   } catch {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const email = body.email?.trim().toLowerCase()
   const password = body.password
-  const role = body.role === 'admin' ? 'admin' : 'viewer'
+  const role = body.role === 'admin' || body.role === 'finance' ? body.role : 'viewer'
   const displayName = body.displayName?.trim()
 
   if (!email || !email.includes('@')) {

@@ -19,6 +19,7 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
+import { useAuth } from '@/contexts/AuthContext'
 import type {
   PurchaseInvoice,
   PurchaseInvoicePaymentStatus,
@@ -126,6 +127,11 @@ function poLineSummary(o: PurchaseOrder): string {
 
 export default function PayablesPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  // 経理ページ: 支払確認(入出金)は admin と finance が編集可、viewer は閲覧のみ。
+  const canEdit = user?.role === 'admin' || user?.role === 'finance'
+  // 受領請求書の新規登録は「仕入」領域のため admin 限定。
+  const isAdmin = user?.role === 'admin'
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([])
   // PO-direct payables: legacy single/free-form payments AND 前払金＋残金 schedules
   // (a schedule makes the PO PO-direct via isLegacyPayablePo). Split into per-PO rows
@@ -447,9 +453,9 @@ export default function PayablesPage() {
           )}
         </td>
         <td className="px-3 py-2 text-right">
-          {/* 請求書・PO直接・前払金・残金 すべて同じ操作（支払確認→確認ダイアログ）。 */}
+          {/* 請求書・PO直接・前払金・残金 すべて同じ操作（支払確認→確認ダイアログ）。viewerは非表示。 */}
           <div className="flex items-center justify-end gap-1.5">
-            {!r.isPaid && (
+            {canEdit && !r.isPaid && (
               <button
                 type="button"
                 onClick={() => openPay(r)}
@@ -459,7 +465,7 @@ export default function PayablesPage() {
                 <CheckCircle2 size={12} /> 支払確認
               </button>
             )}
-            {r.paid > 0 && (
+            {canEdit && r.paid > 0 && (
               <>
                 <button
                   type="button"
@@ -540,12 +546,14 @@ export default function PayablesPage() {
                   {lines.length}件 / 請求予定 {formatCurrency(lines.reduce((s, u) => s + u.billableRemainingAmount, 0))}
                 </span>
               </div>
-              <Link
-                href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}`}
-                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
-              >
-                <Plus size={12} /> まとめて請求書作成
-              </Link>
+              {isAdmin && (
+                <Link
+                  href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]"
+                >
+                  <Plus size={12} /> まとめて請求書作成
+                </Link>
+              )}
             </div>
             <div className="overflow-x-auto border-t border-white/60">
               <table className="min-w-[760px] text-sm">
@@ -566,12 +574,14 @@ export default function PayablesPage() {
                       <td className="px-3 py-2 text-right text-mist">{formatKg(u.receivedKg)}</td>
                       <td className="px-3 py-2 text-right font-medium">{formatCurrency(u.billableRemainingAmount)}</td>
                       <td className="px-3 py-2 text-right">
-                        <Link
-                          href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}&poId=${u.poId}&lineId=${u.lineId}`}
-                          className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper hover:bg-[#205f43]"
-                        >
-                          <Link2 size={12} /> 請求書に紐付け
-                        </Link>
+                        {isAdmin && (
+                          <Link
+                            href={`/purchase-invoices/new?supplier=${encodeURIComponent(supplier)}&poId=${u.poId}&lineId=${u.lineId}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-ink px-2.5 py-1 text-[11px] font-medium text-paper hover:bg-[#205f43]"
+                          >
+                            <Link2 size={12} /> 請求書に紐付け
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -593,13 +603,15 @@ export default function PayablesPage() {
             <p className="text-sm text-mist">受領した請求書を支払い単位に管理します。発注は請求書を登録した時点で支払い対象になります。</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => router.push('/purchase-invoices/new')}
-              className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-[#205f43]"
-            >
-              <Plus size={14} /> 請求書を受領
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => router.push('/purchase-invoices/new')}
+                className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-paper hover:bg-[#205f43]"
+              >
+                <Plus size={14} /> 請求書を受領
+              </button>
+            )}
             <Link href="/financials" className="rounded-full border border-line bg-white px-3 py-1.5 text-xs text-matchaDeep hover:bg-[#eef3eb]">
               収支ダッシュボード →
             </Link>

@@ -142,8 +142,8 @@ export function Sidebar({
           {user && (
             <div className="mb-2 px-3 py-2">
               <p className="truncate text-xs text-mist">{user.email}</p>
-              <span className={`font-mono text-[10px] uppercase tracking-brand ${user.role === 'admin' ? 'text-matcha' : 'text-mist'}`}>
-                {user.role === 'admin' ? 'Admin' : 'Viewer'}
+              <span className={`font-mono text-[10px] uppercase tracking-brand ${user.role === 'admin' ? 'text-matcha' : user.role === 'finance' ? 'text-graphite' : 'text-mist'}`}>
+                {user.role === 'admin' ? 'Admin' : user.role === 'finance' ? 'Finance' : 'Viewer'}
               </span>
             </div>
           )}

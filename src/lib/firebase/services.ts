@@ -27,6 +27,7 @@ import {
 import type {
   ArrivalRecord,
   AuthUser,
+  UserRole,
   EcSaleRecord,
   InventoryCheckRecord,
   InventoryGroup,
@@ -528,24 +529,29 @@ function normalizeBuyerName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
-async function getUserRole(uid: string): Promise<'admin' | 'viewer'> {
+/** Coerce a stored role value to a known UserRole (unknown → viewer). */
+function normalizeRole(r: unknown): UserRole {
+  return r === 'admin' || r === 'finance' ? r : 'viewer'
+}
+
+async function getUserRole(uid: string): Promise<UserRole> {
   const db = getFirebaseDb()
   const snap = await getDoc(doc(db, COLLECTIONS.users, uid))
   if (!snap.exists()) return 'viewer'
-  return snap.data().role === 'admin' ? 'admin' : 'viewer'
+  return normalizeRole(snap.data().role)
 }
 
-async function ensureUserProfile(user: User): Promise<'admin' | 'viewer'> {
+async function ensureUserProfile(user: User): Promise<UserRole> {
   const db = getFirebaseDb()
   const ref = doc(db, COLLECTIONS.users, user.uid)
   const existing = await getDoc(ref)
 
   if (existing.exists()) {
-    return existing.data().role === 'admin' ? 'admin' : 'viewer'
+    return normalizeRole(existing.data().role)
   }
 
   const allUsers = await getDocs(collection(db, COLLECTIONS.users))
-  const role: 'admin' | 'viewer' = allUsers.empty ? 'admin' : 'viewer'
+  const role: UserRole = allUsers.empty ? 'admin' : 'viewer'
 
   await setDoc(ref, {
     email: user.email ?? '',
@@ -557,7 +563,7 @@ async function ensureUserProfile(user: User): Promise<'admin' | 'viewer'> {
   return role
 }
 
-function toAuthUser(user: User, role: 'admin' | 'viewer'): AuthUser {
+function toAuthUser(user: User, role: UserRole): AuthUser {
   return {
     uid: user.uid,
     email: user.email ?? '',
@@ -2377,7 +2383,7 @@ export function createFirebaseServices(): IServices {
         return {
           uid: d.id,
           email: String(data.email ?? ''),
-          role: data.role === 'admin' ? 'admin' : 'viewer',
+          role: normalizeRole(data.role),
           createdAt: data.createdAt ? toDate(data.createdAt) : undefined,
           updatedAt: data.updatedAt ? toDate(data.updatedAt) : undefined,
         } satisfies UserProfile

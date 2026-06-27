@@ -5,8 +5,11 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices, type UserProfile } from '@/lib/services'
+import type { UserRole } from '@/types'
 import { Plus, Save, Settings, ShieldCheck, Trash2, User2, X } from 'lucide-react'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+
+const ROLE_LABELS: Record<UserRole, string> = { admin: 'Admin', viewer: 'Viewer', finance: 'Finance（経理）' }
 
 async function fetchIdToken(): Promise<string> {
   const auth = getFirebaseAuthInstance()
@@ -20,12 +23,12 @@ function CreateUserModal({
   onSubmit,
 }: {
   onClose: () => void
-  onSubmit: (input: { email: string; password: string; role: 'admin' | 'viewer'; displayName?: string }) => Promise<void>
+  onSubmit: (input: { email: string; password: string; role: UserRole; displayName?: string }) => Promise<void>
 }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [role, setRole] = useState<'admin' | 'viewer'>('viewer')
+  const [role, setRole] = useState<UserRole>('viewer')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -93,10 +96,11 @@ function CreateUserModal({
             <label className="mb-1 block text-sm font-medium text-graphite">ロール</label>
             <select
               value={role}
-              onChange={e => setRole(e.target.value as 'admin' | 'viewer')}
+              onChange={e => setRole(e.target.value as UserRole)}
               className="w-full rounded-xl border border-line px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
             >
               <option value="viewer">Viewer（閲覧のみ）</option>
+              <option value="finance">Finance（経理のみ編集）</option>
               <option value="admin">Admin（全操作）</option>
             </select>
           </div>
@@ -138,7 +142,7 @@ export default function SettingsUsersPage() {
   const [loading, setLoading] = useState(true)
   const [savingUid, setSavingUid] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
-  const [pendingRoles, setPendingRoles] = useState<Record<string, 'admin' | 'viewer'>>({})
+  const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({})
   const [createOpen, setCreateOpen] = useState(false)
   const { user } = useAuth()
 
@@ -157,7 +161,7 @@ export default function SettingsUsersPage() {
 
   const isAdmin = user?.role === 'admin'
 
-  const handleRoleSelect = (uid: string, role: 'admin' | 'viewer') => {
+  const handleRoleSelect = (uid: string, role: UserRole) => {
     setPendingRoles(prev => ({ ...prev, [uid]: role }))
   }
 
@@ -169,7 +173,7 @@ export default function SettingsUsersPage() {
     try {
       const services = await getServices()
       await services.auth.updateUserRole(target.uid, role)
-      setFeedback({ tone: 'success', message: `${target.email} を ${role === 'admin' ? 'Admin' : 'Viewer'} に変更しました` })
+      setFeedback({ tone: 'success', message: `${target.email} を ${ROLE_LABELS[role]} に変更しました` })
       await load()
     } catch (err) {
       setFeedback({ tone: 'error', message: err instanceof Error ? err.message : '保存に失敗しました' })
@@ -201,7 +205,7 @@ export default function SettingsUsersPage() {
     }
   }
 
-  const handleCreate = async (input: { email: string; password: string; role: 'admin' | 'viewer'; displayName?: string }) => {
+  const handleCreate = async (input: { email: string; password: string; role: UserRole; displayName?: string }) => {
     const token = await fetchIdToken()
     const res = await fetch('/api/admin/users', {
       method: 'POST',
@@ -349,6 +353,10 @@ export default function SettingsUsersPage() {
                             <ShieldCheck size={12} />
                             Admin
                           </span>
+                        ) : u.role === 'finance' ? (
+                          <span className="inline-flex items-center rounded-full bg-[#ece8ff] px-2 py-0.5 text-xs font-medium text-graphite">
+                            Finance
+                          </span>
                         ) : (
                           <span className="inline-flex items-center rounded-full bg-bone px-2 py-0.5 text-xs font-medium text-graphite">
                             Viewer
@@ -358,11 +366,12 @@ export default function SettingsUsersPage() {
                       <td className="px-4 py-3">
                         <select
                           value={pendingRole}
-                          onChange={e => handleRoleSelect(u.uid, e.target.value as 'admin' | 'viewer')}
+                          onChange={e => handleRoleSelect(u.uid, e.target.value as UserRole)}
                           disabled={u.uid === user?.uid}
                           className="rounded-lg border border-line px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-matcha disabled:bg-bone"
                         >
                           <option value="viewer">Viewer</option>
+                          <option value="finance">Finance</option>
                           <option value="admin">Admin</option>
                         </select>
                       </td>
@@ -410,6 +419,7 @@ export default function SettingsUsersPage() {
           <p className="font-medium text-ink">ロールの違い</p>
           <ul className="mt-2 space-y-1 list-disc list-inside">
             <li><strong>Admin</strong>: 全ての操作（作成・編集・削除・設定変更・ユーザー管理）が可能</li>
+            <li><strong>Finance（経理）</strong>: 経理ページ（入金管理・支払管理・収支管理）のみ編集可能。その他は閲覧のみ</li>
             <li><strong>Viewer</strong>: 閲覧のみ。一覧・詳細表示は可能だが、登録・編集・削除は不可</li>
           </ul>
           <p className="mt-3">

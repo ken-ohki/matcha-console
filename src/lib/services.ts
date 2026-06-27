@@ -1,5 +1,6 @@
 import type {
   AuthUser,
+  UserRole,
   InventoryGroup,
   InventoryGroupInput,
   MasterEntry,
@@ -89,7 +90,7 @@ export interface IMastersService {
 export interface UserProfile {
   uid: string
   email: string
-  role: 'admin' | 'viewer'
+  role: UserRole
   createdAt?: Date
   updatedAt?: Date
 }
@@ -101,7 +102,7 @@ export interface IAuthService {
   getCurrentUser(): Promise<AuthUser | null>
   onAuthStateChanged(callback: (user: AuthUser | null) => void): () => void
   listUsers(): Promise<UserProfile[]>
-  updateUserRole(uid: string, role: 'admin' | 'viewer'): Promise<void>
+  updateUserRole(uid: string, role: UserRole): Promise<void>
   deleteUserProfile(uid: string): Promise<void>
 }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { FieldValue, Timestamp, getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { getAdminApp } from '@/lib/firebase/admin'
-import { requireAdmin, AuthError } from '@/lib/firebase/admin-auth'
+import { requireAdmin, requireUser, requireRole, AuthError, type AuthedUser } from '@/lib/firebase/admin-auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,7 +18,8 @@ function handleAuthError(err: unknown) {
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin(request)
+    // Read access for any authenticated console user (viewer/finance can view 入金管理 etc.).
+    await requireUser(request)
   } catch (err) {
     return handleAuthError(err)
   }
@@ -191,9 +192,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  let staff: { uid: string; email: string }
+  let staff: AuthedUser
   try {
-    staff = await requireAdmin(request)
+    staff = await requireRole(request, ['admin', 'finance'])
   } catch (err) {
     return handleAuthError(err)
   }
@@ -204,6 +205,12 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 })
   }
   if (!body.orderId) return NextResponse.json({ error: 'missing_order_id' }, { status: 400 })
+
+  // finance ロールは入金（経理）系アクションのみ許可。それ以外（見積/承認/発送/取消/直販編集等）は admin 限定。
+  const FINANCE_ACTIONS = new Set(['confirm_payment', 'unconfirm_payment', 'set_billing'])
+  if (staff.role !== 'admin' && !FINANCE_ACTIONS.has(body.action ?? '')) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
 
   // Overseas quote: delegate to the wholesale app (it owns Stripe + stock holds).
   // Forward the staff token; the wholesale endpoint re-verifies it.
