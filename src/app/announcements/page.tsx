@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { Megaphone, Plus, Trash2, Pencil } from 'lucide-react'
 
@@ -44,6 +45,7 @@ const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleDateString('ja-JP') : '�
 
 export default function AnnouncementsPage() {
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const isAdmin = user?.role === 'admin' // 閲覧は全ロール、作成/編集/削除は admin 限定
   const [items, setItems] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,7 +89,7 @@ export default function AnnouncementsPage() {
   }
 
   const remove = async (a: Announcement) => {
-    if (!window.confirm(`「${a.title}」を削除しますか？`)) return
+    if (!(await confirm({ message: `「${a.title}」を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     setBusy(true)
     try {
       await fetch(`/api/announcements?id=${encodeURIComponent(a.id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await token()}` } })

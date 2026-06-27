@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type {
   InventoryGroup,
@@ -45,6 +46,7 @@ export default function PurchaseOrderDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const canEdit = user?.role === 'admin'
 
   const [order, setOrder] = useState<PurchaseOrder | null>(null)
@@ -130,7 +132,7 @@ export default function PurchaseOrderDetailPage() {
 
   const handleDelete = async () => {
     if (!order) return
-    if (!confirm(`発注「${order.supplierName} / ${order.orderDate}」を削除しますか？\n入荷済みの場合、関連する入荷記録も削除されます。`)) return
+    if (!(await confirm({ message: `発注「${order.supplierName} / ${order.orderDate}」を削除しますか？\n入荷済みの場合、関連する入荷記録も削除されます。`, danger: true, confirmLabel: '削除する' }))) return
     const services = await getServices()
     await services.purchaseOrders.deletePurchaseOrder(order.id)
     router.push('/purchase-orders')

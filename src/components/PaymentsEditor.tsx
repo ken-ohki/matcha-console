@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { PurchaseOrderPayment } from '@/types'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, todayIso } from '@/lib/format'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 function newId(): string {
   try {
@@ -28,6 +29,7 @@ export function PaymentsEditor({
   onChange: (next: PurchaseOrderPayment[]) => void
   disabled?: boolean
 }) {
+  const { confirm } = useConfirm()
   const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remaining = Math.max(0, totalIncl - paid)
 
@@ -36,11 +38,11 @@ export function PaymentsEditor({
   const [draftMethod, setDraftMethod] = useState<string>('')
   const [draftNote, setDraftNote] = useState<string>('')
 
-  const addPayment = () => {
+  const addPayment = async () => {
     const amount = Number(draftAmount) || 0
     if (!(amount > 0)) return
     // Overpayment is allowed (rounding, bank fees) but confirm first.
-    if (amount > remaining && !confirm(`支払額が残額（${formatCurrency(remaining)}）を超えています。このまま追加しますか？`)) return
+    if (amount > remaining && !(await confirm({ message: `支払額が残額（${formatCurrency(remaining)}）を超えています。このまま追加しますか？`, confirmLabel: '追加する' }))) return
     onChange([
       ...payments,
       { id: newId(), amount, paidDate: draftDate || todayIso(), method: draftMethod || undefined, note: draftNote || undefined },

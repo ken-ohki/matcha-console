@@ -18,6 +18,7 @@ import { PaymentsEditor } from '@/components/PaymentsEditor'
 import { InstallmentScheduleEditor, hasInstallmentSchedule } from '@/components/InstallmentScheduleEditor'
 import { formatCurrency, formatKg } from '@/lib/format'
 import { uploadPurchaseOrderInvoice, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 // ---- Shared labels / badges -------------------------------------------------
 
@@ -432,6 +433,7 @@ export function PoDatesSection({ form, setForm }: FormProps) {
 }
 
 export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: string }) {
+  const { confirm } = useConfirm()
   const [uploadingInvoice, setUploadingInvoice] = useState(false)
   const [invoiceError, setInvoiceError] = useState('')
   const totals = computePoFormTotals(form)
@@ -499,7 +501,7 @@ export function PoBillingSection({ form, setForm, poId }: FormProps & { poId: st
               <button
                 type="button"
                 onClick={async () => {
-                  if (!confirm('請求書を削除しますか？')) return
+                  if (!(await confirm({ message: '請求書を削除しますか？', confirmLabel: '削除する', danger: true }))) return
                   if (form.invoice?.url) await deleteStorageObjectByUrl(form.invoice.url)
                   setForm(prev => ({ ...prev, invoice: null }))
                 }}

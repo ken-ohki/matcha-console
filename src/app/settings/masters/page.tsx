@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type { MasterEntry, MasterEntryInput, MasterType } from '@/types'
 import { Plus, Save, Settings, Trash2, X } from 'lucide-react'
@@ -47,6 +48,7 @@ export default function SettingsMastersPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const { user } = useAuth()
+  const { confirm } = useConfirm()
 
   const load = async () => {
     setLoading(true)
@@ -95,7 +97,7 @@ export default function SettingsMastersPage() {
       setDrafts(prev => prev.filter((_, i) => i !== index))
       return
     }
-    if (!confirm(`「${row.englishName || row.japaneseName}」を削除しますか？`)) return
+    if (!(await confirm({ message: `「${row.englishName || row.japaneseName}」を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     try {
       const services = await getServices()
       await services.masters.deleteMaster(row.id)

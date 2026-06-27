@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { StockStatusBadge } from '@/components/ui/StatusBadge'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { formatCultivars, formatOptionList } from '@/lib/product-master'
 import { optionsForType, translateValues, type MasterOption } from '@/lib/masters'
 import { getServices } from '@/lib/services'
@@ -396,6 +397,7 @@ export default function InventoryPage() {
   const [dragGroupId, setDragGroupId] = useState<string | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null)
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const router = useRouter()
   const openDetail = (id: string) => router.push(`/inventory/${id}`)
 
@@ -618,7 +620,7 @@ export default function InventoryPage() {
   }
 
   const handleDeleteProduct = async (product: ProductWithInventory) => {
-    if (!confirm(`${product.name} を削除しますか？`)) return
+    if (!(await confirm({ message: `${product.name} を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     try {
       const services = await getServices()
       await services.inventory.deleteProduct(product.id)
@@ -633,7 +635,7 @@ export default function InventoryPage() {
 
   const handleArchiveProduct = async (product: ProductWithInventory) => {
     const next = !product.archived
-    if (next && !confirm(`${product.name} をアーカイブしますか？（一覧・カタログ・受注から除外します。在庫履歴は保持）`)) return
+    if (next && !(await confirm({ message: `${product.name} をアーカイブしますか？（一覧・カタログ・受注から除外します。在庫履歴は保持）`, danger: true, confirmLabel: 'アーカイブする' }))) return
     try {
       const services = await getServices()
       await services.inventory.setProductArchived(product.id, next)
@@ -647,7 +649,7 @@ export default function InventoryPage() {
   }
 
   const handleDeleteGroup = async (group: InventoryGroup) => {
-    if (!confirm(`グループ「${group.name}」を削除しますか？`)) return
+    if (!(await confirm({ message: `グループ「${group.name}」を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     try {
       const services = await getServices()
       await services.inventory.deleteInventoryGroup(group.id)

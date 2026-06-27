@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { PageTabs, PURCHASING_TABS } from '@/components/layout/PageTabs'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type { PurchaseOrder, Supplier, SupplierDetailsInput } from '@/types'
 import { JAPAN_PREFECTURES } from '@/lib/prefectures'
@@ -199,6 +200,7 @@ function SupplierDetailModal({
   const [uploadError, setUploadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const { confirm } = useConfirm()
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -388,7 +390,7 @@ function SupplierDetailModal({
                           <button
                             type="button"
                             onClick={async () => {
-                              if (!confirm(`「${att.name}」を削除しますか？`)) return
+                              if (!(await confirm({ message: `「${att.name}」を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
                               await deleteStorageObjectByUrl(att.url)
                               setForm(prev => ({
                                 ...prev,

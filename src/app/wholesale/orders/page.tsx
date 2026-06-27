@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { formatCurrency } from '@/lib/format'
 import { useStickyState } from '@/hooks/useStickyState'
@@ -110,6 +111,7 @@ type OrdersBucket = 'action' | 'done' | 'all'
 
 export default function WholesaleOrdersPage() {
   const router = useRouter()
+  const { confirm, notify } = useConfirm()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useStickyState<OrdersTab>('orders.tab', 'all')
@@ -172,7 +174,7 @@ export default function WholesaleOrdersPage() {
   // Export the currently-shown list (respects tab / bucket / search / 入金待ち filters).
   const handleExportExcel = () => {
     if (filtered.length === 0) {
-      window.alert('書き出す注文がありません。')
+      notify('書き出す注文がありません。', 'info')
       return
     }
     const fmt = (ms?: number) => (ms ? new Date(ms).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '')
@@ -203,7 +205,7 @@ export default function WholesaleOrdersPage() {
 
   // Inline 入金確認 (manual bank reconciliation) — confirm without opening the order.
   const confirmPayment = async (o: Order) => {
-    if (!window.confirm(`注文「${o.orderNumber}」（¥${(o.totalJpy ?? 0).toLocaleString()} / ${o.memberCompanyName ?? o.contactName ?? ''}）を入金確認済みにしますか？`)) return
+    if (!(await confirm({ title: '入金確認', message: `注文「${o.orderNumber}」（¥${(o.totalJpy ?? 0).toLocaleString()} / ${o.memberCompanyName ?? o.contactName ?? ''}）を入金確認済みにしますか？`, confirmLabel: '確認済みにする' }))) return
     setBusyId(o.id)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -213,7 +215,7 @@ export default function WholesaleOrdersPage() {
       })
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
-        window.alert(`入金確認に失敗しました（${d.error ?? 'error'}）`)
+        notify(`入金確認に失敗しました（${d.error ?? 'error'}）`, 'error')
         return
       }
       await load()
@@ -224,7 +226,7 @@ export default function WholesaleOrdersPage() {
 
   // Release (cancel) an overdue order — frees its stock hold and emails the buyer.
   const releaseOrder = async (o: Order) => {
-    if (!window.confirm(`期限超過の注文「${o.orderNumber}」（${o.memberCompanyName ?? o.contactName ?? ''}）を取消して在庫を解放しますか？\n\nお客様にキャンセル通知メールが送信されます。`)) return
+    if (!(await confirm({ title: '注文の取消', message: `期限超過の注文「${o.orderNumber}」（${o.memberCompanyName ?? o.contactName ?? ''}）を取消して在庫を解放しますか？\n\nお客様にキャンセル通知メールが送信されます。`, confirmLabel: '取消する', danger: true }))) return
     setBusyId(o.id)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -234,7 +236,7 @@ export default function WholesaleOrdersPage() {
       })
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
-        window.alert(`取消に失敗しました（${d.error ?? 'error'}）`)
+        notify(`取消に失敗しました（${d.error ?? 'error'}）`, 'error')
         return
       }
       await load()

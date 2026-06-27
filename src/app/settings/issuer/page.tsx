@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices, type IssuerInfo } from '@/lib/services'
 import { ISSUER } from '@/lib/invoice'
 import { Save, Settings } from 'lucide-react'
@@ -36,6 +37,7 @@ export default function SettingsIssuerPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const isAdmin = user?.role === 'admin'
 
   const load = async () => {
@@ -74,8 +76,8 @@ export default function SettingsIssuerPage() {
     }
   }
 
-  const handleResetDefaults = () => {
-    if (!confirm('デフォルト値で上書きします（保存はしません）。よろしいですか？')) return
+  const handleResetDefaults = async () => {
+    if (!(await confirm({ message: 'デフォルト値で上書きします（保存はしません）。よろしいですか？', danger: true, confirmLabel: 'OK' }))) return
     setForm({
       company: ISSUER.company,
       companyEn: ISSUER.companyEn,

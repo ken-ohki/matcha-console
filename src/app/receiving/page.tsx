@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type {
   InventoryGroup,
@@ -291,6 +292,7 @@ function ReceiveModal({
 
 export default function ReceivingPage() {
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const isAdmin = user?.role === 'admin'
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
   const [products, setProducts] = useState<ProductWithInventory[]>([])
@@ -395,7 +397,7 @@ export default function ReceivingPage() {
   }
 
   const handleUnreceive = async (target: ReceivedLine) => {
-    if (!confirm('この明細の入荷を取り消しますか？（在庫から差し引かれます）')) return
+    if (!(await confirm({ message: 'この明細の入荷を取り消しますか？（在庫から差し引かれます）', danger: true, confirmLabel: '取消する' }))) return
     const services = await getServices()
     await services.purchaseOrders.unreceivePurchaseOrderLine(target.order.id, target.lineIndex)
     await load()
@@ -523,7 +525,7 @@ export default function ReceivingPage() {
                                   <button
                                     type="button"
                                     onClick={async () => {
-                                      if (!confirm(`${product.name} の ${arrival.arrivalDate} の入荷記録（${formatKg(arrival.quantityKg)}）を削除しますか？\n在庫から差し引かれます。`)) return
+                                      if (!(await confirm({ message: `${product.name} の ${arrival.arrivalDate} の入荷記録（${formatKg(arrival.quantityKg)}）を削除しますか？\n在庫から差し引かれます。`, danger: true, confirmLabel: '削除する' }))) return
                                       const services = await getServices()
                                       await services.inventory.deleteArrivalRecord(product.id, arrival.id)
                                       await load()

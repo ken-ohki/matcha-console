@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
@@ -47,6 +48,7 @@ type View = 'list' | 'history' | 'slips'
 
 export default function ShippingPage() {
   const router = useRouter()
+  const { notify } = useConfirm()
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [masters, setMasters] = useState<MasterEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,13 +90,13 @@ export default function ShippingPage() {
   // Issue the delivery note (納品書) PDF to enclose with the shipment.
   const openDeliveryNote = async (id: string) => {
     const current = getFirebaseAuthInstance().currentUser
-    if (!current) { window.alert('未ログインです。'); return }
+    if (!current) { notify('未ログインです。', 'error'); return }
     const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
       headers: { Authorization: `Bearer ${await current.getIdToken()}` },
     })
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      window.alert(`納品書の発行に失敗しました。${d.detail || d.error || ''}`)
+      notify(`納品書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
       return
     }
     window.open(URL.createObjectURL(await res.blob()), '_blank')

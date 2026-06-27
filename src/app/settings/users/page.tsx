@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices, type UserProfile } from '@/lib/services'
 import type { UserRole } from '@/types'
 import { Plus, Save, Settings, ShieldCheck, Trash2, User2, X } from 'lucide-react'
@@ -145,6 +146,7 @@ export default function SettingsUsersPage() {
   const [pendingRoles, setPendingRoles] = useState<Record<string, UserRole>>({})
   const [createOpen, setCreateOpen] = useState(false)
   const { user } = useAuth()
+  const { confirm, notify } = useConfirm()
 
   const load = async () => {
     setLoading(true)
@@ -184,10 +186,10 @@ export default function SettingsUsersPage() {
 
   const handleDelete = async (target: UserProfile) => {
     if (target.uid === user?.uid) {
-      alert('自分自身は削除できません')
+      notify('自分自身は削除できません', 'error')
       return
     }
-    if (!confirm(`${target.email} のユーザーを削除しますか？（ログイン認証ごと無効化されます）`)) return
+    if (!(await confirm({ message: `${target.email} のユーザーを削除しますか？（ログイン認証ごと無効化されます）`, danger: true, confirmLabel: '削除する' }))) return
     try {
       const token = await fetchIdToken()
       const res = await fetch(`/api/admin/users?uid=${encodeURIComponent(target.uid)}`, {

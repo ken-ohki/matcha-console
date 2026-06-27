@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Trash2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type { PurchaseInvoice, PurchaseInvoicePaymentStatus, PurchaseOrderPayment } from '@/types'
 import { InvoiceForm } from '@/components/purchase-invoices/InvoiceForm'
@@ -26,6 +27,7 @@ const PAY_BADGE: Record<PurchaseInvoicePaymentStatus, string> = {
 export default function PurchaseInvoiceDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
+  const { confirm } = useConfirm()
   const id = params.id
 
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null)
@@ -62,7 +64,7 @@ export default function PurchaseInvoiceDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('この請求書を削除しますか？')) return
+    if (!(await confirm({ message: 'この請求書を削除しますか？', danger: true, confirmLabel: '削除する' }))) return
     setDeleting(true)
     setError(null)
     try {

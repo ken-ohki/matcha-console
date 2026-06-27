@@ -15,6 +15,7 @@ import { getServices } from '@/lib/services'
 import { computeInvoiceTotals } from '@/lib/cashflow'
 import { uploadPurchaseInvoiceFile } from '@/lib/firebase/storage'
 import { formatCurrency, todayIso } from '@/lib/format'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { PoLinePicker, type PoLineDraft, draftFromCandidate } from './PoLinePicker'
 import { AdhocLineEditor, type AdhocDraft } from './AdhocLineEditor'
 
@@ -65,6 +66,7 @@ export function InvoiceForm({
   initialPoLine?: { poId: string; lineId: string }
 }) {
   const isEdit = !!invoice
+  const { confirm } = useConfirm()
 
   // --- Header fields ---
   const [supplierName, setSupplierName] = useState(invoice?.supplierName ?? initialSupplier ?? '')
@@ -230,7 +232,7 @@ export function InvoiceForm({
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         if (msg.includes('超過')) {
-          if (!confirm(`${msg}\n\nこのまま請求を登録しますか？`)) {
+          if (!(await confirm({ message: `${msg}\n\nこのまま請求を登録しますか？`, confirmLabel: '登録する' }))) {
             setSaving(false)
             return
           }

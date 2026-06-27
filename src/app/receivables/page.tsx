@@ -17,6 +17,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { getServices } from '@/lib/services'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useModalDismiss } from '@/hooks/useModalDismiss'
 import type { EcSaleRecord, PaymentStatus, SaleRecord, SaleStatus, ShippingStatus } from '@/types'
 import { computeSaleTaxIncluded } from '@/lib/cashflow'
@@ -59,6 +60,7 @@ const BUCKET_LABELS = makeBucketLabels('入金済')
 
 export default function ReceivablesPage() {
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   // 経理ページ: admin と finance のみ編集可。viewer は閲覧のみ。
   const canEdit = user?.role === 'admin' || user?.role === 'finance'
   const [sales, setSales] = useState<SaleRecord[]>([])
@@ -144,7 +146,7 @@ export default function ReceivablesPage() {
   }
 
   const unconfirmPaid = async (sale: SaleRecord) => {
-    if (!confirm(`${sale.buyerName} の入金確認を取り消して「請求済」に戻しますか？\n入金日・入金確認日もクリアされます。`)) return
+    if (!(await confirm({ message: `${sale.buyerName} の入金確認を取り消して「請求済」に戻しますか？\n入金日・入金確認日もクリアされます。`, danger: true, confirmLabel: '取消す' }))) return
     setSavingId(sale.id)
     setFeedback(null)
     try {

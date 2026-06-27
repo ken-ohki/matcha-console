@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices, type TermsSection } from '@/lib/services'
 import { TERMS_AND_CONDITIONS_EN } from '@/lib/invoice'
 import { ArrowDown, ArrowUp, Plus, Save, Settings, Trash2 } from 'lucide-react'
@@ -14,6 +15,7 @@ export default function SettingsTermsPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const isAdmin = user?.role === 'admin'
 
   const load = async () => {
@@ -35,8 +37,8 @@ export default function SettingsTermsPage() {
   const handleAdd = () => {
     setSections(prev => [...prev, { heading: '', body: '' }])
   }
-  const handleRemove = (index: number) => {
-    if (!confirm('このセクションを削除しますか？')) return
+  const handleRemove = async (index: number) => {
+    if (!(await confirm({ message: 'このセクションを削除しますか？', danger: true, confirmLabel: '削除する' }))) return
     setSections(prev => prev.filter((_, i) => i !== index))
   }
   const handleUpdate = (index: number, key: 'heading' | 'body', value: string) => {
@@ -69,8 +71,8 @@ export default function SettingsTermsPage() {
     }
   }
 
-  const handleResetToDefault = () => {
-    if (!confirm('デフォルトの内容で上書きします（保存はしません）。よろしいですか？')) return
+  const handleResetToDefault = async () => {
+    if (!(await confirm({ message: 'デフォルトの内容で上書きします（保存はしません）。よろしいですか？', danger: true, confirmLabel: 'OK' }))) return
     setSections(TERMS_AND_CONDITIONS_EN.map(s => ({ heading: s.heading, body: s.body })))
   }
 

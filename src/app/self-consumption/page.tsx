@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type {
   ProductWithInventory,
@@ -215,6 +216,7 @@ export default function SelfConsumptionPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<SelfConsumptionRecord | null>(null)
   const [message, setMessage] = useState('')
+  const { confirm } = useConfirm()
 
   const load = async () => {
     setLoading(true)
@@ -270,7 +272,7 @@ export default function SelfConsumptionPage() {
   }
 
   const handleDelete = async (record: SelfConsumptionRecord) => {
-    if (!confirm(`${record.productName} の自社消費記録を削除しますか？`)) return
+    if (!(await confirm({ message: `${record.productName} の自社消費記録を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     const services = await getServices()
     await services.selfConsumption.deleteSelfConsumptionRecord(record.id)
     setMessage('自社消費を削除しました')

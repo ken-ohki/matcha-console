@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Check, X, Ban, RefreshCw } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 
@@ -105,6 +106,7 @@ function fmtDate(ms?: number): string {
 export default function WholesaleMemberDetailPage({ params }: { params: Promise<{ uid: string }> }) {
   const { uid } = use(params)
   const { user } = useAuth()
+  const { confirm, notify } = useConfirm()
   // 会員の審査・編集・ログイン支援は admin 限定（viewer/finance は閲覧のみ）。
   const isAdmin = user?.role === 'admin'
   const [member, setMember] = useState<Member | null>(null)
@@ -226,9 +228,9 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
 
   const sendPasswordReset = async () => {
     const isInvite = member?.source === 'manual' && !member?.migratedToUid
-    if (!window.confirm(isInvite
+    if (!(await confirm({ message: isInvite
       ? 'この会員の登録メール宛に、ログイン招待（パスワード設定メール）を送信しますか？初回ログイン時に過去の注文履歴が引き継がれます。'
-      : 'この会員の登録メールアドレス宛に、パスワード再設定メールを送信しますか？')) return
+      : 'この会員の登録メールアドレス宛に、パスワード再設定メールを送信しますか？' }))) return
     setBusy(true)
     setError(null)
     try {
@@ -238,7 +240,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
         body: '{}',
       })
       const d = (await res.json().catch(() => ({}))) as { ok?: boolean; email?: string; error?: string; invited?: boolean }
-      window.alert(
+      notify(
         d.ok
           ? d.invited
             ? `ログイン招待メールを ${d.email} に送信しました。`
@@ -250,6 +252,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
               : d.error === 'no_password_account'
                 ? 'この会員はGoogleログイン（パスワードなし）のため、パスワード再設定はできません。「Googleでログイン」をご案内ください。'
                 : `送信に失敗しました（${d.error ?? 'error'}）`,
+        d.ok ? 'success' : 'error',
       )
     } finally {
       setBusy(false)

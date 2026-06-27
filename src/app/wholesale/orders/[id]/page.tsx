@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { MasterEntry } from '@/types'
@@ -130,6 +131,7 @@ export default function WholesaleOrderDetailPage() {
   const [linkCopied, setLinkCopied] = useState(false)
   const [adminMemo, setAdminMemo] = useState('')
   const [shippingMemo, setShippingMemo] = useState('')
+  const { confirm, notify } = useConfirm()
 
   const copyLink = (url: string) => {
     navigator.clipboard?.writeText(url).then(
@@ -148,7 +150,7 @@ export default function WholesaleOrderDetailPage() {
         body: JSON.stringify({ orderId: order.id, action: 'set_memos', adminMemo, shippingMemo }),
       })
       const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-      if (!res.ok) window.alert(`保存に失敗しました（${d.error ?? 'error'}）`)
+      if (!res.ok) notify(`保存に失敗しました（${d.error ?? 'error'}）`, 'error')
       else await load()
     } finally {
       setBusy(false)
@@ -197,7 +199,7 @@ export default function WholesaleOrderDetailPage() {
   }, [load])
 
   const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
-    if (action === 'accept_quote' && !window.confirm('お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）')) return
+    if (action === 'accept_quote' && !(await confirm({ message: 'お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）', confirmLabel: '確定する' }))) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
     if (action === 'cancel') {
@@ -205,14 +207,14 @@ export default function WholesaleOrderDetailPage() {
         const note = order?.paymentMethod === 'bank_transfer'
           ? 'この注文は入金済み（銀行振込）です。取消しても自動返金は行われません。返金は手動でお振込ください。'
           : 'この注文はStripeで決済済みです。取消しても自動返金は行われません。Stripeダッシュボードで手動返金が必要です。'
-        if (!window.confirm(`${note}\n\n取消して在庫予約を解放しますか？`)) return
-      } else if (!window.confirm('この注文を取消し、在庫予約を解放しますか？')) {
+        if (!(await confirm({ title: '注文の取消', message: `${note}\n\n取消して在庫予約を解放しますか？`, confirmLabel: '取消する', danger: true }))) return
+      } else if (!(await confirm({ title: '注文の取消', message: 'この注文を取消し、在庫予約を解放しますか？', confirmLabel: '取消する', danger: true }))) {
         return
       }
     }
-    if (action === 'approve' && !window.confirm('この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？')) return
-    if (action === 'resend_payment_link' && !window.confirm('新しいStripeカード決済リンクを発行しますか？（メールは送信されません。発行後、画面に表示されるリンクをお客様にお伝えください）')) return
-    if (action === 'notify_shipped' && order?.shipmentEmailedAt && !window.confirm('発送通知メールは既に送信済みです。もう一度送信しますか？')) return
+    if (action === 'approve' && !(await confirm({ message: 'この注文を承認し、お客様へ支払い案内（カード=支払いリンク／振込=振込案内）を送信しますか？', confirmLabel: '承認する' }))) return
+    if (action === 'resend_payment_link' && !(await confirm({ message: '新しいStripeカード決済リンクを発行しますか？（メールは送信されません。発行後、画面に表示されるリンクをお客様にお伝えください）', confirmLabel: '発行する' }))) return
+    if (action === 'notify_shipped' && order?.shipmentEmailedAt && !(await confirm({ message: '発送通知メールは既に送信済みです。もう一度送信しますか？', confirmLabel: '再送する' }))) return
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -223,7 +225,7 @@ export default function WholesaleOrderDetailPage() {
       })
       if (action === 'notify_shipped') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-        window.alert(d.ok ? '発送通知メールを送信しました。' : `送信に失敗しました（${d.error ?? 'error'}）`)
+        notify(d.ok ? '発送通知メールを送信しました。' : `送信に失敗しました（${d.error ?? 'error'}）`, d.ok ? 'success' : 'error')
       }
       if (action === 'approve') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
@@ -232,7 +234,7 @@ export default function WholesaleOrderDetailPage() {
           : d.error === 'overseas_shipping_required'
             ? '海外発送の送料を設定してから承認してください（注文を編集して送料を入力）。'
             : `承認に失敗しました（${d.error ?? 'error'}）`
-        window.alert(msg)
+        notify(msg, d.ok ? 'success' : 'error')
       }
       if (action === 'accept_quote') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
@@ -241,7 +243,7 @@ export default function WholesaleOrderDetailPage() {
           : d.error === 'quote_expired'
             ? '見積の有効期限が切れています。この見積は自動取消の対象のため確定できません。再度見積を作成してください。'
             : `確定に失敗しました（${d.error ?? 'error'}）`
-        window.alert(msg)
+        notify(msg, d.ok ? 'success' : 'error')
       }
       if (action === 'resend_payment_link') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; checkoutUrl?: string; error?: string }
@@ -252,7 +254,7 @@ export default function WholesaleOrderDetailPage() {
             : d.error === 'insufficient_stock'
               ? '在庫が不足しているため決済リンクを発行できません。'
               : `発行に失敗しました（${d.error ?? 'error'}）`
-        window.alert(msg)
+        notify(msg, d.ok ? 'success' : 'error')
       }
       if (action === 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
@@ -265,19 +267,20 @@ export default function WholesaleOrderDetailPage() {
                 : d.error === 'not_card_order'
                   ? 'カード決済の注文ではありません。'
                   : `取得に失敗しました（${d.error ?? 'error'}）`
-          window.alert(msg)
+          notify(msg, 'error')
         }
       }
       // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
       if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link' && action !== 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
-        window.alert(`操作に失敗しました（${d.error ?? 'error'}）`)
+        notify(`操作に失敗しました（${d.error ?? 'error'}）`, 'error')
       }
       if (action === 'cancel' && res.ok && wasPaid) {
-        window.alert(
+        notify(
           order?.paymentMethod === 'bank_transfer'
             ? '取消しました。入金済みのため、返金（お振込）を手動で対応してください。'
             : '取消しました。Stripeダッシュボードで返金処理を行ってください（自動返金はされていません）。',
+          'info',
         )
       }
       await load()
@@ -290,10 +293,11 @@ export default function WholesaleOrderDetailPage() {
   // and require typing the order number so a real order can't be removed by a stray click.
   const deleteOrder = async () => {
     if (!order) return
-    if (!window.confirm(`注文「${order.orderNumber}」を完全に削除します。\n\nこの操作は元に戻せません。テスト注文のみ削除してください。\n紐づく在庫引当（ec_sales）も削除し、在庫を解放します。`)) return
+    if (!(await confirm({ title: '注文を完全に削除', message: `注文「${order.orderNumber}」を完全に削除します。\n\nこの操作は元に戻せません。テスト注文のみ削除してください。\n紐づく在庫引当（ec_sales）も削除し、在庫を解放します。`, confirmLabel: '削除に進む', danger: true }))) return
+    // 取り違え防止の最終ゲート: 注文番号の手入力一致を要求（テキスト入力のため prompt を維持）。
     const typed = window.prompt(`確認のため注文番号「${order.orderNumber}」を入力してください`, '')
     if (typed === null) return
-    if (typed.trim() !== order.orderNumber) { window.alert('注文番号が一致しません。削除を中止しました。'); return }
+    if (typed.trim() !== order.orderNumber) { notify('注文番号が一致しません。削除を中止しました。', 'error'); return }
     setBusy(true)
     try {
       const res = await fetch('/api/wholesale/orders', {
@@ -302,8 +306,8 @@ export default function WholesaleOrderDetailPage() {
         body: JSON.stringify({ orderId: order.id, action: 'delete_order' }),
       })
       const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-      if (!res.ok) { window.alert(`削除に失敗しました（${d.error ?? 'error'}）`); return }
-      window.alert('注文を削除しました。')
+      if (!res.ok) { notify(`削除に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
+      notify('注文を削除しました。', 'success')
       router.push('/wholesale/orders')
     } finally {
       setBusy(false)
@@ -332,10 +336,10 @@ export default function WholesaleOrderDetailPage() {
   const saveEdit = async () => {
     if (!edit || !order) return
     const items = edit.items.filter(i => i.productId).map(i => ({ productId: i.productId, quantityKg: Number(i.quantityKg) || 0, unitPriceJpy: Number(i.unitPriceJpy) || 0, taxRate: i.taxRate }))
-    if (items.length === 0) { window.alert('商品を1つ以上指定してください'); return }
+    if (items.length === 0) { notify('商品を1つ以上指定してください', 'error'); return }
     // Guard against 原価割れ — warn (but allow) when a unit price is below cost/kg.
     const belowCost = items.filter(i => { const c = costByProduct[i.productId]; return c != null && i.unitPriceJpy < c })
-    if (belowCost.length > 0 && !window.confirm(`単価が原価を下回っている商品が ${belowCost.length} 件あります（原価割れ）。このまま保存しますか？`)) return
+    if (belowCost.length > 0 && !(await confirm({ message: `単価が原価を下回っている商品が ${belowCost.length} 件あります（原価割れ）。このまま保存しますか？`, confirmLabel: 'このまま保存' }))) return
     const feeLines = edit.feeLines
       .filter(f => f.name.trim())
       .map(f => ({ name: f.name.trim(), quantity: Number(f.quantity) || 0, unitPriceJpy: Number(f.unitPriceJpy) || 0, taxRate: f.taxRate }))
@@ -353,7 +357,7 @@ export default function WholesaleOrderDetailPage() {
         }),
       })
       const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-      if (!res.ok) { window.alert(`保存に失敗しました（${d.error ?? 'error'}）`); return }
+      if (!res.ok) { notify(`保存に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
       setEditing(false); setEdit(null)
       await load()
     } finally { setBusy(false) }
@@ -373,10 +377,11 @@ export default function WholesaleOrderDetailPage() {
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) {
-        window.alert(
+        notify(
           data.error === 'insufficient_stock'
             ? '在庫が不足しているため見積を確定できません。'
             : `見積の確定に失敗しました（${data.error ?? 'error'}）`,
+          'error',
         )
         return
       }
@@ -397,7 +402,7 @@ export default function WholesaleOrderDetailPage() {
     })
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      window.alert(`領収書の発行に失敗しました。${d.detail || d.error || ''}`)
+      notify(`領収書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
       return
     }
     const blob = await res.blob()
@@ -411,7 +416,7 @@ export default function WholesaleOrderDetailPage() {
     })
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      window.alert(`見積書の発行に失敗しました。${d.detail || d.error || ''}`)
+      notify(`見積書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
       return
     }
     window.open(URL.createObjectURL(await res.blob()), '_blank')
@@ -424,7 +429,7 @@ export default function WholesaleOrderDetailPage() {
     })
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      window.alert(`請求書の発行に失敗しました。${d.detail || d.error || ''}`)
+      notify(`請求書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
       return
     }
     window.open(URL.createObjectURL(await res.blob()), '_blank')
@@ -437,7 +442,7 @@ export default function WholesaleOrderDetailPage() {
     })
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      window.alert(`納品書の発行に失敗しました。${d.detail || d.error || ''}`)
+      notify(`納品書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
       return
     }
     const blob = await res.blob()
@@ -861,7 +866,7 @@ export default function WholesaleOrderDetailPage() {
               )}
               {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
                 <button
-                  onClick={() => { if (window.confirm('Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。')) act('confirm_payment') }}
+                  onClick={async () => { if (await confirm({ title: '入金の手動確定', message: 'Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。', confirmLabel: '確定する' })) act('confirm_payment') }}
                   disabled={busy}
                   className="btn-ghost"
                 >入金を手動確認（カード）</button>

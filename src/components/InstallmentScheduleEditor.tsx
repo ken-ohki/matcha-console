@@ -5,6 +5,7 @@ import { CheckCircle2, RotateCcw } from 'lucide-react'
 import type { PurchaseOrderPayment } from '@/types'
 import { PAYMENT_METHODS } from '@/lib/payment-methods'
 import { formatCurrency, todayIso } from '@/lib/format'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 function newId(): string {
   try {
@@ -41,6 +42,7 @@ export function InstallmentScheduleEditor({
   onChange: (next: PurchaseOrderPayment[]) => void
   disabled?: boolean
 }) {
+  const { confirm } = useConfirm()
   const deposit = payments.find(p => p.kind === 'deposit')
   const balance = payments.find(p => p.kind === 'balance')
   const hasSchedule = !!deposit || !!balance
@@ -80,8 +82,8 @@ export function InstallmentScheduleEditor({
     updateStage(kind, { paid: false, paidDate: '' })
   }
 
-  const clearSchedule = () => {
-    if (!confirm('前払金＋残金の分割払い設定を解除します。よろしいですか？')) return
+  const clearSchedule = async () => {
+    if (!(await confirm({ message: '前払金＋残金の分割払い設定を解除します。よろしいですか？', confirmLabel: '解除する', danger: true }))) return
     onChange(payments.filter(p => p.kind !== 'deposit' && p.kind !== 'balance'))
   }
 

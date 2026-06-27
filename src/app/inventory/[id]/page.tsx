@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { StockStatusBadge } from '@/components/ui/StatusBadge'
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
 import type {
@@ -84,6 +85,7 @@ export default function ProductDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const { user } = useAuth()
+  const { confirm } = useConfirm()
   const canEdit = user?.role === 'admin'
 
   const [product, setProduct] = useState<ProductWithInventory | null>(null)
@@ -255,7 +257,7 @@ export default function ProductDetailPage() {
 
   const handleDelete = async () => {
     if (!product) return
-    if (!confirm(`${product.name} を削除しますか？`)) return
+    if (!(await confirm({ message: `${product.name} を削除しますか？`, danger: true, confirmLabel: '削除する' }))) return
     const services = await getServices()
     await services.inventory.deleteProduct(product.id)
     router.push('/inventory')
