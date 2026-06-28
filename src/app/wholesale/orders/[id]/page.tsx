@@ -9,7 +9,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { MasterEntry } from '@/types'
-import { ArrowLeft, RefreshCw, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Plus, Trash2 } from 'lucide-react'
 
 interface OrderItem {
   productId?: string
@@ -126,48 +126,9 @@ const CARRIER_LABEL: Record<string, string> = {
   designated: '御社指定業者',
 }
 
-// ---- Document edit-before-issue ----
-type DocType = 'quotation' | 'invoice' | 'proforma' | 'commercial' | 'packingList' | 'receipt' | 'deliveryNote'
-const DOC_ROUTE: Record<DocType, string> = {
-  quotation: 'quotation', invoice: 'invoice', proforma: 'proforma-invoice',
-  commercial: 'commercial-invoice', packingList: 'packing-list', receipt: 'receipt', deliveryNote: 'delivery-note',
-}
-const DOC_LABEL: Record<DocType, string> = {
-  quotation: '見積書', invoice: '請求書', proforma: 'Proforma Invoice',
-  commercial: 'Commercial Invoice', packingList: 'Packing List', receipt: '領収書', deliveryNote: '納品書',
-}
-interface DocField { key: string; label: string; type?: 'text' | 'textarea' | 'number' | 'date' }
-const CONSIGNEE_FIELDS: DocField[] = [
-  { key: 'contactName', label: '担当者' },
-  { key: 'shippingPostalCode', label: '郵便番号' },
-  { key: 'shippingAddress', label: '住所', type: 'textarea' },
-  { key: 'shippingCountry', label: '国' },
-  { key: 'phone', label: '電話' },
-  { key: 'shippingEmail', label: 'Email' },
-  { key: 'buyerTaxId', label: '先方 税番号/VAT' },
-]
-const NOTES_FIELD: DocField = { key: 'notes', label: '備考', type: 'textarea' }
-const DOC_FIELDS: Record<DocType, DocField[]> = {
-  commercial: [
-    ...CONSIGNEE_FIELDS,
-    { key: 'incoterms', label: 'Incoterms' }, { key: 'incotermsPlace', label: 'Place of Incoterm' },
-    { key: 'reasonForExport', label: 'Reason for Export' }, { key: 'typeOfExport', label: 'Type of Export' },
-    { key: 'dutyPayer', label: 'Duty/taxes acct' }, { key: 'payerOfVat', label: 'Payer of GST/VAT' },
-    { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
-    { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
-  ],
-  packingList: [
-    ...CONSIGNEE_FIELDS,
-    { key: 'incoterms', label: 'Incoterms' }, { key: 'incotermsPlace', label: 'Place of Incoterm' },
-    { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
-    { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
-  ],
-  proforma: [...CONSIGNEE_FIELDS, { key: 'proformaValidUntil', label: '有効期限（空欄=自動）', type: 'date' }, NOTES_FIELD],
-  invoice: [{ key: 'buyerTaxId', label: '先方 登録番号/Tax ID' }, NOTES_FIELD],
-  deliveryNote: [...CONSIGNEE_FIELDS, { key: 'shippingCarrierLabel', label: '配送業者' }, { key: 'trackingNumber', label: '追跡番号' }, NOTES_FIELD],
-  quotation: [{ key: 'quotationValidUntil', label: '有効期限（空欄=自動）', type: 'date' }, NOTES_FIELD],
-  receipt: [{ key: 'receiptAtena', label: '宛名' }, { key: 'receiptProviso', label: '但し書き' }],
-}
+// 自動生成書類のダウンロード用ルート（注文データから都度生成）。
+const DOC_ROUTE = { invoice: 'invoice', proforma: 'proforma-invoice', receipt: 'receipt', deliveryNote: 'delivery-note' } as const
+type DocKind = keyof typeof DOC_ROUTE
 
 export default function WholesaleOrderDetailPage() {
   const router = useRouter()
@@ -183,10 +144,6 @@ export default function WholesaleOrderDetailPage() {
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
-  const [grossWeight, setGrossWeight] = useState('')
-  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string>; itemNames: Record<string, string>; itemHsCodes: Record<string, string> } | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewing, setPreviewing] = useState(false)
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -235,7 +192,6 @@ export default function WholesaleOrderDetailPage() {
       setOrder(found)
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
-      setGrossWeight(found?.grossWeightKg != null ? String(found.grossWeightKg) : '')
       setAdminMemo(found?.adminMemo ?? '')
       setShippingMemo(found?.shippingMemo ?? '')
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
@@ -454,82 +410,18 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
-  // 発行前の編集モーダルを開く（注文の現在値を初期表示）。
-  const openDoc = (docType: DocType) => {
-    if (!order) return
-    const src = order as unknown as Record<string, unknown>
-    const fields: Record<string, string> = {}
-    for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
-    const itemNames: Record<string, string> = {}
-    const itemHsCodes: Record<string, string> = {}
-    ;(order.items ?? []).forEach((it, i) => { itemNames[String(i)] = it.productName ?? ''; itemHsCodes[String(i)] = it.hsCode ?? '' })
-    setDocModal({ docType, lang: docType === 'commercial' || docType === 'packingList' ? 'en' : 'ja', fields, itemNames, itemHsCodes })
-  }
-
-  // 発行履歴から保存版の書類を開く（再発行はしない）。
-  const viewSavedDoc = async (route: string, lang: string) => {
-    const res = await fetch(`/api/wholesale/orders/${id}/${route}?lang=${lang}`, {
+  // 自動生成書類をダウンロード（注文データから都度生成）。
+  const downloadDoc = async (kind: DocKind) => {
+    const res = await fetch(`/api/wholesale/orders/${id}/${DOC_ROUTE[kind]}`, {
       headers: { Authorization: `Bearer ${await token()}` },
     })
-    if (!res.ok) { notify('書類の取得に失敗しました', 'error'); return }
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      notify(`書類の取得に失敗しました。${d.detail || d.error || ''}`, 'error')
+      return
+    }
     window.open(URL.createObjectURL(await res.blob()), '_blank')
   }
-
-  // 編集内容を保存 → 再発行（Storage上書き＋履歴記録）→ PDFを開く。
-  const issueDoc = async () => {
-    if (!docModal || !order) return
-    setBusy(true)
-    try {
-      const save = await fetch('/api/wholesale/orders', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields, itemNames: docModal.itemNames, itemHsCodes: docModal.itemHsCodes }),
-      })
-      if (!save.ok) {
-        const d = (await save.json().catch(() => ({}))) as { error?: string }
-        notify(`保存に失敗しました（${d.error ?? 'error'}）`, 'error')
-        return
-      }
-      const res = await fetch(`/api/wholesale/orders/${id}/${DOC_ROUTE[docModal.docType]}?lang=${docModal.lang}&reissue=1`, {
-        headers: { Authorization: `Bearer ${await token()}` },
-      })
-      if (!res.ok) {
-        const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-        notify(`${DOC_LABEL[docModal.docType]}の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-        return
-      }
-      window.open(URL.createObjectURL(await res.blob()), '_blank')
-      setDocModal(null)
-      await load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // ライブプレビュー: モーダルの編集内容を保存せずにPDF描画し、iframeで表示（デバウンス）。
-  useEffect(() => {
-    if (!docModal) { setPreviewUrl(null); return }
-    let cancelled = false
-    const timer = setTimeout(async () => {
-      setPreviewing(true)
-      try {
-        const res = await fetch(`/api/wholesale/orders/${id}/document-preview`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-          body: JSON.stringify({ docType: docModal.docType, lang: docModal.lang, fields: docModal.fields, itemNames: docModal.itemNames, itemHsCodes: docModal.itemHsCodes }),
-        })
-        if (cancelled || !res.ok) return
-        const u = URL.createObjectURL(await res.blob())
-        if (cancelled) { URL.revokeObjectURL(u); return }
-        setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return u })
-      } catch {
-        /* preview is best-effort */
-      } finally {
-        if (!cancelled) setPreviewing(false)
-      }
-    }, 600)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [docModal, id])
 
   const o = order
 
@@ -550,11 +442,9 @@ export default function WholesaleOrderDetailPage() {
   const canQuote = o?.origin === 'direct' && o?.status !== 'cancelled'
   const canInvoice = !!o && !['pending_acceptance', 'pending_approval', 'pending_quote', 'cancelled'].includes(o.status ?? '')
   const canReceiptDelivery = o?.status === 'paid' || o?.status === 'shipped'
-  // 越境(輸出)注文: 発送前は Proforma、発送後は Commercial Invoice。国内は従来の請求書。
+  // 越境(輸出)注文は Proforma を発行可（請求書は国内のみ）。
   const isExport = o?.isDomestic === false
   const canProforma = isExport && !!o && !['pending_quote', 'pending_acceptance', 'pending_approval', 'cancelled'].includes(o.status ?? '')
-  const canCommercial = isExport && (o?.status === 'shipped' || !!o?.awbNo)
-  const canPackingList = canCommercial
 
   return (
     <AppLayout>
@@ -912,12 +802,9 @@ export default function WholesaleOrderDetailPage() {
                       {carrierLabel && !carriers.some(c => c.englishName === carrierLabel) && <option value={carrierLabel}>{carrierLabel}（旧値）</option>}
                     </select>
                   </label>
-                  <label className="text-xs text-mist">{o.isDomestic === false ? '追跡番号 / AWB番号' : '追跡番号'}<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} placeholder={o.isDomestic === false ? '航空貨物番号(AWB)' : ''} /></label>
-                  {o.isDomestic === false && (
-                    <label className="text-xs text-mist">総重量(kg)<input type="number" step="0.001" className="mt-1 block w-28 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} placeholder="gross" /></label>
-                  )}
+                  <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
                   {(() => {
-                    const shipFields = { trackingNumber: tracking, shippingCarrierLabel: carrierLabel, grossWeightKg: Number(grossWeight) || undefined }
+                    const shipFields = { trackingNumber: tracking, shippingCarrierLabel: carrierLabel }
                     return o.status === 'shipped' ? (
                       <>
                         <button onClick={() => act('set_fulfillment', shipFields)} disabled={busy} className="btn-primary">出荷情報を更新</button>
@@ -964,50 +851,22 @@ export default function WholesaleOrderDetailPage() {
                   className="btn-ghost"
                 >入金を手動確認（カード）</button>
               )}
-              {isAdmin && canQuote && (
-                <button onClick={() => openDoc('quotation')} disabled={busy} className="btn-ghost">見積書を発行</button>
-              )}
               {isAdmin && canInvoice && !isExport && (
-                <button onClick={() => openDoc('invoice')} disabled={busy} className="btn-ghost">請求書を発行</button>
+                <button onClick={() => downloadDoc('invoice')} disabled={busy} className="btn-ghost">請求書</button>
               )}
               {isAdmin && canProforma && (
-                <button onClick={() => openDoc('proforma')} disabled={busy} className="btn-ghost">Proforma Invoice発行</button>
-              )}
-              {isAdmin && canCommercial && (
-                <button onClick={() => openDoc('commercial')} disabled={busy} className="btn-ghost">Commercial Invoice発行</button>
-              )}
-              {isAdmin && canPackingList && (
-                <button onClick={() => openDoc('packingList')} disabled={busy} className="btn-ghost">Packing List発行</button>
+                <button onClick={() => downloadDoc('proforma')} disabled={busy} className="btn-ghost">Proforma Invoice</button>
               )}
               {isAdmin && canReceiptDelivery && (
-                <button onClick={() => openDoc('receipt')} disabled={busy} className="btn-ghost">領収書を発行</button>
+                <button onClick={() => downloadDoc('receipt')} disabled={busy} className="btn-ghost">領収書</button>
               )}
-              {isAdmin && canReceiptDelivery && (
-                <button onClick={() => openDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書を発行</button>
+              {isAdmin && canReceiptDelivery && !isExport && (
+                <button onClick={() => downloadDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書</button>
               )}
               {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
             </div>
-
-            {/* 発行履歴 — 保存済みの書類を後から開ける */}
-            {isAdmin && o.documents && Object.keys(o.documents).length > 0 && (
-              <div className="mt-2 rounded-lg border border-line bg-white p-4">
-                <p className="mb-2 text-xs font-mono uppercase tracking-brand text-mist">発行履歴</p>
-                <ul className="space-y-1 text-sm">
-                  {(Object.keys(o.documents) as DocType[]).flatMap(dt =>
-                    Object.entries(o.documents![dt] || {}).map(([lang, meta]) => (
-                      <li key={`${dt}-${lang}`} className="flex items-center justify-between gap-3 border-b border-line/40 pb-1">
-                        <button onClick={() => viewSavedDoc(DOC_ROUTE[dt] ?? dt, lang)} className="text-left text-matchaDeep underline hover:opacity-80">
-                          {DOC_LABEL[dt] ?? dt}{meta.no ? `（${meta.no}）` : ''} <span className="text-xs text-mist">[{lang}]</span>
-                        </button>
-                        {meta.issuedAt && <span className="shrink-0 text-xs text-mist">{meta.issuedAt.slice(0, 16).replace('T', ' ')}</span>}
-                      </li>
-                    )),
-                  )}
-                </ul>
-              </div>
-            )}
 
             {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
             {isAdmin && (
@@ -1019,87 +878,6 @@ export default function WholesaleOrderDetailPage() {
           </div>
         )}
       </div>
-
-      {/* 書類の発行前 編集モーダル（左=編集 / 右=ライブプレビュー） */}
-      {docModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setDocModal(null)} role="presentation">
-          <div className="flex h-[94vh] w-full max-w-7xl flex-col rounded-2xl border border-line bg-white shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="flex items-center justify-between border-b border-line px-5 py-3">
-              <h2 className="text-lg font-semibold text-ink">{DOC_LABEL[docModal.docType]} の発行</h2>
-              <div className="flex items-center gap-3">
-                {previewUrl && <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-matchaDeep underline">別タブで開く</a>}
-                <button onClick={() => setDocModal(null)} className="text-mist hover:text-ink" aria-label="閉じる"><X size={18} /></button>
-              </div>
-            </div>
-            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[340px_1fr]">
-              {/* 編集 */}
-              <div className="min-h-0 space-y-3 overflow-y-auto border-b border-line p-5 md:border-b-0 md:border-r">
-                <p className="text-xs text-mist">計算に影響しない項目を編集できます（数量・単価・金額は変更不可）。</p>
-                {docModal.docType !== 'commercial' && docModal.docType !== 'packingList' && (
-                  <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
-                    <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'ja' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
-                    <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
-                  </div>
-                )}
-                {/* 商品名・HSコード（表示のみ・金額に影響しない） */}
-                {(order?.items ?? []).length > 0 && (() => {
-                  const showHs = docModal.docType === 'commercial' || docModal.docType === 'packingList'
-                  return (
-                    <div className="rounded-lg border border-line p-3">
-                      <p className="mb-2 text-xs font-medium text-graphite">商品名{showHs ? ' / HSコード' : ''}</p>
-                      <div className="space-y-2">
-                        {(order?.items ?? []).map((it, i) => (
-                          <div key={i} className="flex gap-2">
-                            <input
-                              value={docModal.itemNames[String(i)] ?? ''}
-                              onChange={e => setDocModal(m => (m ? { ...m, itemNames: { ...m.itemNames, [String(i)]: e.target.value } } : m))}
-                              className="flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
-                              placeholder={it.productName}
-                            />
-                            {showHs && (
-                              <input
-                                value={docModal.itemHsCodes[String(i)] ?? ''}
-                                onChange={e => setDocModal(m => (m ? { ...m, itemHsCodes: { ...m.itemHsCodes, [String(i)]: e.target.value } } : m))}
-                                className="w-28 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
-                                placeholder="HSコード"
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
-                {DOC_FIELDS[docModal.docType].map(f => (
-                  <div key={f.key}>
-                    <label className="mb-1 block text-xs text-mist">{f.label}</label>
-                    {f.type === 'textarea' ? (
-                      <textarea rows={2} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
-                    ) : (
-                      <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
-                    )}
-                  </div>
-                ))}
-              </div>
-              {/* プレビュー */}
-              <div className="relative min-h-[40vh] bg-bone md:min-h-0">
-                {previewUrl ? (
-                  <iframe src={previewUrl} title="preview" className="h-full min-h-[40vh] w-full" />
-                ) : (
-                  <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-mist">プレビューを生成中…</div>
-                )}
-                {previewing && previewUrl && (
-                  <div className="absolute right-2 top-2 rounded bg-ink/70 px-2 py-1 text-[11px] text-paper">更新中…</div>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
-              <button onClick={() => setDocModal(null)} className="btn-ghost">キャンセル</button>
-              <button onClick={issueDoc} disabled={busy} className="btn-primary">{busy ? '発行中…' : '発行'}</button>
-            </div>
-          </div>
-        </div>
-      )}
     </AppLayout>
   )
 }
