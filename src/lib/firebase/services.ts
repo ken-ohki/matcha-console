@@ -2393,7 +2393,7 @@ export function createFirebaseServices(): IServices {
       const snap = await getDoc(doc(db, COLLECTIONS.settings, 'export'))
       const data = snap.data() ?? {}
       return {
-        incotermsDefault: String(data.incotermsDefault ?? 'FOB'),
+        incotermsDefault: String(data.incotermsDefault ?? 'CIP'),
         incotermsPlace: String(data.incotermsPlace ?? ''),
         reasonForExport: String(data.reasonForExport ?? 'Commercial'),
         typeOfExport: String(data.typeOfExport ?? 'Commercial Purposes/Sale'),

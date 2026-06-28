@@ -8,7 +8,7 @@ import { getServices, type ExportSettingsInfo } from '@/lib/services'
 import { Save, Settings } from 'lucide-react'
 
 const EMPTY: ExportSettingsInfo = {
-  incotermsDefault: 'FOB',
+  incotermsDefault: 'CIP',
   incotermsPlace: '',
   reasonForExport: 'Commercial',
   typeOfExport: 'Commercial Purposes/Sale',
@@ -18,7 +18,7 @@ const EMPTY: ExportSettingsInfo = {
 }
 
 const FIELDS: { key: keyof ExportSettingsInfo; label: string; placeholder?: string; full?: boolean }[] = [
-  { key: 'incotermsDefault', label: 'Incoterms（取引条件）の既定', placeholder: 'FOB / CIF / DAP 等' },
+  { key: 'incotermsDefault', label: 'Incoterms（取引条件）の既定', placeholder: 'CIP / CIF / DAP / FOB 等' },
   { key: 'incotermsPlace', label: 'Place of Incoterm（地名）', placeholder: '例: Toyama, Japan' },
   { key: 'defaultCarrier', label: '既定の配送業者（Carrier）', placeholder: 'DHL' },
   { key: 'reasonForExport', label: 'Reason for Export', placeholder: 'Commercial' },
