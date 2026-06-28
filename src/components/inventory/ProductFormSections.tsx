@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ImagePlus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { optionsForType, type MasterOption } from '@/lib/masters'
 import type {
   ArrivalRecord,
@@ -99,6 +99,9 @@ export function buildProductForm(
     wholesaleOptions: initial?.wholesaleOptions,
     sampleAvailable: initial?.sampleAvailable ?? false,
     samplePrice: initial?.samplePrice,
+    originCountry: initial?.originCountry ?? '',
+    hsCodeDefault: initial?.hsCodeDefault ?? '',
+    hsCodeBySize: initial?.hsCodeBySize ?? [],
   }
 }
 
@@ -177,6 +180,11 @@ export function finalizeProductInput(
     wholesaleOptions: form.wholesaleOptions,
     sampleAvailable: form.sampleAvailable,
     samplePrice: form.samplePrice,
+    originCountry: form.originCountry?.trim() || undefined,
+    hsCodeDefault: form.hsCodeDefault?.trim() || undefined,
+    hsCodeBySize: (form.hsCodeBySize ?? [])
+      .map(r => ({ portionKg: Number(r.portionKg) || 0, sizeLabel: r.sizeLabel?.trim() || undefined, hsCode: (r.hsCode ?? '').trim() }))
+      .filter(r => r.portionKg > 0 && r.hsCode),
   }
 }
 
@@ -663,6 +671,77 @@ export function ProductMasterSection({
           productKey={productKey}
           onChange={url => setForm(prev => ({ ...prev, imageUrl: url }))}
         />
+      </div>
+
+      {/* 輸出 / 通関 — 越境注文の Commercial Invoice 用 */}
+      <div className="mt-6 border-t border-line pt-4">
+        <h4 className="mb-1 text-sm font-semibold text-ink">輸出 / 通関</h4>
+        <p className="mb-3 text-[11px] text-mist">越境注文の Commercial Invoice（通関書類）に使用します。</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-graphite">原産国</label>
+            <input
+              value={form.originCountry ?? ''}
+              onChange={e => setForm(prev => ({ ...prev, originCountry: e.target.value }))}
+              className={fieldCls}
+              placeholder="Japan"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-graphite">既定HSコード</label>
+            <input
+              value={form.hsCodeDefault ?? ''}
+              onChange={e => setForm(prev => ({ ...prev, hsCodeDefault: e.target.value }))}
+              className={fieldCls}
+              placeholder="例: 0902.10"
+            />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className="mb-1 block text-sm font-medium text-graphite">梱包(袋)サイズ別のHSコード</label>
+          <p className="mb-2 text-[11px] text-mist">重量で分類が変わる場合に設定。明細の内容量（小分けオプションの袋サイズ）に一致する行のHSを使用し、一致が無ければ既定HSコードを使用します。</p>
+          <div className="space-y-2">
+            {(form.hsCodeBySize ?? []).map((r, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="number"
+                  step="0.001"
+                  value={r.portionKg || ''}
+                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, portionKg: Number(e.target.value) } : x)) }))}
+                  className={`${fieldCls} w-28`}
+                  placeholder="内容量kg"
+                />
+                <input
+                  value={r.sizeLabel ?? ''}
+                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, sizeLabel: e.target.value } : x)) }))}
+                  className={`${fieldCls} w-28`}
+                  placeholder="表示(例:1kg)"
+                />
+                <input
+                  value={r.hsCode}
+                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, hsCode: e.target.value } : x)) }))}
+                  className={`${fieldCls} flex-1`}
+                  placeholder="HSコード (例: 0902.20)"
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).filter((_, j) => j !== i) }))}
+                  className="rounded-lg p-1.5 text-alert hover:bg-alert/5"
+                  aria-label="削除"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm(prev => ({ ...prev, hsCodeBySize: [...(prev.hsCodeBySize ?? []), { portionKg: 0, hsCode: '' }] }))}
+            className="mt-2 inline-flex items-center gap-1 text-xs text-matchaDeep hover:underline"
+          >
+            <Plus size={13} /> サイズ別HSを追加
+          </button>
+        </div>
       </div>
     </div>
   )

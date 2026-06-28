@@ -358,6 +358,13 @@ function mapProduct(id: string, data: DocumentData): Product {
     featured: data.featured === true,
     sampleAvailable: data.sampleAvailable === true,
     samplePrice: data.samplePrice != null ? Number(data.samplePrice) : undefined,
+    originCountry: data.originCountry ? String(data.originCountry) : undefined,
+    hsCodeDefault: data.hsCodeDefault ? String(data.hsCodeDefault) : undefined,
+    hsCodeBySize: Array.isArray(data.hsCodeBySize)
+      ? (data.hsCodeBySize as Record<string, unknown>[])
+          .map(r => ({ portionKg: Number(r.portionKg) || 0, sizeLabel: r.sizeLabel ? String(r.sizeLabel) : undefined, hsCode: String(r.hsCode ?? '') }))
+          .filter(r => r.portionKg > 0 && r.hsCode)
+      : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -1514,6 +1521,9 @@ export function createFirebaseServices(): IServices {
         featured: input.featured ?? current.featured,
         sampleAvailable: input.sampleAvailable ?? current.sampleAvailable,
         samplePrice: input.samplePrice ?? current.samplePrice,
+        originCountry: input.originCountry ?? current.originCountry,
+        hsCodeDefault: input.hsCodeDefault ?? current.hsCodeDefault,
+        hsCodeBySize: input.hsCodeBySize ?? current.hsCodeBySize,
       }
 
       const payload = {
@@ -2363,6 +2373,11 @@ export function createFirebaseServices(): IServices {
         tel: String(data.tel ?? ISSUER.tel),
         email: String(data.email ?? ISSUER.email),
         registrationNumber: String(data.registrationNumber ?? ISSUER.registrationNumber),
+        signerName: String(data.signerName ?? ISSUER.signerName ?? ''),
+        signerPosition: String(data.signerPosition ?? ISSUER.signerPosition ?? ''),
+        traderType: String(data.traderType ?? ISSUER.traderType ?? 'BUSINESS'),
+        vatNo: String(data.vatNo ?? ISSUER.vatNo ?? ''),
+        eori: String(data.eori ?? ISSUER.eori ?? ''),
       }
     },
 

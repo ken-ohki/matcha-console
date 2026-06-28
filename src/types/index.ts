@@ -67,8 +67,19 @@ export interface Product {
   featured?: boolean              // おすすめ商品。卸売サイトで未ログインでも公開。
   sampleAvailable?: boolean       // サンプル注文の可否
   samplePrice?: number            // サンプル1個(10g)あたりの価格(JPY)
+  // 輸出/通関（越境注文の Commercial Invoice 用）
+  originCountry?: string          // 原産国（既定 Japan）
+  hsCodeDefault?: string          // 既定HSコード（サイズ別ルール未マッチ時）
+  hsCodeBySize?: HsSizeRule[]     // 梱包(袋)サイズ別のHSコード（重量で分類が変わる場合）
   createdAt: Date
   updatedAt: Date
+}
+
+/** 梱包サイズ(内容量kg)別のHSコード。100g袋→HS-A、1kg袋→HS-B 等。 */
+export interface HsSizeRule {
+  portionKg: number
+  sizeLabel?: string
+  hsCode: string
 }
 
 export interface ProductWithInventory extends Product {
@@ -294,6 +305,9 @@ export interface ProductInput {
   featured?: boolean
   sampleAvailable?: boolean
   samplePrice?: number
+  originCountry?: string
+  hsCodeDefault?: string
+  hsCodeBySize?: HsSizeRule[]
 }
 
 export interface InventoryGroupInput {

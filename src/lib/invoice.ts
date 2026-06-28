@@ -52,6 +52,11 @@ export const ISSUER = {
   registrationNumber: 'T9-2300-0101-8984',
   bankInfo: '住信SBIネット銀行　法人第一支店（106）普通1703523\n株式会社SABO',
   bankInfoEn: 'Account Name: SABO CO., LTD.\nBank Name: SBI Sumishin Net Bank, Ltd\nAccount Number: 1061703523\nSWIFT Code: SSNBJPJT',
+  signerName: '' as string,
+  signerPosition: '' as string,
+  traderType: 'BUSINESS' as string,
+  vatNo: '' as string,
+  eori: '' as string,
 } as const
 
 export const DEFAULT_EN_PAYMENT_TERMS = `Please refer to the attached Terms & Conditions of Sale.
