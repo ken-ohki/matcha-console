@@ -962,13 +962,10 @@ export default function WholesaleOrderDetailPage() {
                   {(Object.keys(o.documents) as DocType[]).flatMap(dt =>
                     Object.entries(o.documents![dt] || {}).map(([lang, meta]) => (
                       <li key={`${dt}-${lang}`} className="flex items-center justify-between gap-3 border-b border-line/40 pb-1">
-                        <span className="text-ink">
+                        <button onClick={() => viewSavedDoc(DOC_ROUTE[dt] ?? dt, lang)} className="text-left text-matchaDeep underline hover:opacity-80">
                           {DOC_LABEL[dt] ?? dt}{meta.no ? `（${meta.no}）` : ''} <span className="text-xs text-mist">[{lang}]</span>
-                        </span>
-                        <span className="flex items-center gap-3">
-                          {meta.issuedAt && <span className="text-xs text-mist">{meta.issuedAt.slice(0, 16).replace('T', ' ')}</span>}
-                          <button onClick={() => viewSavedDoc(DOC_ROUTE[dt] ?? dt, lang)} className="text-xs text-matchaDeep underline">開く</button>
-                        </span>
+                        </button>
+                        {meta.issuedAt && <span className="shrink-0 text-xs text-mist">{meta.issuedAt.slice(0, 16).replace('T', ' ')}</span>}
                       </li>
                     )),
                   )}
