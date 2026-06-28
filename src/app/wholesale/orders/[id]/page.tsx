@@ -58,6 +58,10 @@ interface Order {
   shipmentEmailedAt?: string
   shipRequestedAt?: string
   shipRequestedBy?: string
+  awbNo?: string
+  grossWeightKg?: number
+  proformaInvoiceNo?: string
+  commercialInvoiceNo?: string
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
   grossProfitJpy?: number
@@ -124,6 +128,8 @@ export default function WholesaleOrderDetailPage() {
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
+  const [awbNo, setAwbNo] = useState('')
+  const [grossWeight, setGrossWeight] = useState('')
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -173,6 +179,8 @@ export default function WholesaleOrderDetailPage() {
       setOrder(found)
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
+      setAwbNo(found?.awbNo ?? '')
+      setGrossWeight(found?.grossWeightKg != null ? String(found.grossWeightKg) : '')
       setAdminMemo(found?.adminMemo ?? '')
       setShippingMemo(found?.shippingMemo ?? '')
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
@@ -435,6 +443,32 @@ export default function WholesaleOrderDetailPage() {
     window.open(URL.createObjectURL(await res.blob()), '_blank')
   }
 
+  const downloadProforma = async (reissue = false) => {
+    if (!order) return
+    const res = await fetch(`/api/wholesale/orders/${id}/proforma-invoice?lang=${docLang}${reissue ? '&reissue=1' : ''}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      notify(`Proforma Invoiceの発行に失敗しました。${d.detail || d.error || ''}`, 'error')
+      return
+    }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
+  const downloadCommercial = async (reissue = false) => {
+    if (!order) return
+    const res = await fetch(`/api/wholesale/orders/${id}/commercial-invoice${reissue ? '?reissue=1' : ''}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+      notify(`Commercial Invoiceの発行に失敗しました。${d.detail || d.error || ''}`, 'error')
+      return
+    }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
   const downloadDeliveryNote = async () => {
     if (!order) return
     const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
@@ -468,6 +502,10 @@ export default function WholesaleOrderDetailPage() {
   const canQuote = o?.origin === 'direct' && o?.status !== 'cancelled'
   const canInvoice = !!o && !['pending_acceptance', 'pending_approval', 'pending_quote', 'cancelled'].includes(o.status ?? '')
   const canReceiptDelivery = o?.status === 'paid' || o?.status === 'shipped'
+  // 越境(輸出)注文: 発送前は Proforma、発送後は Commercial Invoice。国内は従来の請求書。
+  const isExport = o?.isDomestic === false
+  const canProforma = isExport && !!o && !['pending_quote', 'pending_acceptance', 'pending_approval', 'cancelled'].includes(o.status ?? '')
+  const canCommercial = isExport && (o?.status === 'shipped' || !!o?.awbNo)
 
   return (
     <AppLayout>
@@ -826,17 +864,26 @@ export default function WholesaleOrderDetailPage() {
                     </select>
                   </label>
                   <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
-                  {o.status === 'shipped' ? (
+                  {o.isDomestic === false && (
                     <>
-                      <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷情報を更新</button>
-                      <button onClick={() => act('set_fulfillment', { shipped: false })} disabled={busy} className="btn-ghost">未出荷に戻す</button>
+                      <label className="text-xs text-mist">AWB番号<input className="mt-1 block w-44 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={awbNo} onChange={e => setAwbNo(e.target.value)} placeholder="航空貨物番号" /></label>
+                      <label className="text-xs text-mist">総重量(kg)<input type="number" step="0.001" className="mt-1 block w-28 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} placeholder="gross" /></label>
                     </>
-                  ) : (o.status === 'paid' || o.shipRequestedAt) ? (
-                    <button onClick={() => act('mark_shipped', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">出荷済みにする</button>
-                  ) : (
-                    // Not yet paid and no 発送指示 — save carrier/tracking without changing status.
-                    <button onClick={() => act('set_fulfillment', { trackingNumber: tracking, shippingCarrierLabel: carrierLabel })} disabled={busy} className="btn-primary">発送情報を保存</button>
                   )}
+                  {(() => {
+                    const shipFields = { trackingNumber: tracking, shippingCarrierLabel: carrierLabel, awbNo, grossWeightKg: Number(grossWeight) || undefined }
+                    return o.status === 'shipped' ? (
+                      <>
+                        <button onClick={() => act('set_fulfillment', shipFields)} disabled={busy} className="btn-primary">出荷情報を更新</button>
+                        <button onClick={() => act('set_fulfillment', { shipped: false })} disabled={busy} className="btn-ghost">未出荷に戻す</button>
+                      </>
+                    ) : (o.status === 'paid' || o.shipRequestedAt) ? (
+                      <button onClick={() => act('mark_shipped', shipFields)} disabled={busy} className="btn-primary">出荷済みにする</button>
+                    ) : (
+                      // Not yet paid and no 発送指示 — save carrier/tracking without changing status.
+                      <button onClick={() => act('set_fulfillment', shipFields)} disabled={busy} className="btn-primary">発送情報を保存</button>
+                    )
+                  })()}
                 </div>
                 {o.shippedAt && <p className="mb-2 text-xs text-mist">出荷日: {o.shippedAt.slice(0, 10)}</p>}
                 {(o.status === 'paid' || o.status === 'shipped') && (
@@ -871,7 +918,7 @@ export default function WholesaleOrderDetailPage() {
                   className="btn-ghost"
                 >入金を手動確認（カード）</button>
               )}
-              {isAdmin && (canQuote || canInvoice || canReceiptDelivery) && (
+              {isAdmin && (canQuote || canInvoice || canReceiptDelivery || canProforma) && (
                 <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                   <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
                   <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
@@ -880,8 +927,14 @@ export default function WholesaleOrderDetailPage() {
               {isAdmin && canQuote && (
                 <button onClick={downloadQuotation} disabled={busy} className="btn-ghost">見積書を発行</button>
               )}
-              {isAdmin && canInvoice && (
+              {isAdmin && canInvoice && !isExport && (
                 <button onClick={downloadInvoice} disabled={busy} className="btn-ghost">請求書を発行</button>
+              )}
+              {isAdmin && canProforma && (
+                <button onClick={() => downloadProforma(o.status === 'shipped')} disabled={busy} className="btn-ghost">Proforma Invoice発行</button>
+              )}
+              {isAdmin && canCommercial && (
+                <button onClick={() => downloadCommercial(true)} disabled={busy} className="btn-ghost">Commercial Invoice発行</button>
               )}
               {isAdmin && canReceiptDelivery && (
                 <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>

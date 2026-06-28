@@ -123,6 +123,8 @@ interface PatchBody {
   trackingNumber?: string
   shippingCarrierLabel?: string
   shipped?: boolean // set_fulfillment: explicitly set/unset shipped status
+  awbNo?: string // air waybill number (export, set at shipment)
+  grossWeightKg?: number // total gross weight (export, set at shipment)
   // set_billing fields (入金管理 inline edits)
   paymentStatus?: 'paid' | 'invoiced' | 'uninvoiced' | 'unpaid'
   paymentDate?: string // YYYY-MM-DD
@@ -352,6 +354,8 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
     if (body.trackingNumber !== undefined) patch.trackingNumber = body.trackingNumber.trim() || FieldValue.delete()
     if (body.shippingCarrierLabel !== undefined) patch.shippingCarrierLabel = body.shippingCarrierLabel.trim() || FieldValue.delete()
+    if (body.awbNo !== undefined) patch.awbNo = body.awbNo.trim() || FieldValue.delete()
+    if (typeof body.grossWeightKg === 'number') patch.grossWeightKg = body.grossWeightKg > 0 ? body.grossWeightKg : FieldValue.delete()
     if (body.shipped === true) { patch.status = 'shipped'; patch.shippedAt = new Date().toISOString() }
     if (body.shipped === false) { patch.status = 'paid'; patch.shippedAt = FieldValue.delete() }
     await ref.set(patch, { merge: true })
@@ -400,6 +404,8 @@ export async function PATCH(request: Request) {
         shippedAt: now,
         ...(body.trackingNumber?.trim() ? { trackingNumber: body.trackingNumber.trim() } : {}),
         ...(body.shippingCarrierLabel?.trim() ? { shippingCarrierLabel: body.shippingCarrierLabel.trim() } : {}),
+        ...(body.awbNo?.trim() ? { awbNo: body.awbNo.trim() } : {}),
+        ...(typeof body.grossWeightKg === 'number' && body.grossWeightKg > 0 ? { grossWeightKg: body.grossWeightKg } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
