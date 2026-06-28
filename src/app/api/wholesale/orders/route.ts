@@ -126,6 +126,7 @@ interface PatchBody {
   awbNo?: string // air waybill number (export, set at shipment)
   grossWeightKg?: number // total gross weight (export, set at shipment)
   fields?: Record<string, string | number> // set_doc_fields: editable (non-calc) document fields
+  itemNames?: Record<string, string> // set_doc_fields: per-line product name overrides (index → name)
   // set_billing fields (入金管理 inline edits)
   paymentStatus?: 'paid' | 'invoiced' | 'uninvoiced' | 'unpaid'
   paymentDate?: string // YYYY-MM-DD
@@ -387,6 +388,16 @@ export async function PATCH(request: Request) {
       if (fields[k] !== undefined) {
         const n = Number(fields[k])
         patch[k] = Number.isFinite(n) && n > 0 ? n : FieldValue.delete()
+      }
+    }
+    // Editable product names (display only — does not affect amounts).
+    if (body.itemNames) {
+      const cur = (await ref.get()).data() as { items?: { productName?: string }[] } | undefined
+      if (cur?.items) {
+        patch.items = cur.items.map((it, i) => {
+          const name = body.itemNames?.[String(i)]
+          return name != null && String(name).trim() ? { ...it, productName: String(name).trim() } : it
+        })
       }
     }
     await ref.set(patch, { merge: true })

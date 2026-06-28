@@ -175,7 +175,9 @@ export default function WholesaleOrderDetailPage() {
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
   const [grossWeight, setGrossWeight] = useState('')
-  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string> } | null>(null)
+  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string>; itemNames: Record<string, string> } | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -449,7 +451,9 @@ export default function WholesaleOrderDetailPage() {
     const src = order as unknown as Record<string, unknown>
     const fields: Record<string, string> = {}
     for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
-    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : 'ja', fields })
+    const itemNames: Record<string, string> = {}
+    ;(order.items ?? []).forEach((it, i) => { itemNames[String(i)] = it.productName ?? '' })
+    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : 'ja', fields, itemNames })
   }
 
   // 発行履歴から保存版の書類を開く（再発行はしない）。
@@ -469,7 +473,7 @@ export default function WholesaleOrderDetailPage() {
       const save = await fetch('/api/wholesale/orders', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields }),
+        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields, itemNames: docModal.itemNames }),
       })
       if (!save.ok) {
         const d = (await save.json().catch(() => ({}))) as { error?: string }
@@ -491,6 +495,31 @@ export default function WholesaleOrderDetailPage() {
       setBusy(false)
     }
   }
+
+  // ライブプレビュー: モーダルの編集内容を保存せずにPDF描画し、iframeで表示（デバウンス）。
+  useEffect(() => {
+    if (!docModal) { setPreviewUrl(null); return }
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setPreviewing(true)
+      try {
+        const res = await fetch(`/api/wholesale/orders/${id}/document-preview`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+          body: JSON.stringify({ docType: docModal.docType, lang: docModal.lang, fields: docModal.fields, itemNames: docModal.itemNames }),
+        })
+        if (cancelled || !res.ok) return
+        const u = URL.createObjectURL(await res.blob())
+        if (cancelled) { URL.revokeObjectURL(u); return }
+        setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return u })
+      } catch {
+        /* preview is best-effort */
+      } finally {
+        if (!cancelled) setPreviewing(false)
+      }
+    }, 600)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [docModal, id])
 
   const o = order
 
@@ -977,34 +1006,65 @@ export default function WholesaleOrderDetailPage() {
         )}
       </div>
 
-      {/* 書類の発行前 編集モーダル */}
+      {/* 書類の発行前 編集モーダル（左=編集 / 右=ライブプレビュー） */}
       {docModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setDocModal(null)} role="presentation">
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-            <div className="mb-2 flex items-center justify-between">
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-line bg-white shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">{DOC_LABEL[docModal.docType]} の発行</h2>
               <button onClick={() => setDocModal(null)} className="text-mist hover:text-ink" aria-label="閉じる"><X size={18} /></button>
             </div>
-            <p className="mb-3 text-xs text-mist">計算に影響しない項目を編集して発行できます（数量・単価・金額は変更不可）。</p>
-            {docModal.docType !== 'commercial' && (
-              <div className="mb-3 inline-flex overflow-hidden rounded-lg border border-line text-xs">
-                <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'ja' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
-                <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
+            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
+              {/* 編集 */}
+              <div className="min-h-0 space-y-3 overflow-y-auto border-b border-line p-5 md:border-b-0 md:border-r">
+                <p className="text-xs text-mist">計算に影響しない項目を編集できます（数量・単価・金額は変更不可）。</p>
+                {docModal.docType !== 'commercial' && (
+                  <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
+                    <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'ja' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
+                    <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
+                  </div>
+                )}
+                {/* 商品名（表示のみ・金額に影響しない） */}
+                {(order?.items ?? []).length > 0 && (
+                  <div className="rounded-lg border border-line p-3">
+                    <p className="mb-2 text-xs font-medium text-graphite">商品名</p>
+                    <div className="space-y-2">
+                      {(order?.items ?? []).map((it, i) => (
+                        <input
+                          key={i}
+                          value={docModal.itemNames[String(i)] ?? ''}
+                          onChange={e => setDocModal(m => (m ? { ...m, itemNames: { ...m.itemNames, [String(i)]: e.target.value } } : m))}
+                          className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                          placeholder={it.productName}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {DOC_FIELDS[docModal.docType].map(f => (
+                  <div key={f.key}>
+                    <label className="mb-1 block text-xs text-mist">{f.label}</label>
+                    {f.type === 'textarea' ? (
+                      <textarea rows={2} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
+                    ) : (
+                      <input type={f.type === 'number' ? 'number' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
-            <div className="space-y-3">
-              {DOC_FIELDS[docModal.docType].map(f => (
-                <div key={f.key}>
-                  <label className="mb-1 block text-xs text-mist">{f.label}</label>
-                  {f.type === 'textarea' ? (
-                    <textarea rows={2} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
-                  ) : (
-                    <input type={f.type === 'number' ? 'number' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
-                  )}
-                </div>
-              ))}
+              {/* プレビュー */}
+              <div className="relative min-h-[40vh] bg-bone md:min-h-0">
+                {previewUrl ? (
+                  <iframe src={previewUrl} title="preview" className="h-full min-h-[40vh] w-full" />
+                ) : (
+                  <div className="flex h-full min-h-[40vh] items-center justify-center text-sm text-mist">プレビューを生成中…</div>
+                )}
+                {previewing && previewUrl && (
+                  <div className="absolute right-2 top-2 rounded bg-ink/70 px-2 py-1 text-[11px] text-paper">更新中…</div>
+                )}
+              </div>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
               <button onClick={() => setDocModal(null)} className="btn-ghost">キャンセル</button>
               <button onClick={issueDoc} disabled={busy} className="btn-primary">{busy ? '発行中…' : '発行'}</button>
             </div>
