@@ -179,7 +179,6 @@ export default function WholesaleOrderDetailPage() {
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
-  const [docLang, setDocLang] = useState<'ja' | 'en'>('ja')
   const [linkCopied, setLinkCopied] = useState(false)
   const [adminMemo, setAdminMemo] = useState('')
   const [shippingMemo, setShippingMemo] = useState('')
@@ -450,7 +449,7 @@ export default function WholesaleOrderDetailPage() {
     const src = order as unknown as Record<string, unknown>
     const fields: Record<string, string> = {}
     for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
-    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : docLang, fields })
+    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : 'ja', fields })
   }
 
   // 発行履歴から保存版の書類を開く（再発行はしない）。
@@ -924,12 +923,6 @@ export default function WholesaleOrderDetailPage() {
                   disabled={busy}
                   className="btn-ghost"
                 >入金を手動確認（カード）</button>
-              )}
-              {isAdmin && (canQuote || canInvoice || canReceiptDelivery || canProforma) && (
-                <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
-                  <button onClick={() => setDocLang('ja')} className={`px-2.5 py-2 ${docLang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
-                  <button onClick={() => setDocLang('en')} className={`px-2.5 py-2 ${docLang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
-                </div>
               )}
               {isAdmin && canQuote && (
                 <button onClick={() => openDoc('quotation')} disabled={busy} className="btn-ghost">見積書を発行</button>
