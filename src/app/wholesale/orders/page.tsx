@@ -81,7 +81,9 @@ function paymentStateLabel(o: Order): { label: string; tone: string } {
   if (o.status === 'pending_approval') return { label: '承認待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'pending_quote') return { label: '見積待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
   if (o.status === 'quoted') return { label: '支払い待ち（見積済）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-  if (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') return { label: '支払い済み', tone: 'border-matcha text-matcha' }
+  // 発送済みでも入金は別管理（掛け取引で未入金のまま発送できる）。支払い済みは
+  // paymentStatus/status='paid' でのみ判定し、status==='shipped' からは推論しない。
+  if (o.paymentStatus === 'paid' || o.status === 'paid') return { label: '支払い済み', tone: 'border-matcha text-matcha' }
   return { label: '支払い待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
 }
 function shippingStateLabel(o: Order): { label: string; tone: string } {

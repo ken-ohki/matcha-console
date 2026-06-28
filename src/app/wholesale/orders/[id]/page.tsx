@@ -679,7 +679,7 @@ export default function WholesaleOrderDetailPage() {
                 <Row label="粗利" value={`¥${Math.round(grossProfit).toLocaleString()}${marginRate != null ? `（${marginRate.toFixed(1)}%）` : ''}`} strong />
                 {/* Stripe settlement — fee charged + net actually deposited (card only).
                     Shown for paid card orders; if not yet captured, offer a fetch button. */}
-                {o.paymentMethod === 'stripe' && (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') && (
+                {o.paymentMethod === 'stripe' && (o.paymentStatus === 'paid' || o.status === 'paid') && (
                   typeof o.stripeFeeJpy === 'number' ? (
                     <>
                       <Row label="Stripe手数料" value={`¥${o.stripeFeeJpy.toLocaleString()}`} />
@@ -712,7 +712,7 @@ export default function WholesaleOrderDetailPage() {
                       : o.status === 'pending_approval' ? '承認待ち'
                       : o.status === 'pending_quote' ? '見積待ち'
                       : o.status === 'quoted' ? '支払い待ち（見積済）'
-                      : (o.paymentStatus === 'paid' || o.status === 'paid' || o.status === 'shipped') ? '支払い済み'
+                      : (o.paymentStatus === 'paid' || o.status === 'paid') ? '支払い済み'
                       : '支払い待ち'
                   }
                 />
