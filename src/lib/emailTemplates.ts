@@ -79,7 +79,9 @@ export const DEFAULT_EMAIL_TEMPLATES: Record<EmailEventKey, EmailTemplate> = {
     body:
       '<p>{companyName} 様</p>' +
       '<p>送料が確定しました。下記の明細をご確認のうえ、合計金額をお振込先までお支払いください。Proforma Invoice（PDF）を添付しております。<br/>' +
-      'Your shipping cost is confirmed. Please review the details below and transfer the total to our bank account. The Proforma Invoice (PDF) is attached:</p>',
+      'Your shipping cost is confirmed. Please review the details below and transfer the total to our bank account. The Proforma Invoice (PDF) is attached:</p>' +
+      '<p>お振込後、<a href="{myPageUrl}">マイページ</a>の「振込完了を報告」ボタンでお知らせいただくと、入金確認がスムーズです。<br/>' +
+      'After transferring, tap "Report transfer" in <a href="{myPageUrl}">your account</a> to speed up confirmation.</p>',
   },
   quote_card: {
     subject: 'SABO Wholesale — お支払いのご案内 / Payment link ({orderNumber})',
