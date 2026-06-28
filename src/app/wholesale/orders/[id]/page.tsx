@@ -1009,12 +1009,15 @@ export default function WholesaleOrderDetailPage() {
       {/* 書類の発行前 編集モーダル（左=編集 / 右=ライブプレビュー） */}
       {docModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setDocModal(null)} role="presentation">
-          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col rounded-2xl border border-line bg-white shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+          <div className="flex h-[94vh] w-full max-w-7xl flex-col rounded-2xl border border-line bg-white shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="flex items-center justify-between border-b border-line px-5 py-3">
               <h2 className="text-lg font-semibold text-ink">{DOC_LABEL[docModal.docType]} の発行</h2>
-              <button onClick={() => setDocModal(null)} className="text-mist hover:text-ink" aria-label="閉じる"><X size={18} /></button>
+              <div className="flex items-center gap-3">
+                {previewUrl && <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-matchaDeep underline">別タブで開く</a>}
+                <button onClick={() => setDocModal(null)} className="text-mist hover:text-ink" aria-label="閉じる"><X size={18} /></button>
+              </div>
             </div>
-            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
+            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[340px_1fr]">
               {/* 編集 */}
               <div className="min-h-0 space-y-3 overflow-y-auto border-b border-line p-5 md:border-b-0 md:border-r">
                 <p className="text-xs text-mist">計算に影響しない項目を編集できます（数量・単価・金額は変更不可）。</p>
