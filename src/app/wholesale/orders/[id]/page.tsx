@@ -71,6 +71,8 @@ interface Order {
   payerOfVat?: string
   receiptAtena?: string
   receiptProviso?: string
+  quotationValidUntil?: string
+  proformaValidUntil?: string
   documents?: Record<string, Record<string, { url?: string; no?: string; issuedAt?: string; storagePath?: string }>>
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
@@ -134,7 +136,7 @@ const DOC_LABEL: Record<DocType, string> = {
   quotation: '見積書', invoice: '請求書', proforma: 'Proforma Invoice',
   commercial: 'Commercial Invoice', packingList: 'Packing List', receipt: '領収書', deliveryNote: '納品書',
 }
-interface DocField { key: string; label: string; type?: 'text' | 'textarea' | 'number' }
+interface DocField { key: string; label: string; type?: 'text' | 'textarea' | 'number' | 'date' }
 const CONSIGNEE_FIELDS: DocField[] = [
   { key: 'contactName', label: '担当者' },
   { key: 'shippingPostalCode', label: '郵便番号' },
@@ -160,10 +162,10 @@ const DOC_FIELDS: Record<DocType, DocField[]> = {
     { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
     { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
   ],
-  proforma: [...CONSIGNEE_FIELDS, NOTES_FIELD],
+  proforma: [...CONSIGNEE_FIELDS, { key: 'proformaValidUntil', label: '有効期限（空欄=自動）', type: 'date' }, NOTES_FIELD],
   invoice: [{ key: 'buyerTaxId', label: '先方 登録番号/Tax ID' }, NOTES_FIELD],
   deliveryNote: [...CONSIGNEE_FIELDS, { key: 'shippingCarrierLabel', label: '配送業者' }, { key: 'trackingNumber', label: '追跡番号' }, NOTES_FIELD],
-  quotation: [NOTES_FIELD],
+  quotation: [{ key: 'quotationValidUntil', label: '有効期限（空欄=自動）', type: 'date' }, NOTES_FIELD],
   receipt: [{ key: 'receiptAtena', label: '宛名' }, { key: 'receiptProviso', label: '但し書き' }],
 }
 
@@ -1074,7 +1076,7 @@ export default function WholesaleOrderDetailPage() {
                     {f.type === 'textarea' ? (
                       <textarea rows={2} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
                     ) : (
-                      <input type={f.type === 'number' ? 'number' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
+                      <input type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
                     )}
                   </div>
                 ))}

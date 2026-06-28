@@ -378,6 +378,7 @@ export async function PATCH(request: Request) {
       'contactName', 'shippingPostalCode', 'shippingAddress', 'shippingCountry', 'phone', 'shippingEmail',
       'buyerTaxId', 'incoterms', 'incotermsPlace', 'reasonForExport', 'typeOfExport', 'dutyPayer', 'payerOfVat',
       'shippingCarrierLabel', 'trackingNumber', 'notes', 'receiptAtena', 'receiptProviso',
+      'quotationValidUntil', 'proformaValidUntil',
     ]
     const NUMBER_KEYS = ['grossWeightKg']
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
