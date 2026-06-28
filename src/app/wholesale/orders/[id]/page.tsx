@@ -9,7 +9,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { MasterEntry } from '@/types'
-import { ArrowLeft, RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Plus, Trash2, X } from 'lucide-react'
 
 interface OrderItem {
   productId?: string
@@ -62,6 +62,15 @@ interface Order {
   grossWeightKg?: number
   proformaInvoiceNo?: string
   commercialInvoiceNo?: string
+  incoterms?: string
+  incotermsPlace?: string
+  reasonForExport?: string
+  typeOfExport?: string
+  dutyPayer?: string
+  payerOfVat?: string
+  receiptAtena?: string
+  receiptProviso?: string
+  documents?: Record<string, Record<string, { url?: string; no?: string; issuedAt?: string; storagePath?: string }>>
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
   grossProfitJpy?: number
@@ -114,6 +123,43 @@ const CARRIER_LABEL: Record<string, string> = {
   designated: '御社指定業者',
 }
 
+// ---- Document edit-before-issue ----
+type DocType = 'quotation' | 'invoice' | 'proforma' | 'commercial' | 'receipt' | 'deliveryNote'
+const DOC_ROUTE: Record<DocType, string> = {
+  quotation: 'quotation', invoice: 'invoice', proforma: 'proforma-invoice',
+  commercial: 'commercial-invoice', receipt: 'receipt', deliveryNote: 'delivery-note',
+}
+const DOC_LABEL: Record<DocType, string> = {
+  quotation: '見積書', invoice: '請求書', proforma: 'Proforma Invoice',
+  commercial: 'Commercial Invoice', receipt: '領収書', deliveryNote: '納品書',
+}
+interface DocField { key: string; label: string; type?: 'text' | 'textarea' | 'number' }
+const CONSIGNEE_FIELDS: DocField[] = [
+  { key: 'contactName', label: '担当者' },
+  { key: 'shippingPostalCode', label: '郵便番号' },
+  { key: 'shippingAddress', label: '住所', type: 'textarea' },
+  { key: 'shippingCountry', label: '国' },
+  { key: 'phone', label: '電話' },
+  { key: 'shippingEmail', label: 'Email' },
+  { key: 'buyerTaxId', label: '先方 税番号/VAT' },
+]
+const NOTES_FIELD: DocField = { key: 'notes', label: '備考', type: 'textarea' }
+const DOC_FIELDS: Record<DocType, DocField[]> = {
+  commercial: [
+    ...CONSIGNEE_FIELDS,
+    { key: 'incoterms', label: 'Incoterms' }, { key: 'incotermsPlace', label: 'Place of Incoterm' },
+    { key: 'reasonForExport', label: 'Reason for Export' }, { key: 'typeOfExport', label: 'Type of Export' },
+    { key: 'dutyPayer', label: 'Duty/taxes acct' }, { key: 'payerOfVat', label: 'Payer of GST/VAT' },
+    { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
+    { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
+  ],
+  proforma: [...CONSIGNEE_FIELDS, NOTES_FIELD],
+  invoice: [{ key: 'buyerTaxId', label: '先方 登録番号/Tax ID' }, NOTES_FIELD],
+  deliveryNote: [...CONSIGNEE_FIELDS, { key: 'shippingCarrierLabel', label: '配送業者' }, { key: 'trackingNumber', label: '追跡番号' }, NOTES_FIELD],
+  quotation: [NOTES_FIELD],
+  receipt: [{ key: 'receiptAtena', label: '宛名' }, { key: 'receiptProviso', label: '但し書き' }],
+}
+
 export default function WholesaleOrderDetailPage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -129,6 +175,7 @@ export default function WholesaleOrderDetailPage() {
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
   const [grossWeight, setGrossWeight] = useState('')
+  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string> } | null>(null)
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -397,88 +444,53 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
-  const downloadReceipt = async () => {
+  // 発行前の編集モーダルを開く（注文の現在値を初期表示）。
+  const openDoc = (docType: DocType) => {
     if (!order) return
-    const en = docLang === 'en'
-    // 宛名は請求先名を自動使用（変更は会員の請求先情報を修正）。但し書きのみ指定可。
-    const proviso = window.prompt(en ? 'For (description)' : '但し書き', en ? 'matcha products' : '抹茶代として')
-    if (proviso === null) return
-    const res = await fetch(`/api/wholesale/orders/${id}/receipt?proviso=${encodeURIComponent(proviso)}&lang=${docLang}`, {
-      headers: { Authorization: `Bearer ${await token()}` },
-    })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`領収書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
-    }
-    const blob = await res.blob()
-    window.open(URL.createObjectURL(blob), '_blank')
+    const src = order as unknown as Record<string, unknown>
+    const fields: Record<string, string> = {}
+    for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
+    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : docLang, fields })
   }
 
-  const downloadQuotation = async () => {
-    if (!order) return
-    const res = await fetch(`/api/wholesale/orders/${id}/quotation?lang=${docLang}`, {
+  // 発行履歴から保存版の書類を開く（再発行はしない）。
+  const viewSavedDoc = async (route: string, lang: string) => {
+    const res = await fetch(`/api/wholesale/orders/${id}/${route}?lang=${lang}`, {
       headers: { Authorization: `Bearer ${await token()}` },
     })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`見積書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
-    }
+    if (!res.ok) { notify('書類の取得に失敗しました', 'error'); return }
     window.open(URL.createObjectURL(await res.blob()), '_blank')
   }
 
-  const downloadInvoice = async () => {
-    if (!order) return
-    const res = await fetch(`/api/wholesale/orders/${id}/invoice?lang=${docLang}`, {
-      headers: { Authorization: `Bearer ${await token()}` },
-    })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`請求書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
+  // 編集内容を保存 → 再発行（Storage上書き＋履歴記録）→ PDFを開く。
+  const issueDoc = async () => {
+    if (!docModal || !order) return
+    setBusy(true)
+    try {
+      const save = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields }),
+      })
+      if (!save.ok) {
+        const d = (await save.json().catch(() => ({}))) as { error?: string }
+        notify(`保存に失敗しました（${d.error ?? 'error'}）`, 'error')
+        return
+      }
+      const res = await fetch(`/api/wholesale/orders/${id}/${DOC_ROUTE[docModal.docType]}?lang=${docModal.lang}&reissue=1`, {
+        headers: { Authorization: `Bearer ${await token()}` },
+      })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+        notify(`${DOC_LABEL[docModal.docType]}の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
+        return
+      }
+      window.open(URL.createObjectURL(await res.blob()), '_blank')
+      setDocModal(null)
+      await load()
+    } finally {
+      setBusy(false)
     }
-    window.open(URL.createObjectURL(await res.blob()), '_blank')
-  }
-
-  const downloadProforma = async (reissue = false) => {
-    if (!order) return
-    const res = await fetch(`/api/wholesale/orders/${id}/proforma-invoice?lang=${docLang}${reissue ? '&reissue=1' : ''}`, {
-      headers: { Authorization: `Bearer ${await token()}` },
-    })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`Proforma Invoiceの発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
-    }
-    window.open(URL.createObjectURL(await res.blob()), '_blank')
-  }
-
-  const downloadCommercial = async (reissue = false) => {
-    if (!order) return
-    const res = await fetch(`/api/wholesale/orders/${id}/commercial-invoice${reissue ? '?reissue=1' : ''}`, {
-      headers: { Authorization: `Bearer ${await token()}` },
-    })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`Commercial Invoiceの発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
-    }
-    window.open(URL.createObjectURL(await res.blob()), '_blank')
-  }
-
-  const downloadDeliveryNote = async () => {
-    if (!order) return
-    const res = await fetch(`/api/wholesale/orders/${id}/delivery-note?lang=${docLang}`, {
-      headers: { Authorization: `Bearer ${await token()}` },
-    })
-    if (!res.ok) {
-      const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
-      notify(`納品書の発行に失敗しました。${d.detail || d.error || ''}`, 'error')
-      return
-    }
-    const blob = await res.blob()
-    window.open(URL.createObjectURL(blob), '_blank')
   }
 
   const o = order
@@ -920,27 +932,49 @@ export default function WholesaleOrderDetailPage() {
                 </div>
               )}
               {isAdmin && canQuote && (
-                <button onClick={downloadQuotation} disabled={busy} className="btn-ghost">見積書を発行</button>
+                <button onClick={() => openDoc('quotation')} disabled={busy} className="btn-ghost">見積書を発行</button>
               )}
               {isAdmin && canInvoice && !isExport && (
-                <button onClick={downloadInvoice} disabled={busy} className="btn-ghost">請求書を発行</button>
+                <button onClick={() => openDoc('invoice')} disabled={busy} className="btn-ghost">請求書を発行</button>
               )}
               {isAdmin && canProforma && (
-                <button onClick={() => downloadProforma(o.status === 'shipped')} disabled={busy} className="btn-ghost">Proforma Invoice発行</button>
+                <button onClick={() => openDoc('proforma')} disabled={busy} className="btn-ghost">Proforma Invoice発行</button>
               )}
               {isAdmin && canCommercial && (
-                <button onClick={() => downloadCommercial(true)} disabled={busy} className="btn-ghost">Commercial Invoice発行</button>
+                <button onClick={() => openDoc('commercial')} disabled={busy} className="btn-ghost">Commercial Invoice発行</button>
               )}
               {isAdmin && canReceiptDelivery && (
-                <button onClick={downloadReceipt} disabled={busy} className="btn-ghost">領収書を発行</button>
+                <button onClick={() => openDoc('receipt')} disabled={busy} className="btn-ghost">領収書を発行</button>
               )}
               {isAdmin && canReceiptDelivery && (
-                <button onClick={downloadDeliveryNote} disabled={busy} className="btn-ghost">納品書を発行</button>
+                <button onClick={() => openDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書を発行</button>
               )}
               {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
             </div>
+
+            {/* 発行履歴 — 保存済みの書類を後から開ける */}
+            {isAdmin && o.documents && Object.keys(o.documents).length > 0 && (
+              <div className="mt-2 rounded-lg border border-line bg-white p-4">
+                <p className="mb-2 text-xs font-mono uppercase tracking-brand text-mist">発行履歴</p>
+                <ul className="space-y-1 text-sm">
+                  {(Object.keys(o.documents) as DocType[]).flatMap(dt =>
+                    Object.entries(o.documents![dt] || {}).map(([lang, meta]) => (
+                      <li key={`${dt}-${lang}`} className="flex items-center justify-between gap-3 border-b border-line/40 pb-1">
+                        <span className="text-ink">
+                          {DOC_LABEL[dt] ?? dt}{meta.no ? `（${meta.no}）` : ''} <span className="text-xs text-mist">[{lang}]</span>
+                        </span>
+                        <span className="flex items-center gap-3">
+                          {meta.issuedAt && <span className="text-xs text-mist">{meta.issuedAt.slice(0, 16).replace('T', ' ')}</span>}
+                          <button onClick={() => viewSavedDoc(DOC_ROUTE[dt] ?? dt, lang)} className="text-xs text-matchaDeep underline">開く</button>
+                        </span>
+                      </li>
+                    )),
+                  )}
+                </ul>
+              </div>
+            )}
 
             {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
             {isAdmin && (
@@ -952,6 +986,41 @@ export default function WholesaleOrderDetailPage() {
           </div>
         )}
       </div>
+
+      {/* 書類の発行前 編集モーダル */}
+      {docModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setDocModal(null)} role="presentation">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-ink">{DOC_LABEL[docModal.docType]} の発行</h2>
+              <button onClick={() => setDocModal(null)} className="text-mist hover:text-ink" aria-label="閉じる"><X size={18} /></button>
+            </div>
+            <p className="mb-3 text-xs text-mist">計算に影響しない項目を編集して発行できます（数量・単価・金額は変更不可）。</p>
+            {docModal.docType !== 'commercial' && (
+              <div className="mb-3 inline-flex overflow-hidden rounded-lg border border-line text-xs">
+                <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'ja' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
+                <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
+              </div>
+            )}
+            <div className="space-y-3">
+              {DOC_FIELDS[docModal.docType].map(f => (
+                <div key={f.key}>
+                  <label className="mb-1 block text-xs text-mist">{f.label}</label>
+                  {f.type === 'textarea' ? (
+                    <textarea rows={2} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
+                  ) : (
+                    <input type={f.type === 'number' ? 'number' : 'text'} value={docModal.fields[f.key] ?? ''} onChange={e => setDocModal(m => (m ? { ...m, fields: { ...m.fields, [f.key]: e.target.value } } : m))} className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha" />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setDocModal(null)} className="btn-ghost">キャンセル</button>
+              <button onClick={issueDoc} disabled={busy} className="btn-primary">{busy ? '発行中…' : '発行'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   )
 }

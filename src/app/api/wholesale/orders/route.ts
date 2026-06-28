@@ -117,7 +117,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -125,6 +125,7 @@ interface PatchBody {
   shipped?: boolean // set_fulfillment: explicitly set/unset shipped status
   awbNo?: string // air waybill number (export, set at shipment)
   grossWeightKg?: number // total gross weight (export, set at shipment)
+  fields?: Record<string, string | number> // set_doc_fields: editable (non-calc) document fields
   // set_billing fields (入金管理 inline edits)
   paymentStatus?: 'paid' | 'invoiced' | 'uninvoiced' | 'unpaid'
   paymentDate?: string // YYYY-MM-DD
@@ -366,6 +367,28 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
     if (body.adminMemo !== undefined) patch.adminMemo = body.adminMemo.trim() || FieldValue.delete()
     if (body.shippingMemo !== undefined) patch.shippingMemo = body.shippingMemo.trim() || FieldValue.delete()
+    await ref.set(patch, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
+  // 書類の編集（計算に影響しない項目のみ）。発行前の編集モーダルから保存し、再発行で反映。
+  if (body.action === 'set_doc_fields') {
+    const STRING_KEYS = [
+      'contactName', 'shippingPostalCode', 'shippingAddress', 'shippingCountry', 'phone', 'shippingEmail',
+      'buyerTaxId', 'incoterms', 'incotermsPlace', 'reasonForExport', 'typeOfExport', 'dutyPayer', 'payerOfVat',
+      'shippingCarrierLabel', 'trackingNumber', 'notes', 'receiptAtena', 'receiptProviso',
+    ]
+    const NUMBER_KEYS = ['grossWeightKg']
+    const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
+    const fields = (body.fields ?? {}) as Record<string, unknown>
+    for (const k of STRING_KEYS) {
+      if (fields[k] !== undefined) patch[k] = String(fields[k]).trim() || FieldValue.delete()
+    }
+    for (const k of NUMBER_KEYS) {
+      if (fields[k] !== undefined) {
+        const n = Number(fields[k])
+        patch[k] = Number.isFinite(n) && n > 0 ? n : FieldValue.delete()
+      }
+    }
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }
