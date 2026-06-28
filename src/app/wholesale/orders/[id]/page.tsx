@@ -59,21 +59,11 @@ interface Order {
   shipmentEmailedAt?: string
   shipRequestedAt?: string
   shipRequestedBy?: string
-  awbNo?: string
-  grossWeightKg?: number
   proformaInvoiceNo?: string
-  commercialInvoiceNo?: string
-  incoterms?: string
-  incotermsPlace?: string
-  reasonForExport?: string
-  typeOfExport?: string
-  dutyPayer?: string
-  payerOfVat?: string
   receiptAtena?: string
   receiptProviso?: string
-  quotationValidUntil?: string
   proformaValidUntil?: string
-  documents?: Record<string, Record<string, { url?: string; no?: string; issuedAt?: string; storagePath?: string }>>
+  uploadedDocs?: Partial<Record<'commercial' | 'packingList', { storagePath: string; fileName: string; uploadedAt: string }>>
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
   grossProfitJpy?: number
@@ -129,6 +119,9 @@ const CARRIER_LABEL: Record<string, string> = {
 // 自動生成書類のダウンロード用ルート（注文データから都度生成）。
 const DOC_ROUTE = { invoice: 'invoice', proforma: 'proforma-invoice', receipt: 'receipt', deliveryNote: 'delivery-note' } as const
 type DocKind = keyof typeof DOC_ROUTE
+// 手動アップロード書類（越境）。
+type UploadKind = 'commercial' | 'packingList'
+const UPLOAD_LABEL: Record<UploadKind, string> = { commercial: 'Commercial Invoice', packingList: 'Packing List' }
 
 export default function WholesaleOrderDetailPage() {
   const router = useRouter()
@@ -142,6 +135,7 @@ export default function WholesaleOrderDetailPage() {
   const [productList, setProductList] = useState<{ id: string; name: string; sku?: string; price: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [uploadingKind, setUploadingKind] = useState<UploadKind | null>(null)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
@@ -421,6 +415,53 @@ export default function WholesaleOrderDetailPage() {
       return
     }
     window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
+  // 手動アップロード書類（越境: Commercial Invoice / Packing List）。
+  const uploadDoc = async (kind: UploadKind, file: File) => {
+    if (file.type && file.type !== 'application/pdf') { notify('PDFファイルを選択してください', 'error'); return }
+    setUploadingKind(kind)
+    try {
+      const form = new FormData()
+      form.append('kind', kind)
+      form.append('file', file)
+      const res = await fetch(`/api/wholesale/orders/${id}/upload-doc`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await token()}` },
+        body: form,
+      })
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string; detail?: string }
+        notify(`アップロードに失敗しました。${d.detail || d.error || ''}`, 'error')
+        return
+      }
+      await load()
+    } finally {
+      setUploadingKind(null)
+    }
+  }
+
+  const downloadUploaded = async (kind: UploadKind) => {
+    const res = await fetch(`/api/wholesale/orders/${id}/upload-doc?kind=${kind}`, {
+      headers: { Authorization: `Bearer ${await token()}` },
+    })
+    if (!res.ok) { notify('書類の取得に失敗しました', 'error'); return }
+    window.open(URL.createObjectURL(await res.blob()), '_blank')
+  }
+
+  const deleteUploaded = async (kind: UploadKind) => {
+    if (!(await confirm({ title: '書類を削除', message: 'アップロードした書類を削除します。よろしいですか？', danger: true, confirmLabel: '削除' }))) return
+    setUploadingKind(kind)
+    try {
+      const res = await fetch(`/api/wholesale/orders/${id}/upload-doc?kind=${kind}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${await token()}` },
+      })
+      if (!res.ok) { notify('削除に失敗しました', 'error'); return }
+      await load()
+    } finally {
+      setUploadingKind(null)
+    }
   }
 
   const o = order
@@ -867,6 +908,41 @@ export default function WholesaleOrderDetailPage() {
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
             </div>
+
+            {/* 越境: 外部(DHL/EMS)で作成した通関書類のアップロード。発送完了メールに添付される。 */}
+            {isAdmin && isExport && o.status !== 'cancelled' && (
+              <div className="mt-2 rounded-lg border border-line bg-white p-4">
+                <p className="mb-1 text-xs font-mono uppercase tracking-brand text-mist">通関書類のアップロード（越境）</p>
+                <p className="mb-3 text-xs text-mist">DHL / EMS で作成した PDF をアップロードすると、発送完了メールに自動添付され、お客様のマイページからもDLできます。</p>
+                <div className="space-y-2">
+                  {(['commercial', 'packingList'] as UploadKind[]).map(kind => {
+                    const doc = o.uploadedDocs?.[kind]
+                    const isBusy = uploadingKind === kind
+                    return (
+                      <div key={kind} className="flex flex-wrap items-center gap-3 border-b border-line/40 pb-2">
+                        <span className="w-40 text-sm text-ink">{UPLOAD_LABEL[kind]}{kind === 'packingList' && <span className="text-xs text-mist">（任意）</span>}</span>
+                        {doc ? (
+                          <>
+                            <button onClick={() => downloadUploaded(kind)} className="text-sm text-matchaDeep underline hover:opacity-80">{doc.fileName}</button>
+                            <span className="text-xs text-mist">{doc.uploadedAt.slice(0, 16).replace('T', ' ')}</span>
+                            <label className="cursor-pointer text-xs text-graphite underline">
+                              差し替え
+                              <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
+                            </label>
+                            <button onClick={() => deleteUploaded(kind)} disabled={isBusy} className="text-xs text-red-700 underline">削除</button>
+                          </>
+                        ) : (
+                          <label className="cursor-pointer btn-ghost text-sm">
+                            {isBusy ? 'アップロード中…' : 'ファイルを選択'}
+                            <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
+                          </label>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
             {isAdmin && (

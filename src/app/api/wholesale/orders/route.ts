@@ -123,11 +123,7 @@ interface PatchBody {
   trackingNumber?: string
   shippingCarrierLabel?: string
   shipped?: boolean // set_fulfillment: explicitly set/unset shipped status
-  awbNo?: string // air waybill number (export, set at shipment)
-  grossWeightKg?: number // total gross weight (export, set at shipment)
-  fields?: Record<string, string | number> // set_doc_fields: editable (non-calc) document fields
-  itemNames?: Record<string, string> // set_doc_fields: per-line product name overrides (index → name)
-  itemHsCodes?: Record<string, string> // set_doc_fields: per-line HS code overrides (index → hs)
+  fields?: Record<string, string | number> // set_doc_fields: editable (non-calc) document fields (宛名/有効期限)
   // set_billing fields (入金管理 inline edits)
   paymentStatus?: 'paid' | 'invoiced' | 'uninvoiced' | 'unpaid'
   paymentDate?: string // YYYY-MM-DD
@@ -357,8 +353,6 @@ export async function PATCH(request: Request) {
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
     if (body.trackingNumber !== undefined) patch.trackingNumber = body.trackingNumber.trim() || FieldValue.delete()
     if (body.shippingCarrierLabel !== undefined) patch.shippingCarrierLabel = body.shippingCarrierLabel.trim() || FieldValue.delete()
-    if (body.awbNo !== undefined) patch.awbNo = body.awbNo.trim() || FieldValue.delete()
-    if (typeof body.grossWeightKg === 'number') patch.grossWeightKg = body.grossWeightKg > 0 ? body.grossWeightKg : FieldValue.delete()
     if (body.shipped === true) { patch.status = 'shipped'; patch.shippedAt = new Date().toISOString() }
     if (body.shipped === false) { patch.status = 'paid'; patch.shippedAt = FieldValue.delete() }
     await ref.set(patch, { merge: true })
@@ -372,40 +366,13 @@ export async function PATCH(request: Request) {
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }
-  // 書類の編集（計算に影響しない項目のみ）。発行前の編集モーダルから保存し、再発行で反映。
+  // 書類の宛名/有効期限など、計算に影響しない編集可能フィールドの保存。
   if (body.action === 'set_doc_fields') {
-    const STRING_KEYS = [
-      'contactName', 'shippingPostalCode', 'shippingAddress', 'shippingCountry', 'phone', 'shippingEmail',
-      'buyerTaxId', 'incoterms', 'incotermsPlace', 'reasonForExport', 'typeOfExport', 'dutyPayer', 'payerOfVat',
-      'shippingCarrierLabel', 'trackingNumber', 'notes', 'receiptAtena', 'receiptProviso',
-      'quotationValidUntil', 'proformaValidUntil',
-    ]
-    const NUMBER_KEYS = ['grossWeightKg']
+    const STRING_KEYS = ['receiptAtena', 'receiptProviso', 'proformaValidUntil']
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
     const fields = (body.fields ?? {}) as Record<string, unknown>
     for (const k of STRING_KEYS) {
       if (fields[k] !== undefined) patch[k] = String(fields[k]).trim() || FieldValue.delete()
-    }
-    for (const k of NUMBER_KEYS) {
-      if (fields[k] !== undefined) {
-        const n = Number(fields[k])
-        patch[k] = Number.isFinite(n) && n > 0 ? n : FieldValue.delete()
-      }
-    }
-    // Editable product names / HS codes (display only — do not affect amounts).
-    if (body.itemNames || body.itemHsCodes) {
-      const cur = (await ref.get()).data() as { items?: Record<string, unknown>[] } | undefined
-      if (cur?.items) {
-        patch.items = cur.items.map((it, i) => {
-          const name = body.itemNames?.[String(i)]
-          const hs = body.itemHsCodes?.[String(i)]
-          return {
-            ...it,
-            ...(name != null && String(name).trim() ? { productName: String(name).trim() } : {}),
-            ...(hs != null ? { hsCode: String(hs).trim() } : {}),
-          }
-        })
-      }
     }
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
@@ -445,8 +412,6 @@ export async function PATCH(request: Request) {
         shippedAt: now,
         ...(body.trackingNumber?.trim() ? { trackingNumber: body.trackingNumber.trim() } : {}),
         ...(body.shippingCarrierLabel?.trim() ? { shippingCarrierLabel: body.shippingCarrierLabel.trim() } : {}),
-        ...(body.awbNo?.trim() ? { awbNo: body.awbNo.trim() } : {}),
-        ...(typeof body.grossWeightKg === 'number' && body.grossWeightKg > 0 ? { grossWeightKg: body.grossWeightKg } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
