@@ -128,7 +128,6 @@ export default function WholesaleOrderDetailPage() {
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
-  const [awbNo, setAwbNo] = useState('')
   const [grossWeight, setGrossWeight] = useState('')
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
@@ -179,7 +178,6 @@ export default function WholesaleOrderDetailPage() {
       setOrder(found)
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
-      setAwbNo(found?.awbNo ?? '')
       setGrossWeight(found?.grossWeightKg != null ? String(found.grossWeightKg) : '')
       setAdminMemo(found?.adminMemo ?? '')
       setShippingMemo(found?.shippingMemo ?? '')
@@ -863,15 +861,12 @@ export default function WholesaleOrderDetailPage() {
                       {carrierLabel && !carriers.some(c => c.englishName === carrierLabel) && <option value={carrierLabel}>{carrierLabel}（旧値）</option>}
                     </select>
                   </label>
-                  <label className="text-xs text-mist">追跡番号<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} /></label>
+                  <label className="text-xs text-mist">{o.isDomestic === false ? '追跡番号 / AWB番号' : '追跡番号'}<input className="mt-1 block w-52 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={tracking} onChange={e => setTracking(e.target.value)} placeholder={o.isDomestic === false ? '航空貨物番号(AWB)' : ''} /></label>
                   {o.isDomestic === false && (
-                    <>
-                      <label className="text-xs text-mist">AWB番号<input className="mt-1 block w-44 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={awbNo} onChange={e => setAwbNo(e.target.value)} placeholder="航空貨物番号" /></label>
-                      <label className="text-xs text-mist">総重量(kg)<input type="number" step="0.001" className="mt-1 block w-28 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} placeholder="gross" /></label>
-                    </>
+                    <label className="text-xs text-mist">総重量(kg)<input type="number" step="0.001" className="mt-1 block w-28 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" value={grossWeight} onChange={e => setGrossWeight(e.target.value)} placeholder="gross" /></label>
                   )}
                   {(() => {
-                    const shipFields = { trackingNumber: tracking, shippingCarrierLabel: carrierLabel, awbNo, grossWeightKg: Number(grossWeight) || undefined }
+                    const shipFields = { trackingNumber: tracking, shippingCarrierLabel: carrierLabel, grossWeightKg: Number(grossWeight) || undefined }
                     return o.status === 'shipped' ? (
                       <>
                         <button onClick={() => act('set_fulfillment', shipFields)} disabled={busy} className="btn-primary">出荷情報を更新</button>
