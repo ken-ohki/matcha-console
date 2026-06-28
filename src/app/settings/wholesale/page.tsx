@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { SettingsNav } from '@/components/settings/SettingsNav'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
@@ -142,7 +142,6 @@ export default function SettingsWholesalePage() {
     )
   }
 
-  const tabCls = 'rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]'
 
   return (
     <AppLayout>
@@ -158,14 +157,7 @@ export default function SettingsWholesalePage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/settings/masters" className={tabCls}>マスター管理</Link>
-          <Link href="/settings/users" className={tabCls}>ユーザー管理</Link>
-          <Link href="/settings/terms" className={tabCls}>請求書 T&amp;C</Link>
-          <Link href="/settings/bank-accounts" className={tabCls}>入金口座</Link>
-          <Link href="/settings/issuer" className={tabCls}>自社情報</Link>
-          <Link href="/settings/wholesale" className="rounded-full bg-ink px-3 py-1.5 text-paper">卸売設定</Link>
-        </div>
+        <SettingsNav active="wholesale" />
 
         {feedback && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${

@@ -53,7 +53,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: '管理',
     items: [
-      { href: '/settings/masters', label: '設定', icon: Settings, roles: ['admin'] },
+      { href: '/settings', label: '設定', icon: Settings, roles: ['admin'] },
     ],
   },
 ]

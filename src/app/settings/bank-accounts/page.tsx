@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { SettingsNav } from '@/components/settings/SettingsNav'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
@@ -76,14 +76,7 @@ export default function SettingsBankAccountsPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/settings/masters" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">マスター管理</Link>
-          <Link href="/settings/users" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">ユーザー管理</Link>
-          <Link href="/settings/terms" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
-          <Link href="/settings/bank-accounts" className="rounded-full bg-ink px-3 py-1.5 text-paper">入金口座</Link>
-          <Link href="/settings/issuer" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">自社情報</Link>
-          <Link href="/settings/wholesale" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">卸売設定</Link>
-        </div>
+        <SettingsNav active="bank-accounts" />
 
         {feedback && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${

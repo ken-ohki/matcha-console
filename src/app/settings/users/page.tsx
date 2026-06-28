@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import { SettingsNav } from '@/components/settings/SettingsNav'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -269,44 +269,7 @@ export default function SettingsUsersPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-sm">
-          <Link
-            href="/settings/masters"
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
-          >
-            マスター管理
-          </Link>
-          <Link
-            href="/settings/users"
-            className="rounded-full bg-ink px-3 py-1.5 text-paper"
-          >
-            ユーザー管理
-          </Link>
-          <Link
-            href="/settings/terms"
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
-          >
-            請求書 T&amp;C
-          </Link>
-          <Link
-            href="/settings/bank-accounts"
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
-          >
-            入金口座
-          </Link>
-          <Link
-            href="/settings/issuer"
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
-          >
-            自社情報
-          </Link>
-          <Link
-            href="/settings/wholesale"
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]"
-          >
-            卸売設定
-          </Link>
-        </div>
+        <SettingsNav active="users" />
 
         {feedback && (
           <div className={`rounded-xl border px-4 py-3 text-sm ${
