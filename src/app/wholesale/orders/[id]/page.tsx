@@ -860,6 +860,42 @@ export default function WholesaleOrderDetailPage() {
                   })()}
                 </div>
                 {o.shippedAt && <p className="mb-2 text-xs text-mist">出荷日: {o.shippedAt.slice(0, 10)}</p>}
+
+                {/* 越境: 外部(DHL/EMS)で作成した通関書類をアップロード。発送通知メールに自動添付される。 */}
+                {isExport && (
+                  <div className="mb-3 rounded-lg border border-line bg-bone/50 p-3">
+                    <p className="mb-1 text-xs font-mono uppercase tracking-brand text-mist">通関書類のアップロード（越境）</p>
+                    <p className="mb-3 text-xs text-mist">DHL / EMS で作成した PDF をアップロードすると、発送通知メールに自動添付され、お客様のマイページからもDLできます。</p>
+                    <div className="space-y-2">
+                      {(['commercial', 'packingList'] as UploadKind[]).map(kind => {
+                        const doc = o.uploadedDocs?.[kind]
+                        const isBusy = uploadingKind === kind
+                        return (
+                          <div key={kind} className="flex flex-wrap items-center gap-3 border-b border-line/40 pb-2">
+                            <span className="w-40 text-sm text-ink">{UPLOAD_LABEL[kind]}{kind === 'packingList' && <span className="text-xs text-mist">（任意）</span>}</span>
+                            {doc ? (
+                              <>
+                                <button onClick={() => downloadUploaded(kind)} className="text-sm text-matchaDeep underline hover:opacity-80">{doc.fileName}</button>
+                                <span className="text-xs text-mist">{doc.uploadedAt.slice(0, 16).replace('T', ' ')}</span>
+                                <label className="cursor-pointer text-xs text-graphite underline">
+                                  差し替え
+                                  <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
+                                </label>
+                                <button onClick={() => deleteUploaded(kind)} disabled={isBusy} className="text-xs text-red-700 underline">削除</button>
+                              </>
+                            ) : (
+                              <label className="cursor-pointer btn-ghost text-sm">
+                                {isBusy ? 'アップロード中…' : 'ファイルを選択'}
+                                <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
+                              </label>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {(o.status === 'paid' || o.status === 'shipped') && (
                   <div className="flex flex-wrap items-center gap-3">
                     <button onClick={() => act('notify_shipped')} disabled={busy} className="btn-ghost">発送通知メールを送信</button>
@@ -908,41 +944,6 @@ export default function WholesaleOrderDetailPage() {
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
               )}
             </div>
-
-            {/* 越境: 外部(DHL/EMS)で作成した通関書類のアップロード。発送完了メールに添付される。 */}
-            {isAdmin && isExport && o.status !== 'cancelled' && (
-              <div className="mt-2 rounded-lg border border-line bg-white p-4">
-                <p className="mb-1 text-xs font-mono uppercase tracking-brand text-mist">通関書類のアップロード（越境）</p>
-                <p className="mb-3 text-xs text-mist">DHL / EMS で作成した PDF をアップロードすると、発送完了メールに自動添付され、お客様のマイページからもDLできます。</p>
-                <div className="space-y-2">
-                  {(['commercial', 'packingList'] as UploadKind[]).map(kind => {
-                    const doc = o.uploadedDocs?.[kind]
-                    const isBusy = uploadingKind === kind
-                    return (
-                      <div key={kind} className="flex flex-wrap items-center gap-3 border-b border-line/40 pb-2">
-                        <span className="w-40 text-sm text-ink">{UPLOAD_LABEL[kind]}{kind === 'packingList' && <span className="text-xs text-mist">（任意）</span>}</span>
-                        {doc ? (
-                          <>
-                            <button onClick={() => downloadUploaded(kind)} className="text-sm text-matchaDeep underline hover:opacity-80">{doc.fileName}</button>
-                            <span className="text-xs text-mist">{doc.uploadedAt.slice(0, 16).replace('T', ' ')}</span>
-                            <label className="cursor-pointer text-xs text-graphite underline">
-                              差し替え
-                              <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
-                            </label>
-                            <button onClick={() => deleteUploaded(kind)} disabled={isBusy} className="text-xs text-red-700 underline">削除</button>
-                          </>
-                        ) : (
-                          <label className="cursor-pointer btn-ghost text-sm">
-                            {isBusy ? 'アップロード中…' : 'ファイルを選択'}
-                            <input type="file" accept="application/pdf" className="hidden" disabled={isBusy} onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(kind, f); e.target.value = '' }} />
-                          </label>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
             {isAdmin && (
