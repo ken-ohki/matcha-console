@@ -6,6 +6,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import { getServices } from '@/lib/services'
 import type { InventoryGroup, ProductWithInventory } from '@/types'
 import { formatKg, todayIso } from '@/lib/format'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface GroupSection {
   name: string
@@ -75,7 +76,7 @@ export default function StocktakeSheetPage() {
         {loading ? (
           <p className="py-20 text-center text-sm text-mist">読み込み中…</p>
         ) : total === 0 ? (
-          <p className="py-20 text-center text-sm text-mist">対象の商品がありません。</p>
+          <EmptyState message="対象の商品がありません。" />
         ) : (
           <div className="rounded-lg border border-line bg-white p-6 shadow-sm print:border-0 print:p-0 print:shadow-none">
             <div className="mb-4 flex items-end justify-between">

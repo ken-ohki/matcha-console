@@ -12,6 +12,7 @@ import { ExternalLink, FileText, Mail, MapPin, Phone, Save, Search, Trash2, Truc
 import { uploadSupplierAttachment, deleteStorageObjectByUrl } from '@/lib/firebase/storage'
 import type { SupplierAttachment } from '@/types'
 import { formatCurrency } from '@/lib/format'
+import { EmptyState, EmptyTableRow } from '@/components/ui/EmptyState'
 
 function formatDate(date?: Date): string {
   if (!date) return '-'
@@ -133,11 +134,7 @@ export default function SuppliersPage() {
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-3 py-10 text-center text-sm text-mist">
-                      登録済みの仕入先はありません。
-                    </td>
-                  </tr>
+                  <EmptyTableRow colSpan={5} message="登録済みの仕入先はありません。" />
                 )}
                 {filtered.map(s => (
                   <tr
@@ -369,7 +366,7 @@ function SupplierDetailModal({
                   <p className="mb-2 text-xs font-medium uppercase tracking-wider text-mist">料金表など添付ファイル（PDF）</p>
                   <div className="space-y-2">
                     {(form.attachments ?? []).length === 0 && (
-                      <p className="text-xs text-mist">添付ファイルなし</p>
+                      <EmptyState variant="plain" message="添付ファイルなし" />
                     )}
                     {(form.attachments ?? []).map(att => (
                       <div key={att.id} className="flex items-center gap-2 rounded-xl border border-[#e6dfcf] bg-white px-3 py-2 text-sm">
@@ -478,9 +475,7 @@ function SupplierDetailModal({
             <section className="border-t border-[#ece8db] pt-5">
               <h3 className="mb-3 text-sm font-semibold text-ink">過去の発注 ({orders.length}件)</h3>
               {orders.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-line py-6 text-center text-sm text-mist">
-                  発注履歴はまだありません。
-                </div>
+                <EmptyState message="発注履歴はまだありません。" />
               ) : (
                 <div className="overflow-hidden rounded-xl border border-[#ece8db]">
                   <table className="min-w-full text-sm">

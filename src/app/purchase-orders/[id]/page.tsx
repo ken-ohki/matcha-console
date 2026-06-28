@@ -19,6 +19,7 @@ import { ArrowLeft, FileText, Plus, Trash2 } from 'lucide-react'
 import { computePoTaxIncluded, isLegacyPayablePo, poLineBillableRemaining, poLineSubtotal, poPaidTotal, poRemaining } from '@/lib/cashflow'
 import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 import { InstallmentScheduleEditor } from '@/components/InstallmentScheduleEditor'
+import { EmptyState } from '@/components/ui/EmptyState'
 import {
   StatusBadge,
   PaymentStatusBadge,
@@ -360,7 +361,7 @@ export default function PurchaseOrderDetailPage() {
             <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4">
               <p className="mb-2 text-sm font-semibold text-ink">紐付く請求書</p>
               {linkedInvoices.length === 0 ? (
-                <p className="text-xs text-mist">まだ請求書が登録されていません。</p>
+                <EmptyState variant="plain" message="まだ請求書が登録されていません。" />
               ) : (
                 <ul className="space-y-1.5 text-sm">
                   {linkedInvoices.map(inv => (

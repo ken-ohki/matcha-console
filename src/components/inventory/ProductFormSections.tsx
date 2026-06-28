@@ -14,6 +14,7 @@ import type {
 } from '@/types'
 import { getServices } from '@/lib/services'
 import { uploadProductImage } from '@/lib/firebase/storage'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 // ---- helpers (kept local so detail page + modal render identically) ---------
 
@@ -400,9 +401,7 @@ export function ProductStockSection({
         </div>
         <div className="space-y-2">
           {form.arrivalRecords.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line px-4 py-5 text-sm text-mist">
-              まだ入荷記録がありません。
-            </div>
+            <EmptyState message="まだ入荷記録がありません。" />
           ) : (
             form.arrivalRecords
               .slice()
@@ -492,9 +491,7 @@ export function ProductStockSection({
 
         <div className="mt-4 space-y-3">
           {form.inventoryChecks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-line px-4 py-5 text-sm text-mist">
-              まだ棚卸記録がありません。必要なタイミングで追加してください。
-            </div>
+            <EmptyState message="まだ棚卸記録がありません。必要なタイミングで追加してください。" />
           )}
           {form.inventoryChecks
             .slice()

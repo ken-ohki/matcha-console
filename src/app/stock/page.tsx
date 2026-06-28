@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyTableRow } from '@/components/ui/EmptyState'
 import { getServices } from '@/lib/services'
 import type { ProductWithInventory } from '@/types'
 import { Package, Search, Boxes, ClipboardList } from 'lucide-react'
@@ -140,7 +141,7 @@ export default function StockPage() {
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={5} className="px-3 py-10 text-center text-sm text-mist">該当する商品がありません。</td></tr>
+                  <EmptyTableRow colSpan={5} message="該当する商品がありません。" />
                 )}
                 {filtered.map(p => (
                   <tr key={p.id} className="border-b border-[#f0ebdf] hover:bg-bone">

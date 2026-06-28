@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Check, X, Ban, RefreshCw } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
@@ -487,7 +488,7 @@ export default function WholesaleMemberDetailPage({ params }: { params: Promise<
             <section className="rounded-2xl border border-line bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-mist">購入履歴 ({orders.length})</h2>
               {orders.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">購入履歴はありません。</p>
+                <EmptyState message="購入履歴はありません。" />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-sm">

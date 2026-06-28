@@ -16,6 +16,7 @@ import type {
 } from '@/types'
 import { ChevronRight, ClipboardList, FileText, Plus, Search, X } from 'lucide-react'
 import { computePoTaxIncluded } from '@/lib/cashflow'
+import { EmptyTableRow } from '@/components/ui/EmptyState'
 import { formatCurrency, formatDate, formatKg, todayIso } from '@/lib/format'
 import {
   PaymentStatusBadge,
@@ -273,11 +274,7 @@ export default function PurchaseOrdersPage() {
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={11} className="px-3 py-10 text-center text-sm text-mist">
-                      発注はまだ登録されていません。
-                    </td>
-                  </tr>
+                  <EmptyTableRow colSpan={11} message="発注はまだ登録されていません。" />
                 )}
                 {filtered.map(order => (
                   <PoListRow

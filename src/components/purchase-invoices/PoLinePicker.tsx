@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { ListPlus, Plus, Search, Trash2 } from 'lucide-react'
 import type { TaxRate, UnbilledPoLine } from '@/types'
 import { formatCurrency, formatKg } from '@/lib/format'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 // A draft 'po' line held in the form. `key` is a client-only stable id for React
 // keys / edits; it is NOT sent to the service.
@@ -122,9 +123,7 @@ export function PoLinePicker({
           {loading ? (
             <p className="py-3 text-center text-xs text-mist">読み込み中…</p>
           ) : scoped.length === 0 ? (
-            <p className="py-3 text-center text-xs text-mist">
-              この仕入先の請求待ち明細はありません。
-            </p>
+            <EmptyState message="この仕入先の請求待ち明細はありません。" />
           ) : (
             <ul className="max-h-64 space-y-1.5 overflow-y-auto">
               {scoped.map(c => {

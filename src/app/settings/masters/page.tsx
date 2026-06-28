@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
@@ -247,7 +248,7 @@ export default function SettingsMastersPage() {
             {loading ? (
               <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
             ) : drafts.length === 0 ? (
-              <p className="py-10 text-center text-sm text-mist">登録されていません。</p>
+              <EmptyState message="登録されていません。" />
             ) : (
               <div className="space-y-2">
                 <div className="hidden grid-cols-[1fr_1fr_60px_60px] gap-3 px-3 text-[11px] uppercase tracking-wider text-mist md:grid">

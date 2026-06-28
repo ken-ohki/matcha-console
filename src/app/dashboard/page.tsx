@@ -8,6 +8,7 @@ import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { orderToSale, type WholesaleOrderRow } from '@/lib/wholesaleAdapter'
 import type { SaleRecord } from '@/types'
 import { UserCheck, CreditCard, FileText, RefreshCw, ArrowRight, PackageMinus } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface WOrder {
   id: string
@@ -144,7 +145,7 @@ export default function DashboardPage() {
           {loading ? (
             <p className="py-6 text-center text-sm text-mist">読み込み中…</p>
           ) : attentionOrders.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-mist">対応が必要な注文はありません。</p>
+            <EmptyState message="対応が必要な注文はありません。" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-max min-w-full text-sm">

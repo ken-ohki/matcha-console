@@ -5,6 +5,7 @@ import { Info, LayoutGrid, Leaf, List, Lock, Search, X } from 'lucide-react'
 import type { CatalogProduct, CatalogResponse, SupportedCurrency } from '@/lib/catalog'
 import { SUPPORTED_CURRENCIES } from '@/lib/catalog'
 import type { StockStatus } from '@/types'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 const PASSCODE_KEY = 'matcha-catalog-passcode'
 const VIEW_MODE_KEY = 'matcha-catalog-view-mode'
@@ -616,9 +617,7 @@ export default function CatalogPage() {
         </div>
 
         {filteredProducts.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-white/60 py-12 text-center text-sm text-mist">
-            No products match your filters
-          </div>
+          <EmptyState message="No products match your filters" />
         ) : viewMode === 'list' ? (
           <ProductList
             products={filteredProducts}

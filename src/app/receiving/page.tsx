@@ -14,6 +14,7 @@ import type {
 import { PackageOpen, Check, Undo2, X, FilePlus, Trash2 } from 'lucide-react'
 import { formatKg, todayIso } from '@/lib/format'
 import { computeTax } from '@/lib/tax'
+import { EmptyTableRow } from '@/components/ui/EmptyState'
 
 interface PendingLine {
   order: PurchaseOrder
@@ -439,9 +440,7 @@ export default function ReceivingPage() {
                 </thead>
                 <tbody>
                   {pendingLines.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-mist">入荷待ちの商品はありません</td>
-                    </tr>
+                    <EmptyTableRow colSpan={6} message="入荷待ちの商品はありません" />
                   ) : (
                     pendingLines.map(({ order, lineIndex }) => {
                       const item = order.items[lineIndex]
@@ -569,9 +568,7 @@ export default function ReceivingPage() {
                     </thead>
                     <tbody>
                       {receivedLines.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-8 text-center text-mist">入荷済みの商品はありません</td>
-                        </tr>
+                        <EmptyTableRow colSpan={4} message="入荷済みの商品はありません" />
                       ) : (
                         receivedLines.map(({ order, lineIndex }) => {
                           const item = order.items[lineIndex]

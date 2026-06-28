@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyState, EmptyTableRow } from '@/components/ui/EmptyState'
 import { getServices } from '@/lib/services'
 import type {
   EcSaleRecord,
@@ -552,7 +553,7 @@ export default function FinancialsPage() {
                 <h2 className="text-sm font-semibold text-ink">アラート（期限超過）</h2>
               </div>
               {overdueSales.length === 0 && overdueOrders.length === 0 && overdueInvoices.length === 0 ? (
-                <p className="text-xs text-mist">期限超過の請求・支払いはありません。</p>
+                <EmptyState variant="plain" message="期限超過の請求・支払いはありません。" />
               ) : (
                 <div className="space-y-3">
                   {overdueInvoices.length > 0 && (
@@ -689,7 +690,7 @@ function PeriodTable({ rows, title, yoy }: {
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={yoy ? 7 : 6} className="px-3 py-6 text-center text-mist">データがありません。</td></tr>
+              <EmptyTableRow colSpan={yoy ? 7 : 6} message="データがありません。" />
             )}
           </tbody>
         </table>
@@ -705,7 +706,7 @@ function MonthlyTrendChart({ rows, yoy }: {
   const series = [...rows].sort((a, b) => a.key.localeCompare(b.key))
   if (series.length === 0) {
     return (
-      <div className="rounded-2xl border border-line bg-white p-4 text-center text-xs text-mist">表示できる月次データがありません。</div>
+      <EmptyState message="表示できる月次データがありません。" />
     )
   }
   const W = 720, H = 220
@@ -776,7 +777,7 @@ function MonthlyTrendChart({ rows, yoy }: {
 
 function ProductsTab({ rows }: { rows: ProductRow[] }) {
   if (rows.length === 0) {
-    return <div className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">商品データがありません。</div>
+    return <EmptyState message="商品データがありません。" />
   }
   const total = rows.reduce((s, r) => s + r.revenue, 0) || 1
   const maxRev = rows[0]?.revenue || 1
@@ -889,7 +890,7 @@ function PartnerTable({ title, rows, headers }: { title: string; rows: PartnerRo
               )
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-6 text-center text-mist">データがありません。</td></tr>
+              <EmptyTableRow colSpan={6} message="データがありません。" />
             )}
           </tbody>
         </table>

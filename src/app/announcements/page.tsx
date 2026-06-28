@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { Megaphone, Plus, Trash2, Pencil } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface Announcement {
   id: string
@@ -150,7 +151,7 @@ export default function AnnouncementsPage() {
           {loading ? (
             <p className="py-10 text-center text-sm text-mist">読み込み中…</p>
           ) : items.length === 0 ? (
-            <p className="py-10 text-center text-sm text-mist">お知らせはまだありません。</p>
+            <EmptyState message="お知らせはまだありません。" />
           ) : (
             <ul className="divide-y divide-line">
               {items.map(a => (

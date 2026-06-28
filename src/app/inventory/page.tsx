@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { StockStatusBadge } from '@/components/ui/StatusBadge'
+import { EmptyState, EmptyTableRow } from '@/components/ui/EmptyState'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { formatCultivars, formatOptionList } from '@/lib/product-master'
@@ -933,9 +934,7 @@ export default function InventoryPage() {
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="rounded-2xl border border-line bg-white px-4 py-12 text-center text-mist shadow-sm">
-              商品がありません
-            </div>
+            <EmptyState message="商品がありません" />
           )}
         </div>
 
@@ -1067,11 +1066,7 @@ export default function InventoryPage() {
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={user?.role === 'admin' ? 20 : 18} className="px-4 py-12 text-center text-mist">
-                      商品がありません
-                    </td>
-                  </tr>
+                  <EmptyTableRow colSpan={user?.role === 'admin' ? 20 : 18} message="商品がありません" />
                 )}
               </tbody>
             </table>

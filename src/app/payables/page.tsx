@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { getServices } from '@/lib/services'
 import { useAuth } from '@/contexts/AuthContext'
 import type {
@@ -538,7 +539,7 @@ export default function PayablesPage() {
     }
     const suppliers = [...bySupplier.entries()].sort((a, b) => a[0].localeCompare(b[0]))
     if (suppliers.length === 0) {
-      return <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">請求待ち（入荷済み・未請求）の発注はありません。</p>
+      return <EmptyState message="請求待ち（入荷済み・未請求）の発注はありません。" />
     }
     return (
       <div className="space-y-4">
@@ -700,7 +701,7 @@ export default function PayablesPage() {
                 renderPending()
               ) : active === 'actionNeeded' ? (
                 overGroup.length === 0 && dueGroup.length === 0 ? (
-                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の支払いはありません。</p>
+                  <EmptyState message="要確認の支払いはありません。" />
                 ) : (
                   <div className="space-y-4">
                     {overGroup.length > 0 && renderCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
@@ -708,7 +709,7 @@ export default function PayablesPage() {
                   </div>
                 )
               ) : (grouped[active] ?? []).length === 0 ? (
-                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{TAB_LABELS[active]}の支払いはありません。</p>
+                <EmptyState message={`${TAB_LABELS[active]}の支払いはありません。`} />
               ) : (
                 renderCard(TAB_LABELS[active], BUCKET_COLORS[active], grouped[active], active === 'paid')
               )}

@@ -8,6 +8,7 @@ import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { businessTypeText } from '@/lib/wholesaleBusinessTypes'
 import { useStickyState } from '@/hooks/useStickyState'
 import { Check, X, Ban, RefreshCw, Search } from 'lucide-react'
+import { EmptyTableRow } from '@/components/ui/EmptyState'
 
 interface Member {
   uid: string
@@ -264,9 +265,7 @@ export default function WholesaleMembersPage() {
                     </tr>
                   ))}
                   {filtered.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-mist">該当する会員がいません。</td>
-                    </tr>
+                    <EmptyTableRow colSpan={10} message="該当する会員がいません。" />
                   )}
                 </tbody>
               </table>

@@ -15,6 +15,7 @@ import {
 import { X, Undo2 } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { getServices } from '@/lib/services'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -491,7 +492,7 @@ export default function ReceivablesPage() {
                 </div>
               ) : active === 'actionNeeded' ? (
                 overGroup.length === 0 && dueGroup.length === 0 ? (
-                  <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">要確認の売掛はありません。</p>
+                  <EmptyState message="要確認の売掛はありません。" />
                 ) : (
                   <div className="space-y-4">
                     {overGroup.length > 0 && renderSaleCard('期限超過', 'border-alert/40 bg-alert/5', overGroup)}
@@ -499,7 +500,7 @@ export default function ReceivablesPage() {
                   </div>
                 )
               ) : rows.length === 0 ? (
-                <p className="rounded-2xl border border-line bg-white p-6 text-center text-sm text-mist">{BUCKET_LABELS[active as Bucket]}の売掛はありません。</p>
+                <EmptyState message={`${BUCKET_LABELS[active as Bucket]}の売掛はありません。`} />
               ) : (
                 renderSaleCard(BUCKET_LABELS[active as Bucket], BUCKET_COLORS[active as Bucket], rows)
               )}

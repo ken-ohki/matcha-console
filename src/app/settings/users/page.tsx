@@ -9,6 +9,7 @@ import { getServices, type UserProfile } from '@/lib/services'
 import type { UserRole } from '@/types'
 import { Plus, Save, Settings, ShieldCheck, Trash2, User2, X } from 'lucide-react'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 const ROLE_LABELS: Record<UserRole, string> = { admin: 'Admin', viewer: 'Viewer', finance: 'Finance（経理）' }
 
@@ -321,7 +322,7 @@ export default function SettingsUsersPage() {
           {loading ? (
             <p className="px-5 py-10 text-center text-sm text-mist">読み込み中…</p>
           ) : users.length === 0 ? (
-            <p className="px-5 py-10 text-center text-sm text-mist">登録ユーザーがいません。</p>
+            <EmptyState message="登録ユーザーがいません。" />
           ) : (
             <table className="min-w-full text-sm">
               <thead>

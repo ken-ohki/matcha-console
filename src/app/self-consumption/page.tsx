@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyState, EmptyTableRow } from '@/components/ui/EmptyState'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import type {
@@ -346,9 +347,7 @@ export default function SelfConsumptionPage() {
 
           <div className="mt-5 space-y-3 md:hidden">
             {!loading && filteredRecords.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center text-sm text-mist">
-                条件に合う自社消費の記録はありません。
-              </div>
+              <EmptyState message="条件に合う自社消費の記録はありません。" />
             )}
             {filteredRecords.map(record => (
               <div key={record.id} className="rounded-2xl border border-line bg-bone p-4">
@@ -405,11 +404,7 @@ export default function SelfConsumptionPage() {
               </thead>
               <tbody>
                 {!loading && filteredRecords.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3 py-10 text-center text-sm text-mist">
-                      条件に合う自社消費の記録はありません。
-                    </td>
-                  </tr>
+                  <EmptyTableRow colSpan={6} message="条件に合う自社消費の記録はありません。" />
                 )}
                 {filteredRecords.map(record => (
                   <tr key={record.id} className="border-b border-[#f0ebdf] text-ink">

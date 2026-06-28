@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getServices } from '@/lib/services'
 import type { Settings, ShippingTierJp, WholesaleCoupon, WholesaleOption, WholesaleRankDiscounts } from '@/types'
 import { Save, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 const uid = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)
@@ -233,7 +234,7 @@ export default function SettingsWholesalePage() {
               </button>
             </div>
             {coupons.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">クーポンがありません。</p>
+              <EmptyState message="クーポンがありません。" />
             ) : (
               <div className="space-y-4">
                 {coupons.map((c, ci) => {
@@ -271,7 +272,7 @@ export default function SettingsWholesalePage() {
                         <p className="text-[11px] text-mist">対象商品（未選択＝全商品）{eligible.length > 0 ? ` — ${eligible.length}件選択中` : ''}</p>
                         <div className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-line p-2">
                           {products.length === 0 ? (
-                            <p className="px-1 py-2 text-xs text-mist">商品がありません。</p>
+                            <EmptyState variant="plain" message="商品がありません。" />
                           ) : (
                             products.map(p => (
                               <label key={p.id} className="flex items-center gap-2 px-1 py-1 text-sm text-ink">
@@ -397,9 +398,7 @@ export default function SettingsWholesalePage() {
             </div>
 
             {tiers.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">
-                送料段がありません。「段を追加」で重量階段を作成してください。
-              </p>
+              <EmptyState message="送料段がありません。「段を追加」で重量階段を作成してください。" />
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 text-[11px] text-mist">
@@ -455,9 +454,7 @@ export default function SettingsWholesalePage() {
             </div>
 
             {options.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-mist">
-                オプションがありません。「オプションを追加」で小分けサービスを作成してください。
-              </p>
+              <EmptyState message="オプションがありません。「オプションを追加」で小分けサービスを作成してください。" />
             ) : (
               <div className="space-y-4">
                 {options.map((o, oi) => (
@@ -512,7 +509,7 @@ export default function SettingsWholesalePage() {
                         </button>
                       </div>
                       {o.tiers.length === 0 ? (
-                        <p className="text-[11px] text-mist">サイズが未設定です。「サイズを追加」で 1kg・100g 等を作成してください。</p>
+                        <EmptyState variant="plain" message="サイズが未設定です。「サイズを追加」で 1kg・100g 等を作成してください。" />
                       ) : (
                         <div className="space-y-2">
                           <div className="grid grid-cols-[1fr_1fr_1fr_36px] gap-2 px-1 text-[10px] text-mist">

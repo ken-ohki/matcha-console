@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
+import { EmptyState, EmptyTableRow } from '@/components/ui/EmptyState'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
 import { fetchWholesaleOrders, orderToSale } from '@/lib/wholesaleAdapter'
@@ -274,7 +275,7 @@ export default function ShippingPage() {
                 </thead>
                 <tbody>
                   {!loading && filtered.length === 0 && (
-                    <tr><td colSpan={10} className="px-3 py-10 text-center text-sm text-mist">該当する販売案件がありません。</td></tr>
+                    <EmptyTableRow colSpan={10} message="該当する販売案件がありません。" />
                   )}
                   {filtered.map(sale => {
                     const first = sale.items[0]
@@ -334,7 +335,7 @@ export default function ShippingPage() {
           {view === 'history' && (
             <div className="mt-4 space-y-5">
               {!loading && historyGroups.length === 0 && (
-                <p className="py-10 text-center text-sm text-mist">発送完了の履歴がありません。</p>
+                <EmptyState message="発送完了の履歴がありません。" />
               )}
               {historyGroups.map(group => (
                 <div key={group.key || '(none)'} className="overflow-hidden rounded-2xl border border-[#e6dfcf]">
@@ -395,7 +396,7 @@ export default function ShippingPage() {
                 </thead>
                 <tbody>
                   {!loading && slipList.length === 0 && (
-                    <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-mist">発送伝票が添付された案件がありません。</td></tr>
+                    <EmptyTableRow colSpan={7} message="発送伝票が添付された案件がありません。" />
                   )}
                   {slipList.map(sale => {
                     const first = sale.items[0]
