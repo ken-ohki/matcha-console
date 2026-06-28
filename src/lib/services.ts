@@ -1,3 +1,4 @@
+import type { EmailEventKey, EmailTemplate } from '@/lib/emailTemplates'
 import type {
   AuthUser,
   UserRole,
@@ -78,6 +79,8 @@ export interface ISettingsService {
   updateBankAccounts(input: BankAccounts): Promise<void>
   getIssuer(): Promise<IssuerInfo>
   updateIssuer(input: IssuerInfo): Promise<void>
+  getEmailTemplates(): Promise<Record<EmailEventKey, EmailTemplate>>
+  updateEmailTemplates(input: Partial<Record<EmailEventKey, EmailTemplate>>): Promise<void>
 }
 
 export interface IMastersService {

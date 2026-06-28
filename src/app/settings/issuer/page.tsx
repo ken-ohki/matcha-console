@@ -120,6 +120,7 @@ export default function SettingsIssuerPage() {
           <Link href="/settings/terms" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
           <Link href="/settings/bank-accounts" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">入金口座</Link>
           <Link href="/settings/issuer" className="rounded-full bg-ink px-3 py-1.5 text-paper">自社情報</Link>
+          <Link href="/settings/emails" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">メール文面</Link>
           <Link href="/settings/wholesale" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">卸売設定</Link>
         </div>
 

@@ -77,6 +77,7 @@ import type {
 } from '../services'
 import { getFirebaseAuthInstance, getFirebaseDb } from './config'
 import { ISSUER } from '../invoice'
+import { EMAIL_EVENTS, DEFAULT_EMAIL_TEMPLATES, type EmailEventKey, type EmailTemplate } from '../emailTemplates'
 import {
   computeInvoiceTotals,
   derivePoBillingStatus,
@@ -2369,6 +2370,27 @@ export function createFirebaseServices(): IServices {
     async updateIssuer(input) {
       await setDoc(
         doc(db, COLLECTIONS.settings, 'issuer'),
+        { ...input, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+    },
+
+    async getEmailTemplates() {
+      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'email_templates'))
+      const stored = (snap.data() ?? {}) as Partial<Record<EmailEventKey, Partial<EmailTemplate>>>
+      const out = {} as Record<EmailEventKey, EmailTemplate>
+      for (const e of EMAIL_EVENTS) {
+        out[e.key] = {
+          subject: stored[e.key]?.subject?.trim() || DEFAULT_EMAIL_TEMPLATES[e.key].subject,
+          body: stored[e.key]?.body?.trim() || DEFAULT_EMAIL_TEMPLATES[e.key].body,
+        }
+      }
+      return out
+    },
+
+    async updateEmailTemplates(input) {
+      await setDoc(
+        doc(db, COLLECTIONS.settings, 'email_templates'),
         { ...input, updatedAt: serverTimestamp() },
         { merge: true },
       )
