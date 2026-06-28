@@ -358,13 +358,6 @@ function mapProduct(id: string, data: DocumentData): Product {
     featured: data.featured === true,
     sampleAvailable: data.sampleAvailable === true,
     samplePrice: data.samplePrice != null ? Number(data.samplePrice) : undefined,
-    originCountry: data.originCountry ? String(data.originCountry) : undefined,
-    hsCodeDefault: data.hsCodeDefault ? String(data.hsCodeDefault) : undefined,
-    hsCodeBySize: Array.isArray(data.hsCodeBySize)
-      ? (data.hsCodeBySize as Record<string, unknown>[])
-          .map(r => ({ maxKg: Number(r.maxKg) || 0, label: r.label ? String(r.label) : undefined, hsCode: String(r.hsCode ?? '') }))
-          .filter(r => r.maxKg > 0 && r.hsCode)
-      : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   }
@@ -1521,9 +1514,6 @@ export function createFirebaseServices(): IServices {
         featured: input.featured ?? current.featured,
         sampleAvailable: input.sampleAvailable ?? current.sampleAvailable,
         samplePrice: input.samplePrice ?? current.samplePrice,
-        originCountry: input.originCountry ?? current.originCountry,
-        hsCodeDefault: input.hsCodeDefault ?? current.hsCodeDefault,
-        hsCodeBySize: input.hsCodeBySize ?? current.hsCodeBySize,
       }
 
       const payload = {
