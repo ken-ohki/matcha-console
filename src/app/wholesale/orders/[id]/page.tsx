@@ -861,7 +861,7 @@ export default function WholesaleOrderDetailPage() {
                 <button onClick={() => downloadDoc('receipt')} disabled={busy} className="btn-ghost">領収書</button>
               )}
               {isAdmin && canReceiptDelivery && !isExport && (
-                <button onClick={() => downloadDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書</button>
+                <button onClick={() => downloadDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書兼領収書</button>
               )}
               {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
                 <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
