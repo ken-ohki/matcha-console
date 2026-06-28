@@ -2388,6 +2388,28 @@ export function createFirebaseServices(): IServices {
         { merge: true },
       )
     },
+
+    async getExportSettings() {
+      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'export'))
+      const data = snap.data() ?? {}
+      return {
+        incotermsDefault: String(data.incotermsDefault ?? 'FOB'),
+        incotermsPlace: String(data.incotermsPlace ?? ''),
+        reasonForExport: String(data.reasonForExport ?? 'Commercial'),
+        typeOfExport: String(data.typeOfExport ?? 'Commercial Purposes/Sale'),
+        dutyPayer: String(data.dutyPayer ?? 'Receiver Will Pay'),
+        payerOfVat: String(data.payerOfVat ?? ''),
+        defaultCarrier: String(data.defaultCarrier ?? 'DHL'),
+      }
+    },
+
+    async updateExportSettings(input) {
+      await setDoc(
+        doc(db, COLLECTIONS.settings, 'export'),
+        { ...input, updatedAt: serverTimestamp() },
+        { merge: true },
+      )
+    },
   }
 
   const authService: IAuthService = {
