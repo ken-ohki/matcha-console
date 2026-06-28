@@ -67,12 +67,6 @@ export interface IssuerInfo {
   tel: string
   email: string
   registrationNumber: string
-  // 輸出書類（Commercial Invoice）用
-  signerName: string
-  signerPosition: string
-  traderType: string
-  vatNo: string
-  eori: string
 }
 
 export interface ISettingsService {
@@ -84,18 +78,6 @@ export interface ISettingsService {
   updateBankAccounts(input: BankAccounts): Promise<void>
   getIssuer(): Promise<IssuerInfo>
   updateIssuer(input: IssuerInfo): Promise<void>
-  getExportSettings(): Promise<ExportSettingsInfo>
-  updateExportSettings(input: ExportSettingsInfo): Promise<void>
-}
-
-export interface ExportSettingsInfo {
-  incotermsDefault: string
-  incotermsPlace: string
-  reasonForExport: string
-  typeOfExport: string
-  dutyPayer: string
-  payerOfVat: string
-  defaultCarrier: string
 }
 
 export interface IMastersService {

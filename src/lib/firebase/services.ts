@@ -2373,39 +2373,12 @@ export function createFirebaseServices(): IServices {
         tel: String(data.tel ?? ISSUER.tel),
         email: String(data.email ?? ISSUER.email),
         registrationNumber: String(data.registrationNumber ?? ISSUER.registrationNumber),
-        signerName: String(data.signerName ?? ISSUER.signerName ?? ''),
-        signerPosition: String(data.signerPosition ?? ISSUER.signerPosition ?? ''),
-        traderType: String(data.traderType ?? ISSUER.traderType ?? 'BUSINESS'),
-        vatNo: String(data.vatNo ?? ISSUER.vatNo ?? ''),
-        eori: String(data.eori ?? ISSUER.eori ?? ''),
       }
     },
 
     async updateIssuer(input) {
       await setDoc(
         doc(db, COLLECTIONS.settings, 'issuer'),
-        { ...input, updatedAt: serverTimestamp() },
-        { merge: true },
-      )
-    },
-
-    async getExportSettings() {
-      const snap = await getDoc(doc(db, COLLECTIONS.settings, 'export'))
-      const data = snap.data() ?? {}
-      return {
-        incotermsDefault: String(data.incotermsDefault ?? 'CIP'),
-        incotermsPlace: String(data.incotermsPlace ?? ''),
-        reasonForExport: String(data.reasonForExport ?? 'Commercial'),
-        typeOfExport: String(data.typeOfExport ?? 'Commercial Purposes/Sale'),
-        dutyPayer: String(data.dutyPayer ?? 'Receiver Will Pay'),
-        payerOfVat: String(data.payerOfVat ?? ''),
-        defaultCarrier: String(data.defaultCarrier ?? 'DHL'),
-      }
-    },
-
-    async updateExportSettings(input) {
-      await setDoc(
-        doc(db, COLLECTIONS.settings, 'export'),
         { ...input, updatedAt: serverTimestamp() },
         { merge: true },
       )

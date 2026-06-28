@@ -18,11 +18,6 @@ const EMPTY: IssuerInfo = {
   tel: '',
   email: '',
   registrationNumber: '',
-  signerName: '',
-  signerPosition: '',
-  traderType: 'BUSINESS',
-  vatNo: '',
-  eori: '',
 }
 
 const FIELDS: { key: keyof IssuerInfo; label: string; placeholder?: string; full?: boolean }[] = [
@@ -34,12 +29,6 @@ const FIELDS: { key: keyof IssuerInfo; label: string; placeholder?: string; full
   { key: 'addressEn', label: '住所（英語）', full: true },
   { key: 'email', label: 'Email' },
   { key: 'registrationNumber', label: '適格請求書発行事業者 登録番号', placeholder: 'T0000000000000' },
-  // 輸出書類（Commercial Invoice）用
-  { key: 'signerName', label: '署名者氏名（輸出書類）', placeholder: '例: 北川 唯生' },
-  { key: 'signerPosition', label: '署名者 役職（輸出書類）', placeholder: '例: 代表取締役' },
-  { key: 'traderType', label: 'Trader Type（輸出書類）', placeholder: 'BUSINESS' },
-  { key: 'vatNo', label: 'VAT番号（輸出書類・任意）' },
-  { key: 'eori', label: 'EORI番号（輸出書類・任意）' },
 ]
 
 export default function SettingsIssuerPage() {
@@ -77,11 +66,6 @@ export default function SettingsIssuerPage() {
         tel: form.tel.trim(),
         email: form.email.trim(),
         registrationNumber: form.registrationNumber.trim(),
-        signerName: form.signerName.trim(),
-        signerPosition: form.signerPosition.trim(),
-        traderType: form.traderType.trim(),
-        vatNo: form.vatNo.trim(),
-        eori: form.eori.trim(),
       }
       await services.settings.updateIssuer(cleaned)
       setFeedback({ tone: 'success', message: '自社情報を保存しました' })
@@ -103,11 +87,6 @@ export default function SettingsIssuerPage() {
       tel: ISSUER.tel,
       email: ISSUER.email,
       registrationNumber: ISSUER.registrationNumber,
-      signerName: ISSUER.signerName,
-      signerPosition: ISSUER.signerPosition,
-      traderType: ISSUER.traderType,
-      vatNo: ISSUER.vatNo,
-      eori: ISSUER.eori,
     })
   }
 
@@ -141,7 +120,6 @@ export default function SettingsIssuerPage() {
           <Link href="/settings/terms" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">請求書 T&amp;C</Link>
           <Link href="/settings/bank-accounts" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">入金口座</Link>
           <Link href="/settings/issuer" className="rounded-full bg-ink px-3 py-1.5 text-paper">自社情報</Link>
-          <Link href="/settings/export" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">輸出設定</Link>
           <Link href="/settings/wholesale" className="rounded-full border border-line bg-white px-3 py-1.5 text-ink transition hover:bg-[#ece8db]">卸売設定</Link>
         </div>
 
