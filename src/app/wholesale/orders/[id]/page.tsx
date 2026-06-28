@@ -18,6 +18,7 @@ interface OrderItem {
   sampleUnits?: number
   unitPriceJpy?: number
   lineTotalJpy?: number
+  hsCode?: string
   option?: { optionName?: string; tierLabel?: string; bags?: number; feeJpy?: number }
 }
 interface Order {
@@ -181,7 +182,7 @@ export default function WholesaleOrderDetailPage() {
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
   const [grossWeight, setGrossWeight] = useState('')
-  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string>; itemNames: Record<string, string> } | null>(null)
+  const [docModal, setDocModal] = useState<{ docType: DocType; lang: 'ja' | 'en'; fields: Record<string, string>; itemNames: Record<string, string>; itemHsCodes: Record<string, string> } | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
@@ -458,8 +459,9 @@ export default function WholesaleOrderDetailPage() {
     const fields: Record<string, string> = {}
     for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
     const itemNames: Record<string, string> = {}
-    ;(order.items ?? []).forEach((it, i) => { itemNames[String(i)] = it.productName ?? '' })
-    setDocModal({ docType, lang: docType === 'commercial' || docType === 'packingList' ? 'en' : 'ja', fields, itemNames })
+    const itemHsCodes: Record<string, string> = {}
+    ;(order.items ?? []).forEach((it, i) => { itemNames[String(i)] = it.productName ?? ''; itemHsCodes[String(i)] = it.hsCode ?? '' })
+    setDocModal({ docType, lang: docType === 'commercial' || docType === 'packingList' ? 'en' : 'ja', fields, itemNames, itemHsCodes })
   }
 
   // 発行履歴から保存版の書類を開く（再発行はしない）。
@@ -479,7 +481,7 @@ export default function WholesaleOrderDetailPage() {
       const save = await fetch('/api/wholesale/orders', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields, itemNames: docModal.itemNames }),
+        body: JSON.stringify({ orderId: order.id, action: 'set_doc_fields', fields: docModal.fields, itemNames: docModal.itemNames, itemHsCodes: docModal.itemHsCodes }),
       })
       if (!save.ok) {
         const d = (await save.json().catch(() => ({}))) as { error?: string }
@@ -512,7 +514,7 @@ export default function WholesaleOrderDetailPage() {
         const res = await fetch(`/api/wholesale/orders/${id}/document-preview`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
-          body: JSON.stringify({ docType: docModal.docType, lang: docModal.lang, fields: docModal.fields, itemNames: docModal.itemNames }),
+          body: JSON.stringify({ docType: docModal.docType, lang: docModal.lang, fields: docModal.fields, itemNames: docModal.itemNames, itemHsCodes: docModal.itemHsCodes }),
         })
         if (cancelled || !res.ok) return
         const u = URL.createObjectURL(await res.blob())
@@ -1037,23 +1039,35 @@ export default function WholesaleOrderDetailPage() {
                     <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
                   </div>
                 )}
-                {/* 商品名（表示のみ・金額に影響しない） */}
-                {(order?.items ?? []).length > 0 && (
-                  <div className="rounded-lg border border-line p-3">
-                    <p className="mb-2 text-xs font-medium text-graphite">商品名</p>
-                    <div className="space-y-2">
-                      {(order?.items ?? []).map((it, i) => (
-                        <input
-                          key={i}
-                          value={docModal.itemNames[String(i)] ?? ''}
-                          onChange={e => setDocModal(m => (m ? { ...m, itemNames: { ...m.itemNames, [String(i)]: e.target.value } } : m))}
-                          className="w-full rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
-                          placeholder={it.productName}
-                        />
-                      ))}
+                {/* 商品名・HSコード（表示のみ・金額に影響しない） */}
+                {(order?.items ?? []).length > 0 && (() => {
+                  const showHs = docModal.docType === 'commercial' || docModal.docType === 'packingList'
+                  return (
+                    <div className="rounded-lg border border-line p-3">
+                      <p className="mb-2 text-xs font-medium text-graphite">商品名{showHs ? ' / HSコード' : ''}</p>
+                      <div className="space-y-2">
+                        {(order?.items ?? []).map((it, i) => (
+                          <div key={i} className="flex gap-2">
+                            <input
+                              value={docModal.itemNames[String(i)] ?? ''}
+                              onChange={e => setDocModal(m => (m ? { ...m, itemNames: { ...m.itemNames, [String(i)]: e.target.value } } : m))}
+                              className="flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                              placeholder={it.productName}
+                            />
+                            {showHs && (
+                              <input
+                                value={docModal.itemHsCodes[String(i)] ?? ''}
+                                onChange={e => setDocModal(m => (m ? { ...m, itemHsCodes: { ...m.itemHsCodes, [String(i)]: e.target.value } } : m))}
+                                className="w-28 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+                                placeholder="HSコード"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
                 {DOC_FIELDS[docModal.docType].map(f => (
                   <div key={f.key}>
                     <label className="mb-1 block text-xs text-mist">{f.label}</label>
