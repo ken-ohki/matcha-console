@@ -124,14 +124,14 @@ const CARRIER_LABEL: Record<string, string> = {
 }
 
 // ---- Document edit-before-issue ----
-type DocType = 'quotation' | 'invoice' | 'proforma' | 'commercial' | 'receipt' | 'deliveryNote'
+type DocType = 'quotation' | 'invoice' | 'proforma' | 'commercial' | 'packingList' | 'receipt' | 'deliveryNote'
 const DOC_ROUTE: Record<DocType, string> = {
   quotation: 'quotation', invoice: 'invoice', proforma: 'proforma-invoice',
-  commercial: 'commercial-invoice', receipt: 'receipt', deliveryNote: 'delivery-note',
+  commercial: 'commercial-invoice', packingList: 'packing-list', receipt: 'receipt', deliveryNote: 'delivery-note',
 }
 const DOC_LABEL: Record<DocType, string> = {
   quotation: '見積書', invoice: '請求書', proforma: 'Proforma Invoice',
-  commercial: 'Commercial Invoice', receipt: '領収書', deliveryNote: '納品書',
+  commercial: 'Commercial Invoice', packingList: 'Packing List', receipt: '領収書', deliveryNote: '納品書',
 }
 interface DocField { key: string; label: string; type?: 'text' | 'textarea' | 'number' }
 const CONSIGNEE_FIELDS: DocField[] = [
@@ -150,6 +150,12 @@ const DOC_FIELDS: Record<DocType, DocField[]> = {
     { key: 'incoterms', label: 'Incoterms' }, { key: 'incotermsPlace', label: 'Place of Incoterm' },
     { key: 'reasonForExport', label: 'Reason for Export' }, { key: 'typeOfExport', label: 'Type of Export' },
     { key: 'dutyPayer', label: 'Duty/taxes acct' }, { key: 'payerOfVat', label: 'Payer of GST/VAT' },
+    { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
+    { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
+  ],
+  packingList: [
+    ...CONSIGNEE_FIELDS,
+    { key: 'incoterms', label: 'Incoterms' }, { key: 'incotermsPlace', label: 'Place of Incoterm' },
     { key: 'shippingCarrierLabel', label: 'Carrier' }, { key: 'trackingNumber', label: 'AWB番号' },
     { key: 'grossWeightKg', label: '総重量(kg)', type: 'number' }, NOTES_FIELD,
   ],
@@ -453,7 +459,7 @@ export default function WholesaleOrderDetailPage() {
     for (const f of DOC_FIELDS[docType]) fields[f.key] = src[f.key] != null ? String(src[f.key]) : ''
     const itemNames: Record<string, string> = {}
     ;(order.items ?? []).forEach((it, i) => { itemNames[String(i)] = it.productName ?? '' })
-    setDocModal({ docType, lang: docType === 'commercial' ? 'en' : 'ja', fields, itemNames })
+    setDocModal({ docType, lang: docType === 'commercial' || docType === 'packingList' ? 'en' : 'ja', fields, itemNames })
   }
 
   // 発行履歴から保存版の書類を開く（再発行はしない）。
@@ -544,6 +550,7 @@ export default function WholesaleOrderDetailPage() {
   const isExport = o?.isDomestic === false
   const canProforma = isExport && !!o && !['pending_quote', 'pending_acceptance', 'pending_approval', 'cancelled'].includes(o.status ?? '')
   const canCommercial = isExport && (o?.status === 'shipped' || !!o?.awbNo)
+  const canPackingList = canCommercial
 
   return (
     <AppLayout>
@@ -965,6 +972,9 @@ export default function WholesaleOrderDetailPage() {
               {isAdmin && canCommercial && (
                 <button onClick={() => openDoc('commercial')} disabled={busy} className="btn-ghost">Commercial Invoice発行</button>
               )}
+              {isAdmin && canPackingList && (
+                <button onClick={() => openDoc('packingList')} disabled={busy} className="btn-ghost">Packing List発行</button>
+              )}
               {isAdmin && canReceiptDelivery && (
                 <button onClick={() => openDoc('receipt')} disabled={busy} className="btn-ghost">領収書を発行</button>
               )}
@@ -1021,7 +1031,7 @@ export default function WholesaleOrderDetailPage() {
               {/* 編集 */}
               <div className="min-h-0 space-y-3 overflow-y-auto border-b border-line p-5 md:border-b-0 md:border-r">
                 <p className="text-xs text-mist">計算に影響しない項目を編集できます（数量・単価・金額は変更不可）。</p>
-                {docModal.docType !== 'commercial' && (
+                {docModal.docType !== 'commercial' && docModal.docType !== 'packingList' && (
                   <div className="inline-flex overflow-hidden rounded-lg border border-line text-xs">
                     <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'ja' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'ja' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>日本語</button>
                     <button onClick={() => setDocModal(m => (m ? { ...m, lang: 'en' } : m))} className={`px-2.5 py-1.5 ${docModal.lang === 'en' ? 'bg-ink text-paper' : 'text-ink hover:bg-bone'}`}>English</button>
