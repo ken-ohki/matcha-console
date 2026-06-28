@@ -75,11 +75,11 @@ export interface Product {
   updatedAt: Date
 }
 
-/** 梱包サイズ(内容量kg)別のHSコード。100g袋→HS-A、1kg袋→HS-B 等。 */
+/** 梱包(即時包装)重量のしきい値別HSコード。例: 3kg以下→0902.10、超→既定(0902.20)。 */
 export interface HsSizeRule {
-  portionKg: number
-  sizeLabel?: string
+  maxKg: number // この重量(kg)以下の包装に適用
   hsCode: string
+  label?: string
 }
 
 export interface ProductWithInventory extends Product {

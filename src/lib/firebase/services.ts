@@ -362,8 +362,8 @@ function mapProduct(id: string, data: DocumentData): Product {
     hsCodeDefault: data.hsCodeDefault ? String(data.hsCodeDefault) : undefined,
     hsCodeBySize: Array.isArray(data.hsCodeBySize)
       ? (data.hsCodeBySize as Record<string, unknown>[])
-          .map(r => ({ portionKg: Number(r.portionKg) || 0, sizeLabel: r.sizeLabel ? String(r.sizeLabel) : undefined, hsCode: String(r.hsCode ?? '') }))
-          .filter(r => r.portionKg > 0 && r.hsCode)
+          .map(r => ({ maxKg: Number(r.maxKg) || 0, label: r.label ? String(r.label) : undefined, hsCode: String(r.hsCode ?? '') }))
+          .filter(r => r.maxKg > 0 && r.hsCode)
       : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),

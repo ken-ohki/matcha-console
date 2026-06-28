@@ -183,8 +183,8 @@ export function finalizeProductInput(
     originCountry: form.originCountry?.trim() || undefined,
     hsCodeDefault: form.hsCodeDefault?.trim() || undefined,
     hsCodeBySize: (form.hsCodeBySize ?? [])
-      .map(r => ({ portionKg: Number(r.portionKg) || 0, sizeLabel: r.sizeLabel?.trim() || undefined, hsCode: (r.hsCode ?? '').trim() }))
-      .filter(r => r.portionKg > 0 && r.hsCode),
+      .map(r => ({ maxKg: Number(r.maxKg) || 0, label: r.label?.trim() || undefined, hsCode: (r.hsCode ?? '').trim() }))
+      .filter(r => r.maxKg > 0 && r.hsCode),
   }
 }
 
@@ -688,40 +688,35 @@ export function ProductMasterSection({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-graphite">既定HSコード</label>
+            <label className="mb-1 block text-sm font-medium text-graphite">既定HSコード（しきい値超）</label>
             <input
               value={form.hsCodeDefault ?? ''}
               onChange={e => setForm(prev => ({ ...prev, hsCodeDefault: e.target.value }))}
               className={fieldCls}
-              placeholder="例: 0902.10"
+              placeholder="例: 0902.20"
             />
           </div>
         </div>
         <div className="mt-3">
-          <label className="mb-1 block text-sm font-medium text-graphite">梱包(袋)サイズ別のHSコード</label>
-          <p className="mb-2 text-[11px] text-mist">重量で分類が変わる場合に設定。明細の内容量（小分けオプションの袋サイズ）に一致する行のHSを使用し、一致が無ければ既定HSコードを使用します。</p>
+          <label className="mb-1 block text-sm font-medium text-graphite">包装重量しきい値別のHSコード</label>
+          <p className="mb-2 text-[11px] text-mist">即時包装(袋)の内容量で分類が変わる場合に設定。各行は「指定kg以下」に適用し、どの行にも該当しない（＝しきい値超）場合は既定HSコードを使用します。未設定の場合は抹茶の標準（3kg以下=0902.10、超=0902.20）を自動適用します。</p>
           <div className="space-y-2">
             {(form.hsCodeBySize ?? []).map((r, i) => (
               <div key={i} className="flex items-center gap-2">
+                <span className="text-xs text-mist">≤</span>
                 <input
                   type="number"
                   step="0.001"
-                  value={r.portionKg || ''}
-                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, portionKg: Number(e.target.value) } : x)) }))}
-                  className={`${fieldCls} w-28`}
-                  placeholder="内容量kg"
-                />
-                <input
-                  value={r.sizeLabel ?? ''}
-                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, sizeLabel: e.target.value } : x)) }))}
-                  className={`${fieldCls} w-28`}
-                  placeholder="表示(例:1kg)"
+                  value={r.maxKg || ''}
+                  onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, maxKg: Number(e.target.value) } : x)) }))}
+                  className={`${fieldCls} w-24`}
+                  placeholder="kg以下"
                 />
                 <input
                   value={r.hsCode}
                   onChange={e => setForm(prev => ({ ...prev, hsCodeBySize: (prev.hsCodeBySize ?? []).map((x, j) => (j === i ? { ...x, hsCode: e.target.value } : x)) }))}
                   className={`${fieldCls} flex-1`}
-                  placeholder="HSコード (例: 0902.20)"
+                  placeholder="HSコード (例: 0902.10)"
                 />
                 <button
                   type="button"
@@ -736,10 +731,10 @@ export function ProductMasterSection({
           </div>
           <button
             type="button"
-            onClick={() => setForm(prev => ({ ...prev, hsCodeBySize: [...(prev.hsCodeBySize ?? []), { portionKg: 0, hsCode: '' }] }))}
+            onClick={() => setForm(prev => ({ ...prev, hsCodeBySize: [...(prev.hsCodeBySize ?? []), { maxKg: 0, hsCode: '' }] }))}
             className="mt-2 inline-flex items-center gap-1 text-xs text-matchaDeep hover:underline"
           >
-            <Plus size={13} /> サイズ別HSを追加
+            <Plus size={13} /> しきい値を追加
           </button>
         </div>
       </div>
