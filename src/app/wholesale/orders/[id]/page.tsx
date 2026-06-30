@@ -211,7 +211,7 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'extend_quote' | 'resend_payment_link' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
     if (action === 'accept_quote' && !(await confirm({ message: 'お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）', confirmLabel: '確定する' }))) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
@@ -258,18 +258,6 @@ export default function WholesaleOrderDetailPage() {
             : `確定に失敗しました（${d.error ?? 'error'}）`
         notify(msg, d.ok ? 'success' : 'error')
       }
-      if (action === 'extend_quote') {
-        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; detail?: string; acceptanceExpiresAtMs?: number }
-        const until = d.acceptanceExpiresAtMs ? new Date(d.acceptanceExpiresAtMs).toISOString().slice(0, 10) : ''
-        const msg = d.ok
-          ? `承諾期限を延長しました（${until} まで）。「承諾して確定」で確定できます。`
-          : d.error === 'insufficient_stock'
-            ? `在庫が不足しているため延長できません（${d.detail ?? ''}）。`
-            : d.error === 'not_pending_acceptance'
-              ? 'この注文は承諾待ちではないため延長できません。'
-              : `延長に失敗しました（${d.error ?? 'error'}）`
-        notify(msg, d.ok ? 'success' : 'error')
-      }
       if (action === 'resend_payment_link') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; checkoutUrl?: string; error?: string }
         const msg = d.ok
@@ -296,7 +284,7 @@ export default function WholesaleOrderDetailPage() {
         }
       }
       // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
-      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'extend_quote' && action !== 'resend_payment_link' && action !== 'fetch_fee') {
+      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link' && action !== 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
         notify(`操作に失敗しました（${d.error ?? 'error'}）`, 'error')
       }
@@ -921,9 +909,6 @@ export default function WholesaleOrderDetailPage() {
             <div className="flex flex-wrap gap-2">
               {isAdmin && o.status === 'pending_acceptance' && !editing && (
                 <button onClick={() => act('accept_quote')} disabled={busy} className="btn-primary">承諾して確定</button>
-              )}
-              {isAdmin && o.status === 'pending_acceptance' && !editing && (
-                <button onClick={() => act('extend_quote')} disabled={busy} className="btn-ghost">承諾期限を延長</button>
               )}
               {isAdmin && o.status === 'pending_approval' && !editing && (
                 <button onClick={() => act('approve')} disabled={busy} className="btn-primary">承認して支払い案内を送る</button>
