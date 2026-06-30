@@ -44,7 +44,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'transactions', label: '取引履歴' },
 ]
 
-type TxKind = 'purchase' | 'sale' | 'ec' | 'self'
+type TxKind = 'purchase' | 'order' | 'adjustment' | 'sale' | 'ec' | 'self'
 
 type TxRow = {
   key: string
@@ -59,7 +59,9 @@ type TxRow = {
 }
 
 const TX_META: Record<TxKind, { label: string; cls: string }> = {
-  purchase: { label: '仕入', cls: 'bg-bone text-graphite' },
+  purchase: { label: '入荷', cls: 'bg-bone text-graphite' },
+  order: { label: '発注（未入荷）', cls: 'bg-bone text-mist' },
+  adjustment: { label: '棚卸調整', cls: 'bg-bone text-graphite' },
   sale: { label: '販売', cls: 'bg-bone text-matcha' },
   ec: { label: 'EC', cls: 'bg-bone text-graphite' },
   self: { label: '自社消費', cls: 'bg-bone text-graphite' },
@@ -181,12 +183,17 @@ export default function ProductDetailPage() {
     const rows: TxRow[] = []
 
     for (const po of purchaseOrders) {
+      if (po.status === 'cancelled') continue
+      // Only RECEIVED purchase orders are in stock (they create arrivalRecords).
+      // Placed/shipped POs are ordered but not yet received — show them as
+      // 発注（未入荷）, NOT counted as stock so the ledger reconciles with 残在庫.
+      const received = po.status === 'received'
       po.items.forEach((item, i) => {
         if (item.productId !== pid) return
         rows.push({
           key: `po-${po.id}-${i}`,
           date: po.actualDeliveryDate || po.orderDate,
-          kind: 'purchase',
+          kind: received ? 'purchase' : 'order',
           counterparty: po.supplierName,
           quantityKg: item.quantityKg,
           unitPrice: item.unitPrice,
@@ -194,6 +201,18 @@ export default function ProductDetailPage() {
           status: STATUS_LABELS[po.status],
           href: `/purchase-orders/${po.id}`,
         })
+      })
+    }
+
+    // 棚卸調整 (inventory checks) — these adjust 残在庫 but had no ledger row.
+    for (const c of product?.inventoryChecks ?? []) {
+      if (!c.adjustmentKg) continue
+      rows.push({
+        key: `chk-${c.id}`,
+        date: c.checkedDate,
+        kind: 'adjustment',
+        counterparty: '棚卸',
+        quantityKg: c.adjustmentKg, // signed: + increase / - decrease
       })
     }
 
@@ -248,17 +267,19 @@ export default function ProductDetailPage() {
     }
 
     return rows.sort((a, b) => b.date.localeCompare(a.date))
-  }, [params.id, purchaseOrders, sales, ecSales, selfRecords])
+  }, [params.id, product, purchaseOrders, sales, ecSales, selfRecords])
 
   const txTotals = useMemo(() => {
-    let purchased = 0, sold = 0, ec = 0, self = 0
+    let purchased = 0, adjustment = 0, sold = 0, ec = 0, self = 0
     for (const t of transactions) {
       if (t.kind === 'purchase') purchased += t.quantityKg
+      else if (t.kind === 'adjustment') adjustment += t.quantityKg
       else if (t.kind === 'sale') sold += -t.quantityKg
       else if (t.kind === 'ec') ec += -t.quantityKg
-      else self += -t.quantityKg
+      else if (t.kind === 'self') self += -t.quantityKg
+      // 'order' (発注・未入荷) は在庫外なので合計に含めない
     }
-    return { purchased, sold, ec, self }
+    return { purchased, adjustment, sold, ec, self, computedStock: purchased + adjustment - sold - ec - self }
   }, [transactions])
 
   const reload = async () => {
@@ -489,11 +510,20 @@ export default function ProductDetailPage() {
 
         {tab === 'transactions' && (
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              <OverviewCard label="仕入（入荷）計" value={formatKg(txTotals.purchased)} />
+            <div className="grid gap-3 sm:grid-cols-5">
+              <OverviewCard label="入荷計" value={formatKg(txTotals.purchased)} />
+              <OverviewCard label="棚卸調整" value={formatKg(txTotals.adjustment)} />
               <OverviewCard label="販売計" value={formatKg(txTotals.sold)} />
               <OverviewCard label="Shopify販売計" value={formatKg(txTotals.ec)} />
               <OverviewCard label="自社消費計" value={formatKg(txTotals.self)} />
+            </div>
+            <div className="rounded-2xl border border-[#e6dfcf] bg-bone/40 px-4 py-3 text-sm text-graphite">
+              入荷 {formatKg(txTotals.purchased)} ＋ 棚卸 {formatKg(txTotals.adjustment)} − 販売 {formatKg(txTotals.sold)} − Shopify {formatKg(txTotals.ec)} − 自社消費 {formatKg(txTotals.self)}
+              ＝ <span className="font-semibold text-ink">{formatKg(txTotals.computedStock)}</span>
+              <span className="ml-2 text-xs text-mist">（残在庫: {formatKg(product.currentStockKg)}）</span>
+              {Math.abs(txTotals.computedStock - product.currentStockKg) > 0.001 && (
+                <span className="ml-2 text-xs text-alert">※ 差異 {formatKg(txTotals.computedStock - product.currentStockKg)}</span>
+              )}
             </div>
 
             {transactions.length === 0 ? (
@@ -543,7 +573,7 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             )}
-            <p className="text-xs text-mist">数量は仕入を ＋（入荷）、販売・EC・自社消費を −（出庫）で表示しています。</p>
+            <p className="text-xs text-mist">入荷・棚卸(＋)を入庫、販売・EC・自社消費を出庫(−)として残在庫に反映します。「発注（未入荷）」は入荷待ちのため在庫・合計には含みません。</p>
           </div>
         )}
       </div>
