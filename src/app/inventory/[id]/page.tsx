@@ -77,6 +77,18 @@ const SELF_USAGE_LABELS: Record<string, string> = {
   sample: 'サンプル',
 }
 
+// 販売引当中の注文表示用（注文ステータス → 日本語ラベル）。
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending_acceptance: '承諾待ち（見積）',
+  pending_approval: '承認待ち',
+  pending_quote: '見積待ち',
+  quoted: '支払い待ち（見積済）',
+  pending_payment: '支払い待ち',
+  paid: '支払い済み',
+  shipped: '出荷済み',
+  cancelled: '取消',
+}
+
 function yen(value?: number): string {
   if (value == null) return '-'
   return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(value)
@@ -95,6 +107,7 @@ export default function ProductDetailPage() {
   const [sales, setSales] = useState<SaleRecord[]>([])
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [ecSales, setEcSales] = useState<EcSaleRecord[]>([])
+  const [orderIndex, setOrderIndex] = useState<Record<string, { id: string; status: string }>>({})
   const [selfRecords, setSelfRecords] = useState<SelfConsumptionRecord[]>([])
   const [form, setForm] = useState<ProductInput | null>(null)
   const [pending, setPending] = useState<PendingInventoryCheck>(EMPTY_PENDING_CHECK)
@@ -125,6 +138,10 @@ export default function ProductDetailPage() {
       setMasters(nextMasters)
       // Direct sales are now wholesale_orders; cost not needed for the tx history.
       setSales(nextOrders.map(o => orderToSale(o, {})))
+      // 引当中注文の表示用に 注文番号→{id,status} を保持（ec_salesにはorderNumberのみ）。
+      setOrderIndex(Object.fromEntries(
+        nextOrders.map(o => [String(o.orderNumber ?? ''), { id: String(o.id ?? ''), status: String(o.status ?? '') }]),
+      ))
       setPurchaseOrders(nextPos)
       setEcSales(nextEc)
       setSelfRecords(nextSelf)
@@ -141,6 +158,25 @@ export default function ProductDetailPage() {
   const stock = product
     ? { currentStockKg: product.currentStockKg, salesAllocatedKg: product.salesAllocatedKg, selfConsumedKg: product.selfConsumedKg }
     : { currentStockKg: 0, salesAllocatedKg: 0, selfConsumedKg: 0 }
+
+  // 現在この商品の在庫を引き当てている卸売注文（= 販売引当 の内訳）。
+  // computeInventory の reservedByProduct と同じ条件: channel='Wholesale' かつ在庫を消費中
+  // （active、または未期限の reserved。cancelled/期限切れは除外）。
+  const allocations = useMemo(() => {
+    const pid = params.id
+    const now = Date.now()
+    return ecSales
+      .filter(ec => ec.productId === pid && ec.channel === 'Wholesale')
+      .filter(ec => ec.status !== 'cancelled' && !(ec.status === 'reserved' && ec.expiresAtMs != null && ec.expiresAtMs < now))
+      .map(ec => ({
+        id: ec.id,
+        orderNumber: ec.orderNumber ?? '—',
+        quantityKg: ec.quantityKg,
+        reserved: ec.status === 'reserved',
+        order: ec.orderNumber ? orderIndex[ec.orderNumber] : undefined,
+      }))
+      .sort((a, b) => a.orderNumber.localeCompare(b.orderNumber))
+  }, [ecSales, orderIndex, params.id])
 
   const transactions = useMemo<TxRow[]>(() => {
     const pid = params.id
@@ -390,6 +426,35 @@ export default function ProductDetailPage() {
                 {product.adminNote && <p className="mt-2 whitespace-pre-wrap text-sm text-ink"><span className="text-mist">管理メモ：</span>{product.adminNote}</p>}
               </div>
             )}
+
+            {/* 販売引当中の注文 — この商品の在庫を現在引き当てている卸売注文の内訳 */}
+            <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 lg:col-span-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-ink">販売引当中の注文</h3>
+                <span className="text-xs text-mist">合計 {formatKg(product.salesAllocatedKg)}・{allocations.length}件</span>
+              </div>
+              {allocations.length === 0 ? (
+                <p className="text-sm text-mist">引当中の注文はありません。</p>
+              ) : (
+                <ul className="divide-y divide-line/60 text-sm">
+                  {allocations.map(a => (
+                    <li key={a.id} className="flex items-center justify-between gap-3 py-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {a.order ? (
+                          <Link href={`/wholesale/orders/${a.order.id}`} className="font-mono text-matchaDeep underline hover:opacity-80">{a.orderNumber}</Link>
+                        ) : (
+                          <span className="font-mono text-ink">{a.orderNumber}</span>
+                        )}
+                        <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-graphite">
+                          {a.reserved ? '見積保留' : (a.order ? ORDER_STATUS_LABELS[a.order.status] ?? a.order.status : '引当中')}
+                        </span>
+                      </div>
+                      <span className="whitespace-nowrap text-ink">{formatKg(a.quantityKg)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 

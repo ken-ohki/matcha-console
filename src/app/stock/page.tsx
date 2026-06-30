@@ -135,13 +135,14 @@ export default function StockPage() {
                   <th className="px-3 py-3 font-medium">商品名</th>
                   <th className="px-3 py-3 font-medium">SKU</th>
                   <th className="px-3 py-3 text-right font-medium">在庫数量</th>
+                  <th className="px-3 py-3 text-right font-medium">引当中</th>
                   <th className="px-3 py-3 font-medium">入荷元の商品名</th>
                   <th className="px-3 py-3 font-medium">仕入先</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <EmptyTableRow colSpan={5} message="該当する商品がありません。" />
+                  <EmptyTableRow colSpan={6} message="該当する商品がありません。" />
                 )}
                 {filtered.map(p => (
                   <tr key={p.id} className="border-b border-[#f0ebdf] hover:bg-bone">
@@ -150,6 +151,7 @@ export default function StockPage() {
                     </td>
                     <td className="px-3 py-3 font-mono text-graphite">{p.sku || '—'}</td>
                     <td className={`px-3 py-3 text-right text-base font-semibold ${stockColorClass(p.currentStockKg)}`}>{p.currentStockKg.toFixed(1)} kg</td>
+                    <td className="px-3 py-3 text-right text-graphite">{p.salesAllocatedKg > 0 ? `${p.salesAllocatedKg.toFixed(1)} kg` : '—'}</td>
                     <td className="px-3 py-3 text-graphite">{p.purchaseProductName || '—'}</td>
                     <td className="px-3 py-3 text-graphite">{p.supplier || '—'}</td>
                   </tr>
