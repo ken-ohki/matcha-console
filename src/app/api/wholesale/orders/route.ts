@@ -535,10 +535,39 @@ export async function PATCH(request: Request) {
       batch.delete(database.collection('ec_sales').doc(ecId))
     }
     const ecSaleIds: string[] = []
+    // 在庫超過の受注生産品は全量「受注生産」として引当しない（在庫に手を付けない）。
+    // 在庫以内、または非受注生産品は通常どおり引当（在庫から減る）。会員注文の判定と統一。
+    const madeToOrderPids = new Set<string>()
     if (reserveOnEdit) {
+      const orderEcIds = new Set((Array.isArray(cur.ecSaleIds) ? cur.ecSaleIds : []) as string[])
+      const mtoPids = [...new Set(items.filter(it => it._madeToOrder && it.productId).map(it => it.productId))]
+      if (mtoPids.length > 0) {
+        const nowMs = Date.now()
+        const [ecAll, selfAll] = await Promise.all([
+          database.collection('ec_sales').get(),
+          database.collection('self_consumptions').get(),
+        ])
+        const consumesStock = (d: Record<string, unknown>) => {
+          if (d.channel === 'WholesaleSample') return false
+          if (d.status === 'cancelled') return false
+          if (d.status === 'reserved') { const e = Number(d.expiresAtMs) || 0; if (e && e < nowMs) return false }
+          return true
+        }
+        const reqByProduct = new Map<string, number>()
+        for (const it of items) if (it.productId) reqByProduct.set(it.productId, (reqByProduct.get(it.productId) ?? 0) + it.quantityKg)
+        for (const pid of mtoPids) {
+          const p = (products.get(pid) ?? {}) as Record<string, unknown>
+          const arrivals = Array.isArray(p.arrivalRecords) ? (p.arrivalRecords as Record<string, unknown>[]).reduce((s, r) => s + Number(r.quantityKg ?? 0), 0) : Number(p.initialStockKg ?? 0)
+          const adj = Array.isArray(p.inventoryChecks) ? (p.inventoryChecks as Record<string, unknown>[]).reduce((s, r) => s + Number(r.adjustmentKg ?? 0), 0) : 0
+          let consumed = 0
+          for (const d of ecAll.docs) { if (orderEcIds.has(d.id)) continue; const x = d.data(); if (String(x.productId) !== pid || !consumesStock(x)) continue; consumed += Number(x.quantityKg ?? 0) }
+          for (const d of selfAll.docs) { const x = d.data(); if (String(x.productId) === pid) consumed += Number(x.quantityKg ?? 0) }
+          if ((reqByProduct.get(pid) ?? 0) > arrivals + adj - consumed + 1e-9) madeToOrderPids.add(pid)
+        }
+      }
       items.forEach((it, i) => {
         if (!it.productId) return
-        if (it._madeToOrder) return // made-to-order lines don't reserve stock
+        if (madeToOrderPids.has(it.productId)) return // 受注生産（在庫超過）→ 引当しない
         const ecId = `${body.orderId}:e${i}`
         ecSaleIds.push(ecId)
         batch.set(database.collection('ec_sales').doc(ecId), {
@@ -551,7 +580,11 @@ export async function PATCH(request: Request) {
       })
     }
     batch.set(ref, {
-      items: items.map(({ _taxRate, _costPerKg, _madeToOrder, ...rest }) => { void _taxRate; void _costPerKg; void _madeToOrder; return rest }),
+      items: items.map(({ _taxRate, _costPerKg, _madeToOrder, ...rest }) => {
+        void _taxRate; void _costPerKg; void _madeToOrder
+        // 在庫超過で引当しなかった（＝受注生産扱いの）明細に印を付け、画面表示で区別できるようにする。
+        return rest.productId && madeToOrderPids.has(rest.productId) ? { ...rest, madeToOrder: true } : rest
+      }),
       subtotalJpy, taxBreakdown, taxJpy, totalJpy, displayTotal: totalJpy,
       shippingFeeJpy, optionFeesJpy, paymentFeeJpy, costAmountJpy, grossProfitJpy,
       feeLines,

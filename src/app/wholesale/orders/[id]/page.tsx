@@ -18,6 +18,7 @@ interface OrderItem {
   sampleUnits?: number
   unitPriceJpy?: number
   lineTotalJpy?: number
+  madeToOrder?: boolean
   hsCode?: string
   option?: { optionName?: string; tierLabel?: string; bags?: number; feeJpy?: number }
 }
@@ -648,6 +649,7 @@ export default function WholesaleOrderDetailPage() {
                       <td className="py-2 text-ink">
                         {i.productName}
                         {i.option ? <span className="text-mist"> ／ {i.option.optionName}: {i.option.tierLabel} ×{i.option.bags}</span> : null}
+                        {i.madeToOrder ? <span className="ml-2 rounded-full bg-[#ece8ff] px-2 py-0.5 text-[10px] text-graphite">受注生産（在庫引当なし）</span> : null}
                       </td>
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.sampleUnits ? `サンプル ${i.sampleUnits}×10g` : `${i.quantityKg}kg`}</td>
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.unitPriceJpy != null ? `¥${i.unitPriceJpy.toLocaleString()}` : '—'}</td>
