@@ -629,6 +629,14 @@ function computeInventory(
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
   }, {})
+  // 「商談中」= 未確定の仮予約(reserved・未期限)のみ。確定(active)は除く。
+  const negotiatingByProduct = ecSales.reduce<Record<string, number>>((acc, record) => {
+    if (record.channel === 'WholesaleSample') return acc
+    if (record.status !== 'reserved') return acc
+    if (!ecRecordConsumesStock(record, nowMs) || !isWholesaleChannel(record.channel)) return acc
+    acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
+    return acc
+  }, {})
   const selfConsumedByProduct = selfConsumptions.reduce<Record<string, number>>((acc, record) => {
     acc[record.productId] = (acc[record.productId] ?? 0) + record.quantityKg
     return acc
@@ -645,6 +653,7 @@ function computeInventory(
     .map(product => {
       const inventoryAdjustmentKg = deriveInventoryAdjustmentKg(product.inventoryChecks)
       const salesAllocatedKg = reservedByProduct[product.id] ?? 0
+      const negotiatingKg = negotiatingByProduct[product.id] ?? 0
       const selfConsumedKg = selfConsumedByProduct[product.id] ?? 0
       const ecSoldKg = ecSoldByProduct[product.id] ?? 0
       const effectiveInitialKg = product.initialStockKg + inventoryAdjustmentKg
@@ -652,6 +661,7 @@ function computeInventory(
       return {
         ...product,
         salesAllocatedKg,
+        negotiatingKg,
         selfConsumedKg,
         ecSoldKg,
         inventoryAdjustmentKg,

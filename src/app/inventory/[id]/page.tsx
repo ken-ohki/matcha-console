@@ -159,20 +159,18 @@ export default function ProductDetailPage() {
     ? { currentStockKg: product.currentStockKg, salesAllocatedKg: product.salesAllocatedKg, selfConsumedKg: product.selfConsumedKg }
     : { currentStockKg: 0, salesAllocatedKg: 0, selfConsumedKg: 0 }
 
-  // 現在この商品の在庫を引き当てている卸売注文（= 販売引当 の内訳）。
-  // computeInventory の reservedByProduct と同じ条件: channel='Wholesale' かつ在庫を消費中
-  // （active、または未期限の reserved。cancelled/期限切れは除外）。
+  // 商談中の注文（= negotiatingKg の内訳）。未確定の仮予約(reserved・未期限)のみ。
+  // channel='Wholesale'、確定(active)/取消/期限切れは除外。
   const allocations = useMemo(() => {
     const pid = params.id
     const now = Date.now()
     return ecSales
       .filter(ec => ec.productId === pid && ec.channel === 'Wholesale')
-      .filter(ec => ec.status !== 'cancelled' && !(ec.status === 'reserved' && ec.expiresAtMs != null && ec.expiresAtMs < now))
+      .filter(ec => ec.status === 'reserved' && !(ec.expiresAtMs != null && ec.expiresAtMs < now))
       .map(ec => ({
         id: ec.id,
         orderNumber: ec.orderNumber ?? '—',
         quantityKg: ec.quantityKg,
-        reserved: ec.status === 'reserved',
         order: ec.orderNumber ? orderIndex[ec.orderNumber] : undefined,
       }))
       .sort((a, b) => a.orderNumber.localeCompare(b.orderNumber))
@@ -405,7 +403,7 @@ export default function ProductDetailPage() {
               <OverviewCard label="残在庫" value={<span className={product.currentStockKg < 0 ? 'text-alert' : ''}>{formatKg(product.currentStockKg)}</span>} strong />
               <OverviewCard label="在庫グループ" value={groupName} />
               <OverviewCard label="入荷累計" value={formatKg(product.initialStockKg)} />
-              <OverviewCard label="販売引当" value={formatKg(product.salesAllocatedKg)} />
+              <OverviewCard label="商談中" value={formatKg(product.negotiatingKg)} />
               <OverviewCard label="自社消費" value={formatKg(product.selfConsumedKg)} />
               <OverviewCard label="Shopify販売" value={formatKg(product.ecSoldKg)} />
               <OverviewCard label="標準卸売単価" value={yen(wholesale)} />
@@ -427,14 +425,14 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* 販売引当中の注文 — この商品の在庫を現在引き当てている卸売注文の内訳 */}
+            {/* 商談中の注文 — この商品の在庫を仮押さえ(reserved)している未確定の卸売注文 */}
             <div className="rounded-2xl border border-[#e6dfcf] bg-white p-4 lg:col-span-3">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-ink">販売引当中の注文</h3>
-                <span className="text-xs text-mist">合計 {formatKg(product.salesAllocatedKg)}・{allocations.length}件</span>
+                <h3 className="text-sm font-semibold text-ink">商談中の注文</h3>
+                <span className="text-xs text-mist">合計 {formatKg(product.negotiatingKg)}・{allocations.length}件</span>
               </div>
               {allocations.length === 0 ? (
-                <p className="text-sm text-mist">引当中の注文はありません。</p>
+                <p className="text-sm text-mist">商談中の注文はありません。</p>
               ) : (
                 <ul className="divide-y divide-line/60 text-sm">
                   {allocations.map(a => (
@@ -446,7 +444,7 @@ export default function ProductDetailPage() {
                           <span className="font-mono text-ink">{a.orderNumber}</span>
                         )}
                         <span className="rounded-full bg-bone px-2 py-0.5 text-xs text-graphite">
-                          {a.reserved ? '見積保留' : (a.order ? ORDER_STATUS_LABELS[a.order.status] ?? a.order.status : '引当中')}
+                          {a.order ? ORDER_STATUS_LABELS[a.order.status] ?? a.order.status : '商談中'}
                         </span>
                       </div>
                       <span className="whitespace-nowrap text-ink">{formatKg(a.quantityKg)}</span>

@@ -381,6 +381,7 @@ export default function InventoryPage() {
       arrivalDate: '',
       initialStockKg: 0,
       salesAllocatedKg: 0,
+      negotiatingKg: 0,
       selfConsumedKg: 0,
       inventoryAdjustmentKg: 0,
       currentStockKg: 0,

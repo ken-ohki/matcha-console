@@ -73,7 +73,8 @@ export interface Product {
 
 export interface ProductWithInventory extends Product {
   currentStockKg: number
-  salesAllocatedKg: number
+  salesAllocatedKg: number   // 在庫を消費している卸売予約の合計（reserved+active）。在庫数量の算定に使用。
+  negotiatingKg: number      // うち未確定の仮予約(reserved＝見積/承諾待ち)のみ＝「商談中」表示用。
   selfConsumedKg: number
   ecSoldKg: number
   inventoryAdjustmentKg: number
