@@ -117,7 +117,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'extend_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -614,6 +614,89 @@ export async function PATCH(request: Request) {
     batch.set(ref, { status: 'pending_payment', acceptedAt: new Date().toISOString(), updatedAt: FieldValue.serverTimestamp() }, { merge: true })
     await batch.commit()
     return NextResponse.json({ ok: true, status: 'pending_payment' })
+  }
+  // Re-open an expired quote: extend the 14-day acceptance window and refresh the
+  // stock holds, so staff can confirm it again. Re-checks availability for any real
+  // stock-reserving (channel 'Wholesale') line — sample / made-to-order lines hold
+  // no stock, so sample-only quotes always pass.
+  if (body.action === 'extend_quote') {
+    const snap = await ref.get()
+    const cur = snap.data() as { status?: string; ecSaleIds?: string[] } | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    if (cur.status !== 'pending_acceptance') return NextResponse.json({ error: 'not_pending_acceptance' }, { status: 400 })
+
+    const ecIds = Array.isArray(cur.ecSaleIds) ? cur.ecSaleIds : []
+    const ecSnaps = await Promise.all(ecIds.map(id => database.collection('ec_sales').doc(id).get()))
+    const stockHolds = ecSnaps
+      .filter(s => s.exists)
+      .map(s => s.data() as Record<string, unknown>)
+      .filter(h => h.channel === 'Wholesale') // 'WholesaleSample' holds never deduct stock
+
+    // Availability check for real-stock lines (excluding this order's own holds).
+    const needed = new Map<string, number>()
+    for (const h of stockHolds) needed.set(String(h.productId), (needed.get(String(h.productId)) ?? 0) + Number(h.quantityKg ?? 0))
+    if (needed.size > 0) {
+      const nowMs = Date.now()
+      const excluded = new Set(ecIds)
+      const [prodSnap, ecAll, selfAll] = await Promise.all([
+        database.collection('products').get(),
+        database.collection('ec_sales').get(),
+        database.collection('self_consumptions').get(),
+      ])
+      const initialByProduct = new Map<string, number>()
+      for (const d of prodSnap.docs) {
+        if (!needed.has(d.id)) continue
+        const data = d.data() as Record<string, unknown>
+        const arrivals = Array.isArray(data.arrivalRecords) ? (data.arrivalRecords as Record<string, unknown>[]) : []
+        const checks = Array.isArray(data.inventoryChecks) ? (data.inventoryChecks as Record<string, unknown>[]) : []
+        const init = arrivals.reduce((s, r) => s + Number(r.quantityKg ?? 0), 0) + checks.reduce((s, r) => s + Number(r.adjustmentKg ?? 0), 0)
+        initialByProduct.set(d.id, init)
+      }
+      const consumesStock = (data: Record<string, unknown>): boolean => {
+        if (data.channel === 'WholesaleSample') return false
+        if (data.status === 'cancelled') return false
+        if (data.status === 'reserved') { const exp = Number(data.expiresAtMs) || 0; if (exp && exp < nowMs) return false }
+        return true
+      }
+      const consumedByProduct = new Map<string, number>()
+      for (const d of ecAll.docs) {
+        if (excluded.has(d.id)) continue
+        const data = d.data() as Record<string, unknown>
+        const pid = String(data.productId ?? '')
+        if (!needed.has(pid) || !consumesStock(data)) continue
+        consumedByProduct.set(pid, (consumedByProduct.get(pid) ?? 0) + Number(data.quantityKg ?? 0))
+      }
+      for (const d of selfAll.docs) {
+        const data = d.data() as Record<string, unknown>
+        const pid = String(data.productId ?? '')
+        if (!needed.has(pid)) continue
+        consumedByProduct.set(pid, (consumedByProduct.get(pid) ?? 0) + Number(data.quantityKg ?? 0))
+      }
+      const shortages: string[] = []
+      for (const [pid, need] of needed) {
+        const avail = (initialByProduct.get(pid) ?? 0) - (consumedByProduct.get(pid) ?? 0)
+        if (need > avail + 1e-9) {
+          const name = String((prodSnap.docs.find(d => d.id === pid)?.data() as Record<string, unknown> | undefined)?.name ?? pid)
+          shortages.push(`${name}（必要 ${need}kg / 在庫 ${Math.max(0, avail).toFixed(1)}kg）`)
+        }
+      }
+      if (shortages.length > 0) {
+        return NextResponse.json({ error: 'insufficient_stock', detail: shortages.join('、') }, { status: 409 })
+      }
+    }
+
+    const newExpiry = Date.now() + 14 * 24 * 60 * 60 * 1000 // QUOTE_VALID_DAYS = 14
+    const batch = database.batch()
+    for (const id of ecIds) {
+      batch.set(
+        database.collection('ec_sales').doc(id),
+        { status: 'reserved', expiresAtMs: newExpiry, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      )
+    }
+    batch.set(ref, { acceptanceExpiresAtMs: newExpiry, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    await batch.commit()
+    return NextResponse.json({ ok: true, acceptanceExpiresAtMs: newExpiry })
   }
   return NextResponse.json({ error: 'invalid_action' }, { status: 400 })
 }
