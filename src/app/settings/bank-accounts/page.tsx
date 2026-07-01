@@ -4,9 +4,7 @@ import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { SettingsNav } from '@/components/settings/SettingsNav'
 import { useAuth } from '@/contexts/AuthContext'
-import { useConfirm } from '@/contexts/ConfirmContext'
 import { getServices } from '@/lib/services'
-import { ISSUER } from '@/lib/invoice'
 import { Save, Settings } from 'lucide-react'
 
 export default function SettingsBankAccountsPage() {
@@ -16,15 +14,14 @@ export default function SettingsBankAccountsPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
   const { user } = useAuth()
-  const { confirm } = useConfirm()
   const isAdmin = user?.role === 'admin'
 
   const load = async () => {
     setLoading(true)
     const services = await getServices()
     const stored = await services.settings.getBankAccounts()
-    setJa(stored.ja || ISSUER.bankInfo)
-    setEn(stored.en || ISSUER.bankInfoEn)
+    setJa(stored.ja)
+    setEn(stored.en)
     setLoading(false)
   }
 
@@ -44,12 +41,6 @@ export default function SettingsBankAccountsPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleResetDefaults = async () => {
-    if (!(await confirm({ message: 'デフォルトの口座情報で上書きします（保存はしません）。よろしいですか？', danger: true, confirmLabel: 'OK' }))) return
-    setJa(ISSUER.bankInfo)
-    setEn(ISSUER.bankInfoEn)
   }
 
   if (!isAdmin) {
@@ -119,13 +110,6 @@ export default function SettingsBankAccountsPage() {
         )}
 
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-graphite hover:bg-bone"
-          >
-            デフォルトに戻す
-          </button>
           <button
             type="button"
             onClick={handleSave}
