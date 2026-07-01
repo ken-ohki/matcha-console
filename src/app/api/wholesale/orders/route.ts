@@ -117,7 +117,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_shipping' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'resend_invoice' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_shipping' | 'set_destination' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -160,6 +160,16 @@ function recomputeTax(lines: { revenue: number; taxRate: number }[], feesTotal: 
   if (reduced) taxBreakdown.push({ rate: 8, taxableJpy: reduced, taxJpy: reducedTax })
   if (standard) taxBreakdown.push({ rate: 10, taxableJpy: standard, taxJpy: standardTax })
   return { taxBreakdown, taxJpy: reducedTax + standardTax }
+}
+
+// 国内送料（税抜）を重量別テーブルから算出。sabo-wholesale の computeDomesticShippingJpy と同ロジック
+// （重量 ≤ uptoKg の最小ティア、超過は最大ティア）。テーブルは settings/main.shippingRatesJp。
+function computeDomesticShippingJpy(weightKg: number, tiers: { uptoKg?: number; feeJpy?: number }[] | undefined): number {
+  if (!Array.isArray(tiers) || tiers.length === 0) return 0
+  const sorted = tiers.filter(t => Number(t.uptoKg) > 0).sort((a, b) => Number(a.uptoKg) - Number(b.uptoKg))
+  if (sorted.length === 0) return 0
+  const tier = sorted.find(t => weightKg <= Number(t.uptoKg)) ?? sorted[sorted.length - 1]
+  return Math.max(0, Math.round(Number(tier.feeJpy) || 0))
 }
 
 // Base URL of the wholesale storefront app (owns Stripe + order/stock logic).
@@ -285,6 +295,23 @@ export async function PATCH(request: Request) {
     }
   }
 
+  // Resend the bank-transfer invoice + payment instructions (after an edit changed the total).
+  // Delegate to the wholesale app (owns Resend + invoice PDF rendering).
+  if (body.action === 'resend_invoice') {
+    const auth = request.headers.get('authorization') ?? ''
+    try {
+      const res = await fetch(`${WHOLESALE_BASE_URL}/api/wholesale/admin/resend-invoice`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: auth },
+        body: JSON.stringify({ orderId: body.orderId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+      return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
+    }
+  }
+
   const database = db()
   const ref = database.collection('wholesale_orders').doc(body.orderId)
 
@@ -374,6 +401,23 @@ export async function PATCH(request: Request) {
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }
+  // 発送先・宛先の変更（金額に影響しない項目のみ）。国内は重量課金で住所変更は送料不変のため、
+  // 支払い済み・発送前でも許可する。国・数量・金額・在庫予約には触れない。
+  if (body.action === 'set_destination') {
+    const cur = (await ref.get()).data() as Record<string, unknown> | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    if (cur.status === 'shipped' || cur.status === 'cancelled') {
+      return NextResponse.json({ error: 'not_editable' }, { status: 400 })
+    }
+    const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
+    if (body.contactName !== undefined) patch.contactName = body.contactName.trim() || null
+    if (body.shippingPostalCode !== undefined) patch.shippingPostalCode = body.shippingPostalCode.trim() || null
+    if (body.shippingAddress !== undefined) patch.shippingAddress = body.shippingAddress.trim() || null
+    if (body.phone !== undefined) patch.phone = body.phone.trim() || null
+    if (body.shippingEmail !== undefined) patch.shippingEmail = body.shippingEmail.trim() || null
+    await ref.set(patch, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
   // Staff-only internal memos: order memo + shipping memo (shown on 発送管理).
   if (body.action === 'set_memos') {
     const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() }
@@ -449,16 +493,19 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'wholesale_unreachable', detail: err instanceof Error ? err.message : 'unknown' }, { status: 502 })
     }
   }
-  // Edit a 直販 (staff-entered / migrated) order's content: items, shipping, fees,
-  // notes. Recomputes totals/tax/cost and rebuilds the ec_sales stock reservation.
+  // Edit an order's content: items, shipping, fees, notes. Recomputes totals/tax/cost
+  // and rebuilds the ec_sales stock reservation. Allowed for any UNSETTLED order —
+  // direct (直販) orders AND EC self-service orders that are not yet paid/shipped —
+  // so staff can honor a customer's change request before payment.
   if (body.action === 'update_direct_order') {
     const snap = await ref.get()
     const cur = snap.data() as Record<string, unknown> | undefined
     if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    // Editable: staff-entered/migrated (直販) orders, or any order awaiting approval (受注生産).
-    if (cur.origin !== 'direct' && cur.status !== 'pending_approval') return NextResponse.json({ error: 'ec_order_not_editable' }, { status: 400 })
-    // Never edit a settled order — recomputing would rewrite an already-paid total.
-    if (cur.status === 'paid' || cur.status === 'shipped') return NextResponse.json({ error: 'order_settled_not_editable' }, { status: 400 })
+    // Never edit a settled/closed order — recomputing would rewrite an already-paid
+    // total. Amount changes on paid orders must go through 取消→返金→再注文.
+    if (cur.status === 'paid' || cur.status === 'shipped' || cur.status === 'cancelled') {
+      return NextResponse.json({ error: 'order_settled_not_editable' }, { status: 400 })
+    }
     if (!Array.isArray(body.items) || body.items.length === 0) return NextResponse.json({ error: 'no_items' }, { status: 400 })
 
     const prodSnap = await database.collection('products').get()
@@ -521,7 +568,16 @@ export async function PATCH(request: Request) {
       })
     const feeLinesTotal = feeLines.reduce((s, f) => s + f.amountJpy, 0)
     const optionFeesJpy = optionFromItems + feeLinesTotal
-    const shippingFeeJpy = body.shippingFeeJpy != null ? Number(body.shippingFeeJpy) : Number(cur.shippingFeeJpy ?? 0)
+    // 国内は総重量から送料を自動再計算（数量変更を送料に反映）。海外は手入力を尊重。
+    let shippingFeeJpy: number
+    if (domestic) {
+      const shippingWeightKg = Math.round(items.reduce((s, i) => s + i.quantityKg, 0) * 1000) / 1000
+      const settingsSnap = await database.collection('settings').doc('main').get()
+      const tiers = (settingsSnap.data()?.shippingRatesJp ?? []) as { uptoKg?: number; feeJpy?: number }[]
+      shippingFeeJpy = computeDomesticShippingJpy(shippingWeightKg, tiers)
+    } else {
+      shippingFeeJpy = body.shippingFeeJpy != null ? Number(body.shippingFeeJpy) : Number(cur.shippingFeeJpy ?? 0)
+    }
     const paymentFeeJpy = body.paymentFeeJpy != null ? Number(body.paymentFeeJpy) : Number(cur.paymentFeeJpy ?? 0)
     // Goods + fee lines are bucketed by their own rate; shipping + 小分けオプション
     // are standard 10% (domestic) / 0 (export).
@@ -617,7 +673,8 @@ export async function PATCH(request: Request) {
       updatedAt: FieldValue.serverTimestamp(),
     }, { merge: true })
     await batch.commit()
-    return NextResponse.json({ ok: true })
+    // UI が編集後の再通知（支払いリンク再発行 / 請求書再送）要否を判断できるよう返す。
+    return NextResponse.json({ ok: true, status: cur.status ?? null, paymentMethod: cur.paymentMethod ?? null, totalJpy })
   }
   if (body.action === 'cancel') {
     const before = (await ref.get()).data() as { status?: string } | undefined

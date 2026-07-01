@@ -141,6 +141,8 @@ export default function WholesaleOrderDetailPage() {
   const [carrierLabel, setCarrierLabel] = useState('')
   const [shipFee, setShipFee] = useState('')
   const [shipCarrier, setShipCarrier] = useState('ems')
+  const [destOpen, setDestOpen] = useState(false)
+  const [dest, setDest] = useState({ contactName: '', shippingPostalCode: '', shippingAddress: '', phone: '', shippingEmail: '' })
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -193,6 +195,37 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
+  // 発送先の変更（金額に影響しない項目のみ）。支払い済み・発送前でも可能。
+  const openDest = () => {
+    if (!order) return
+    setDest({
+      contactName: order.contactName ?? '',
+      shippingPostalCode: order.shippingPostalCode ?? '',
+      shippingAddress: order.shippingAddress ?? '',
+      phone: order.phone ?? '',
+      shippingEmail: order.shippingEmail ?? '',
+    })
+    setDestOpen(true)
+  }
+  const saveDest = async () => {
+    if (!order) return
+    setBusy(true)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: order.id, action: 'set_destination', ...dest }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) { notify(`発送先の変更に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
+      notify('発送先を変更しました。', 'success')
+      setDestOpen(false)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -236,7 +269,7 @@ export default function WholesaleOrderDetailPage() {
     load()
   }, [load])
 
-  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
+  const act = async (action: 'confirm_payment' | 'cancel' | 'mark_shipped' | 'notify_shipped' | 'set_fulfillment' | 'approve' | 'accept_quote' | 'resend_payment_link' | 'resend_invoice' | 'fetch_fee' | 'request_shipment' | 'cancel_shipment_request', extra: Record<string, unknown> = {}) => {
     if (action === 'accept_quote' && !(await confirm({ message: 'お客様が金額を承諾済みとして、この注文を確定しますか？（在庫はすでに引当済み。確定後は支払い案内へ進めます）', confirmLabel: '確定する' }))) return
     // Cancelling a PAID order does NOT auto-refund — warn staff to refund manually.
     const wasPaid = order?.paymentStatus === 'paid' || order?.status === 'paid'
@@ -294,6 +327,10 @@ export default function WholesaleOrderDetailPage() {
               : `発行に失敗しました（${d.error ?? 'error'}）`
         notify(msg, d.ok ? 'success' : 'error')
       }
+      if (action === 'resend_invoice') {
+        const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+        notify(d.ok ? '変更後の請求書・お振込案内を再送しました。' : `再送に失敗しました（${d.error ?? 'error'}）`, d.ok ? 'success' : 'error')
+      }
       if (action === 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
         if (!d.ok) {
@@ -309,7 +346,7 @@ export default function WholesaleOrderDetailPage() {
         }
       }
       // Surface guard rejections (not_paid / settled / etc.) for actions without a bespoke handler.
-      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link' && action !== 'fetch_fee') {
+      if (!res.ok && action !== 'notify_shipped' && action !== 'approve' && action !== 'accept_quote' && action !== 'resend_payment_link' && action !== 'resend_invoice' && action !== 'fetch_fee') {
         const d = (await res.json().catch(() => ({}))) as { error?: string }
         notify(`操作に失敗しました（${d.error ?? 'error'}）`, 'error')
       }
@@ -394,10 +431,22 @@ export default function WholesaleOrderDetailPage() {
           paymentFeeJpy: edit.paymentFeeJpy !== '' ? Number(edit.paymentFeeJpy) : undefined,
         }),
       })
-      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; status?: string; paymentMethod?: string }
       if (!res.ok) { notify(`保存に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
       setEditing(false); setEdit(null)
       await load()
+      // 未払い注文は、変更後の支払い案内を再送するか明示確認（二重請求・行き違い防止）。
+      if (d.status === 'pending_payment' || d.status === 'quoted') {
+        const isBank = d.paymentMethod === 'bank_transfer'
+        const ok = await confirm({
+          title: '支払い案内の再送',
+          message: isBank
+            ? '変更を反映した請求書・お振込案内をお客様へ再送しますか？'
+            : '変更後の金額で支払いリンクを再発行し、お客様へ再送しますか？（旧リンクは無効になります）',
+          confirmLabel: '再送する',
+        })
+        if (ok) await act(isBank ? 'resend_invoice' : 'resend_payment_link')
+      }
     } finally { setBusy(false) }
   }
   const setEditItem = (idx: number, patch: Partial<EditState['items'][number]>) =>
@@ -520,7 +569,7 @@ export default function WholesaleOrderDetailPage() {
             <ArrowLeft size={15} /> 卸売注文一覧へ
           </Link>
           <div className="flex items-center gap-2">
-            {isAdmin && (o?.origin === 'direct' || o?.status === 'pending_approval') && !editing && o?.status !== 'cancelled' && o?.status !== 'paid' && o?.status !== 'shipped' && (
+            {isAdmin && !editing && o?.status !== 'cancelled' && o?.status !== 'paid' && o?.status !== 'shipped' && (
               <button onClick={startEdit} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">内容を編集</button>
             )}
             <button onClick={load} className="flex items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm font-bold text-ink hover:bg-bone">
@@ -949,6 +998,29 @@ export default function WholesaleOrderDetailPage() {
                   </label>
                   <button type="button" disabled={busy} onClick={() => saveShipping(false)} className="btn-ghost">送料を保存</button>
                 </div>
+              </div>
+            )}
+
+            {/* 支払い済み・発送前: 金額に影響しない発送先変更／金額変更は取消→返金→再注文の案内 */}
+            {isAdmin && o.status === 'paid' && (
+              <div className="mb-2 rounded-lg border border-line bg-bone/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-graphite">お客様の変更依頼：<strong className="text-ink">発送先・宛先</strong>はここで変更できます。<strong className="text-ink">数量など金額が変わる変更</strong>は、取消→返金→再注文で対応してください。</p>
+                  {!destOpen && <button onClick={openDest} disabled={busy} className="btn-ghost text-sm">発送先を変更</button>}
+                </div>
+                {destOpen && (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <label className="text-xs text-mist">宛名（担当者）<input value={dest.contactName} onChange={e => setDest({ ...dest, contactName: e.target.value })} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                    <label className="text-xs text-mist">郵便番号<input value={dest.shippingPostalCode} onChange={e => setDest({ ...dest, shippingPostalCode: e.target.value })} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                    <label className="text-xs text-mist sm:col-span-2">住所<input value={dest.shippingAddress} onChange={e => setDest({ ...dest, shippingAddress: e.target.value })} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                    <label className="text-xs text-mist">電話<input value={dest.phone} onChange={e => setDest({ ...dest, phone: e.target.value })} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                    <label className="text-xs text-mist">Email<input value={dest.shippingEmail} onChange={e => setDest({ ...dest, shippingEmail: e.target.value })} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                    <div className="flex gap-2 sm:col-span-2">
+                      <button onClick={saveDest} disabled={busy} className="btn-primary text-sm">保存</button>
+                      <button onClick={() => setDestOpen(false)} disabled={busy} className="btn-ghost text-sm">キャンセル</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
