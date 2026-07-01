@@ -117,7 +117,7 @@ async function confirmOrderPaid(database: Firestore, orderId: string): Promise<v
 
 interface PatchBody {
   orderId?: string
-  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
+  action?: 'confirm_payment' | 'unconfirm_payment' | 'cancel' | 'mark_shipped' | 'quote' | 'approve' | 'resend_payment_link' | 'fetch_fee' | 'accept_quote' | 'notify_shipped' | 'set_billing' | 'set_fulfillment' | 'set_shipping' | 'set_memos' | 'set_doc_fields' | 'update_direct_order' | 'delete_order' | 'request_shipment' | 'cancel_shipment_request'
   shippingFeeJpy?: number
   overseasCarrier?: 'ems' | 'epacket' | 'dhl' | 'designated'
   trackingNumber?: string
@@ -355,6 +355,22 @@ export async function PATCH(request: Request) {
     if (body.shippingCarrierLabel !== undefined) patch.shippingCarrierLabel = body.shippingCarrierLabel.trim() || FieldValue.delete()
     if (body.shipped === true) { patch.status = 'shipped'; patch.shippedAt = new Date().toISOString() }
     if (body.shipped === false) { patch.status = 'paid'; patch.shippedAt = FieldValue.delete() }
+    await ref.set(patch, { merge: true })
+    return NextResponse.json({ ok: true })
+  }
+  // 海外注文の送料だけを軽量に更新（編集画面に入らずに設定できるようにする）。
+  // 海外は送料が免税(0%)なので税再計算は不要。total は旧送料との差分で更新。
+  if (body.action === 'set_shipping') {
+    const cur = (await ref.get()).data() as Record<string, unknown> | undefined
+    if (!cur) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    if (cur.isDomestic !== false) return NextResponse.json({ error: 'overseas_only' }, { status: 400 })
+    if (cur.status === 'paid' || cur.status === 'shipped' || cur.status === 'cancelled') {
+      return NextResponse.json({ error: 'order_settled_not_editable' }, { status: 400 })
+    }
+    const fee = Math.max(0, Math.round(Number(body.shippingFeeJpy) || 0))
+    const newTotal = Number(cur.totalJpy || 0) - Number(cur.shippingFeeJpy || 0) + fee
+    const patch: Record<string, unknown> = { shippingFeeJpy: fee, totalJpy: newTotal, displayTotal: newTotal, updatedAt: FieldValue.serverTimestamp() }
+    if (body.overseasCarrier) patch.overseasCarrier = body.overseasCarrier
     await ref.set(patch, { merge: true })
     return NextResponse.json({ ok: true })
   }

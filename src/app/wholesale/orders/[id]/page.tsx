@@ -139,6 +139,8 @@ export default function WholesaleOrderDetailPage() {
   const [uploadingKind, setUploadingKind] = useState<UploadKind | null>(null)
   const [tracking, setTracking] = useState('')
   const [carrierLabel, setCarrierLabel] = useState('')
+  const [shipFee, setShipFee] = useState('')
+  const [shipCarrier, setShipCarrier] = useState('ems')
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -171,6 +173,26 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
+  // 海外注文の送料を保存（編集画面に入らずに設定できる）。approve=true なら保存後に承認まで実行。
+  const saveShipping = async (approve = false) => {
+    if (!order) return
+    const fee = Number(shipFee)
+    if (shipFee === '' || !Number.isFinite(fee) || fee < 0) { notify('送料を入力してください', 'error'); return }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/wholesale/orders', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify({ orderId: order.id, action: 'set_shipping', shippingFeeJpy: fee, overseasCarrier: shipCarrier }),
+      })
+      const d = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok) { notify(`送料の保存に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
+      if (approve) { await act('approve') } else { notify('送料を保存しました。', 'success'); await load() }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -187,6 +209,8 @@ export default function WholesaleOrderDetailPage() {
       setOrder(found)
       setTracking(found?.trackingNumber ?? '')
       setCarrierLabel(found?.shippingCarrierLabel ?? '')
+      setShipFee(found?.shippingFeeJpy != null ? String(found.shippingFeeJpy) : '')
+      setShipCarrier(found?.overseasCarrier ?? 'ems')
       setAdminMemo(found?.adminMemo ?? '')
       setShippingMemo(found?.shippingMemo ?? '')
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
@@ -907,13 +931,34 @@ export default function WholesaleOrderDetailPage() {
               </Section>
             )}
 
+            {/* 海外・承認待ちの送料入力（編集画面に入らずここで設定。承認前に必須） */}
+            {isAdmin && isExport && o.status === 'pending_approval' && !editing && (
+              <div className="mb-2 rounded-lg border border-matchaDeep/30 bg-[#eef3eb] p-3">
+                <p className="mb-2 text-xs font-medium text-ink">海外発送の送料（承認前に必須）{(o.shippingFeeJpy ?? 0) <= 0 && <span className="ml-1 text-alert">未入力</span>}</p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="text-xs text-mist">発送業者
+                    <select value={shipCarrier} onChange={e => setShipCarrier(e.target.value)} className="mt-1 block rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink">
+                      <option value="ems">EMS（国際スピード郵便）</option>
+                      <option value="epacket">国際エアパケット</option>
+                      <option value="dhl">DHL</option>
+                      <option value="designated">御社指定業者</option>
+                    </select>
+                  </label>
+                  <label className="text-xs text-mist">送料 (円・税抜/免税)
+                    <input type="number" min="0" step="1" value={shipFee} onChange={e => setShipFee(e.target.value)} className="mt-1 block w-32 rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="例: 4500" />
+                  </label>
+                  <button type="button" disabled={busy} onClick={() => saveShipping(false)} className="btn-ghost">送料を保存</button>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
               {isAdmin && o.status === 'pending_acceptance' && !editing && (
                 <button onClick={() => act('accept_quote')} disabled={busy} className="btn-primary">承諾して確定</button>
               )}
               {isAdmin && o.status === 'pending_approval' && !editing && (
-                <button onClick={() => act('approve')} disabled={busy} className="btn-primary">承認して支払い案内を送る</button>
+                <button onClick={() => isExport ? saveShipping(true) : act('approve')} disabled={busy} className="btn-primary">{isExport ? '送料を保存して承認' : '承認して支払い案内を送る'}</button>
               )}
               {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
                 <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
