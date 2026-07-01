@@ -68,6 +68,12 @@ export interface IssuerInfo {
   tel: string
   email: string
   registrationNumber: string
+  // 輸出書類（Commercial Invoice）用
+  signerName: string
+  signerPosition: string
+  traderType: string
+  vatNo: string
+  eori: string
 }
 
 export interface ISettingsService {

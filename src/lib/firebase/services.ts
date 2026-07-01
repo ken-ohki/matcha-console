@@ -2374,6 +2374,11 @@ export function createFirebaseServices(): IServices {
         tel: String(data.tel ?? ISSUER.tel),
         email: String(data.email ?? ISSUER.email),
         registrationNumber: String(data.registrationNumber ?? ISSUER.registrationNumber),
+        signerName: String(data.signerName ?? ISSUER.signerName ?? ''),
+        signerPosition: String(data.signerPosition ?? ISSUER.signerPosition ?? ''),
+        traderType: String(data.traderType ?? ISSUER.traderType ?? 'BUSINESS'),
+        vatNo: String(data.vatNo ?? ISSUER.vatNo ?? ''),
+        eori: String(data.eori ?? ISSUER.eori ?? ''),
       }
     },
 

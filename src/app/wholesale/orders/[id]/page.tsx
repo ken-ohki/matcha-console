@@ -65,6 +65,8 @@ interface Order {
   receiptProviso?: string
   proformaValidUntil?: string
   uploadedDocs?: Partial<Record<'commercial' | 'packingList', { storagePath: string; fileName: string; uploadedAt: string }>>
+  commercialInvoiceNo?: string
+  commercialInvoice?: CommercialInvoiceDraft
   // Staff-only accounting (console API only; stripped from the member API).
   costAmountJpy?: number
   grossProfitJpy?: number
@@ -124,6 +126,23 @@ type DocKind = keyof typeof DOC_ROUTE
 type UploadKind = 'commercial' | 'packingList'
 const UPLOAD_LABEL: Record<UploadKind, string> = { commercial: 'Commercial Invoice', packingList: 'Packing List' }
 
+// Commercial Invoice 作成フォーム（都度入力の通関項目）。金額・数量は注文本体を使う。
+interface CommercialInvoiceDraft {
+  invoiceNo?: string
+  incoterms?: string; incotermsPlace?: string; reasonForExport?: string; typeOfExport?: string
+  dutyPayer?: string; payerOfVat?: string; grossWeightKg?: number; awbNo?: string; buyerTaxId?: string
+  items?: { hsCode?: string; originCountry?: string; netWeightKgPerUnit?: number }[]
+}
+type CiForm = {
+  incoterms: string; incotermsPlace: string; reasonForExport: string; typeOfExport: string
+  dutyPayer: string; payerOfVat: string; grossWeightKg: string; awbNo: string; buyerTaxId: string
+  items: { hsCode: string; originCountry: string; netWeightKgPerUnit: string }[]
+}
+const CI_DEFAULTS = {
+  incoterms: 'CIP', incotermsPlace: '', reasonForExport: 'Commercial',
+  typeOfExport: 'Commercial Purposes/Sale', dutyPayer: 'Receiver Will Pay', payerOfVat: '',
+}
+
 export default function WholesaleOrderDetailPage() {
   const router = useRouter()
   const { user } = useAuth()
@@ -143,6 +162,8 @@ export default function WholesaleOrderDetailPage() {
   const [shipCarrier, setShipCarrier] = useState('ems')
   const [destOpen, setDestOpen] = useState(false)
   const [dest, setDest] = useState({ contactName: '', shippingPostalCode: '', shippingAddress: '', phone: '', shippingEmail: '' })
+  const [ciOpen, setCiOpen] = useState(false)
+  const [ci, setCi] = useState<CiForm | null>(null)
   const [carriers, setCarriers] = useState<MasterEntry[]>([])
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditState | null>(null)
@@ -220,6 +241,59 @@ export default function WholesaleOrderDetailPage() {
       if (!res.ok) { notify(`発送先の変更に失敗しました（${d.error ?? 'error'}）`, 'error'); return }
       notify('発送先を変更しました。', 'success')
       setDestOpen(false)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Commercial Invoice 作成フォームを開く（保存済み下書き or 既定値で初期化）。
+  const openCi = () => {
+    if (!order) return
+    const d = order.commercialInvoice
+    setCi({
+      incoterms: d?.incoterms ?? CI_DEFAULTS.incoterms,
+      incotermsPlace: d?.incotermsPlace ?? CI_DEFAULTS.incotermsPlace,
+      reasonForExport: d?.reasonForExport ?? CI_DEFAULTS.reasonForExport,
+      typeOfExport: d?.typeOfExport ?? CI_DEFAULTS.typeOfExport,
+      dutyPayer: d?.dutyPayer ?? CI_DEFAULTS.dutyPayer,
+      payerOfVat: d?.payerOfVat ?? CI_DEFAULTS.payerOfVat,
+      grossWeightKg: d?.grossWeightKg != null ? String(d.grossWeightKg) : '',
+      awbNo: d?.awbNo ?? order.trackingNumber ?? '',
+      buyerTaxId: d?.buyerTaxId ?? order.buyerTaxId ?? '',
+      items: (order.items ?? []).map((it, i) => ({
+        hsCode: d?.items?.[i]?.hsCode ?? '',
+        originCountry: d?.items?.[i]?.originCountry ?? 'Japan',
+        netWeightKgPerUnit: d?.items?.[i]?.netWeightKgPerUnit != null ? String(d.items[i].netWeightKgPerUnit) : '',
+      })),
+    })
+    setCiOpen(true)
+  }
+  const saveCi = async () => {
+    if (!order || !ci) return
+    const payload: CommercialInvoiceDraft = {
+      incoterms: ci.incoterms.trim(), incotermsPlace: ci.incotermsPlace.trim(),
+      reasonForExport: ci.reasonForExport.trim(), typeOfExport: ci.typeOfExport.trim(),
+      dutyPayer: ci.dutyPayer.trim(), payerOfVat: ci.payerOfVat.trim(),
+      grossWeightKg: ci.grossWeightKg !== '' ? Number(ci.grossWeightKg) : undefined,
+      awbNo: ci.awbNo.trim(), buyerTaxId: ci.buyerTaxId.trim(),
+      items: ci.items.map(it => ({
+        hsCode: it.hsCode.trim() || undefined,
+        originCountry: it.originCountry.trim() || undefined,
+        netWeightKgPerUnit: it.netWeightKgPerUnit !== '' ? Number(it.netWeightKgPerUnit) : undefined,
+      })),
+    }
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/wholesale/orders/${id}/commercial-invoice`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', Authorization: `Bearer ${await token()}` },
+        body: JSON.stringify(payload),
+      })
+      const dd = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; detail?: string }
+      if (!res.ok) { notify(`Commercial Invoiceの作成に失敗しました（${dd.detail || dd.error || 'error'}）`, 'error'); return }
+      notify('Commercial Invoiceを作成しました。', 'success')
+      setCiOpen(false)
       await load()
     } finally {
       setBusy(false)
@@ -935,6 +1009,49 @@ export default function WholesaleOrderDetailPage() {
                   })()}
                 </div>
                 {o.shippedAt && <p className="mb-2 text-xs text-mist">出荷日: {o.shippedAt.slice(0, 10)}</p>}
+
+                {/* 越境: Commercial Invoice をシステムで作成（都度フォーム入力）。commercial 枠に保存され添付/DLに使われる。 */}
+                {isExport && (
+                  <div className="mb-3 rounded-lg border border-line bg-bone/50 p-3">
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-mono uppercase tracking-brand text-mist">Commercial Invoice をシステムで作成</p>
+                      {!ciOpen && <button onClick={openCi} disabled={busy} className="btn-ghost text-sm">{o.commercialInvoice ? 'CIを編集・再作成' : 'Commercial Invoiceを作成'}</button>}
+                    </div>
+                    <p className="mb-2 text-xs text-mist">通関項目を入力して作成すると commercial 枠に保存され、発送通知メール添付・マイページDLに使われます（外部作成のアップロードと同じ枠）。</p>
+                    {ciOpen && ci && (
+                      <div className="space-y-3">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <label className="text-xs text-mist">Incoterms<input value={ci.incoterms} onChange={e => setCi(c => c ? { ...c, incoterms: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">Place of Incoterm<input value={ci.incotermsPlace} onChange={e => setCi(c => c ? { ...c, incotermsPlace: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">総重量(kg)<input type="number" step="0.001" value={ci.grossWeightKg} onChange={e => setCi(c => c ? { ...c, grossWeightKg: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="未入力なら正味重量" /></label>
+                          <label className="text-xs text-mist">Reason for Export<input value={ci.reasonForExport} onChange={e => setCi(c => c ? { ...c, reasonForExport: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">Type of Export<input value={ci.typeOfExport} onChange={e => setCi(c => c ? { ...c, typeOfExport: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">Duty/taxes acct<input value={ci.dutyPayer} onChange={e => setCi(c => c ? { ...c, dutyPayer: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">Payer of GST/VAT<input value={ci.payerOfVat} onChange={e => setCi(c => c ? { ...c, payerOfVat: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                          <label className="text-xs text-mist">AWB No<input value={ci.awbNo} onChange={e => setCi(c => c ? { ...c, awbNo: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" placeholder="追跡番号" /></label>
+                          <label className="text-xs text-mist">先方 税番号/VAT<input value={ci.buyerTaxId} onChange={e => setCi(c => c ? { ...c, buyerTaxId: e.target.value } : c)} className="mt-1 block w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-ink" /></label>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs text-mist">明細ごとの通関項目（HSコード / 原産国 / 正味重量kg・1個あたり）</p>
+                          <div className="space-y-1.5">
+                            {ci.items.map((it, i) => (
+                              <div key={i} className="flex flex-wrap items-center gap-2">
+                                <span className="w-40 truncate text-xs text-ink">{o.items?.[i]?.productName ?? `明細${i + 1}`}</span>
+                                <input value={it.hsCode} onChange={e => setCi(c => c ? { ...c, items: c.items.map((x, j) => j === i ? { ...x, hsCode: e.target.value } : x) } : c)} className="w-32 rounded-lg border border-line bg-paper px-2 py-1 text-sm text-ink outline-none focus:border-ink" placeholder="HS 例:0902.10" />
+                                <input value={it.originCountry} onChange={e => setCi(c => c ? { ...c, items: c.items.map((x, j) => j === i ? { ...x, originCountry: e.target.value } : x) } : c)} className="w-24 rounded-lg border border-line bg-paper px-2 py-1 text-sm text-ink outline-none focus:border-ink" placeholder="原産国" />
+                                <input type="number" step="0.001" value={it.netWeightKgPerUnit} onChange={e => setCi(c => c ? { ...c, items: c.items.map((x, j) => j === i ? { ...x, netWeightKgPerUnit: e.target.value } : x) } : c)} className="w-24 rounded-lg border border-line bg-paper px-2 py-1 text-sm text-ink outline-none focus:border-ink" placeholder="正味kg" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={saveCi} disabled={busy} className="btn-primary text-sm">{busy ? '作成中…' : '作成する'}</button>
+                          <button onClick={() => setCiOpen(false)} disabled={busy} className="btn-ghost text-sm">キャンセル</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 越境: 外部(DHL/EMS)で作成した通関書類をアップロード。発送通知メールに自動添付される。 */}
                 {isExport && (
