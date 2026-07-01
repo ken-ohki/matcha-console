@@ -105,7 +105,9 @@ export function orderToSale(o: WholesaleOrderRow, costByProduct: Record<string, 
   const lineTaxRate = defaultTaxRateForCountry(o.shippingCountry)
   const items: SaleLineItem[] = (o.items ?? []).map(it => {
     const isSample = it.kind === 'sample'
-    const costPerKg = isSample ? 0 : (costByProduct[it.productId] ?? 0)
+    // サンプル(10g)も原価は仕入単価×内容量。quantityKg はサンプルで 0.01kg×個数 なので、
+    // costPerKg×quantityKg ＝ 仕入単価×0.01×個数 となり「仕入価格×0.01」ルールに一致する。
+    const costPerKg = costByProduct[it.productId] ?? 0
     const quantityKg = Number(it.quantityKg) || 0
     const revenue = Number(it.lineTotalJpy) || 0
     const costAmount = costPerKg * quantityKg

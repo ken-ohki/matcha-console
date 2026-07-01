@@ -617,7 +617,9 @@ export default function WholesaleOrderDetailPage() {
   // Cost / gross profit (staff only). Use the stored snapshot for migrated orders,
   // otherwise compute live from each product's purchase price.
   // Samples are not bought at cost/kg, so they carry no cost in the 原価/粗利 total.
-  const itemCost = (i: OrderItem) => (i.sampleUnits ? 0 : (costByProduct[i.productId ?? ''] ?? 0) * (i.quantityKg ?? 0))
+  // サンプルも原価計上: quantityKg はサンプルで 0.01kg×個数 のため、仕入単価×quantityKg で
+  // 「仕入価格×0.01×個数」となる。
+  const itemCost = (i: OrderItem) => (costByProduct[i.productId ?? ''] ?? 0) * (i.quantityKg ?? 0)
   const revenueExTax = o?.subtotalJpy ?? 0
   const totalCost = o?.costAmountJpy ?? (o?.items ?? []).reduce((s, i) => s + itemCost(i), 0)
   const paymentFee = o?.paymentFeeJpy ?? 0
@@ -802,11 +804,10 @@ export default function WholesaleOrderDetailPage() {
                       <td className="whitespace-nowrap py-2 text-right text-mist">{i.unitPriceJpy != null ? `¥${i.unitPriceJpy.toLocaleString()}` : '—'}</td>
                       <td className="whitespace-nowrap py-2 text-right">
                         {(() => {
-                          // Samples are priced from the wholesale rate, not bought at cost/kg —
-                          // showing cost / a below-cost alert here is misleading, so skip it.
-                          if (i.sampleUnits) return <span className="text-mist">—</span>
                           const cost = costByProduct[i.productId ?? '']
                           if (cost == null) return <span className="text-mist">—</span>
+                          // サンプルは 10g(0.01kg) 単位の原価＝仕入単価×0.01。原価割れ判定は行わない。
+                          if (i.sampleUnits) return <span className="text-mist">¥{Math.round(cost * 0.01).toLocaleString()}<span className="text-[10px]">/10g</span></span>
                           const below = i.unitPriceJpy != null && i.unitPriceJpy < cost
                           return <span className={below ? 'font-medium text-alert' : 'text-mist'}>¥{Math.round(cost).toLocaleString()}{below ? '（原価割れ）' : ''}</span>
                         })()}
