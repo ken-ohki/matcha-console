@@ -32,7 +32,10 @@ import {
   computePoTaxIncluded,
   computeSaleTaxIncluded,
   invoiceRemaining,
+  invoicePaidTotal,
   isLegacyPayablePo,
+  hasInstallmentSchedule,
+  poPaidTotal,
   todayMonthKey,
   type CashFlowMode,
   type MonthlyCashFlow,
@@ -111,6 +114,7 @@ export default function FinancialsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
+  const [partnerQuery, setPartnerQuery] = useState('')
   // 集計の基準日: 発注日（無ければ作成日）/ 納品日（納期、無ければ発注日/作成日）
   const [saleBasis, setSaleBasis] = useState<'order' | 'delivery'>('order')
   const saleDate = (r: SaleRecord): Date => {
@@ -198,6 +202,18 @@ export default function FinancialsPage() {
     })
   }, [ecSales, fromTime, toTime])
 
+  // 仕入請求書（invoice-driven の買掛）。請求日で期間フィルタ。
+  const filteredInvoices = useMemo(() => {
+    return purchaseInvoices.filter(inv => {
+      const d = inv.invoiceDate || inv.receivedDate
+      if (!d) return true
+      const t = new Date(d).getTime()
+      if (fromTime != null && t < fromTime) return false
+      if (toTime != null && t > toTime) return false
+      return true
+    })
+  }, [purchaseInvoices, fromTime, toTime])
+
   const kpis = useMemo(() => {
     const ecTotal = filteredEc.reduce((s, ec) => s + ecRevenue(ec), 0)
     const directRevenue = filteredSales.reduce((s, r) => s + saleIncome(r), 0)
@@ -210,13 +226,29 @@ export default function FinancialsPage() {
     const outstanding = filteredSales
       .filter(r => r.status === 'confirmed' && r.paymentStatus !== 'paid')
       .reduce((s, r) => s + saleIncome(r), 0)
-    const totalExpense = filteredOrders.reduce((s, o) => s + poExpense(o), 0)
-    const paid = filteredOrders
-      .filter(o => o.paymentStatus === 'paid')
-      .reduce((s, o) => s + poExpense(o), 0)
-    const unpaid = filteredOrders
-      .filter(o => o.paymentStatus !== 'paid')
-      .reduce((s, o) => s + poExpense(o), 0)
+    // 仕入・支払（支払管理と同じ買掛モデル: 請求書 ＋ PO直払い。派生の実支払で判定）。
+    const invoicedPoIds = new Set(purchaseInvoices.flatMap(inv => inv.linkedPoIds ?? []))
+    let totalExpense = 0
+    let paid = 0
+    for (const inv of filteredInvoices) {
+      const t = inv.totalAmount ?? 0
+      totalExpense += t
+      paid += Math.min(invoicePaidTotal(inv), t)
+    }
+    for (const o of filteredOrders) {
+      const schedule = hasInstallmentSchedule(o.payments)
+      if (!(isLegacyPayablePo(o) && (schedule || !invoicedPoIds.has(o.id)))) continue
+      const t = computePoTaxIncluded(o)
+      const p = (o.payments?.length ?? 0) > 0 ? poPaidTotal(o) : (o.paymentStatus === 'paid' ? t : 0)
+      totalExpense += t
+      paid += Math.min(p, t)
+    }
+    const unpaid = Math.max(0, totalExpense - paid)
+    // 粗利（売上原価差引）: SaleRecord.grossProfit を合算し、EC も原価を差し引く。
+    const salesGross = filteredSales.reduce((s, r) => s + (r.grossProfit ?? 0), 0)
+    const ecGross = filteredEc.reduce((s, ec) => s + (ecRevenue(ec) - (costByProduct[ec.productId] ?? 0) * ec.quantityKg), 0)
+    const grossProfit = salesGross + ecGross
+    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : null
     // Stripe processing fees on collected card orders, and the net actually deposited.
     const stripeFees = filteredSales
       .filter(r => r.paymentStatus === 'paid')
@@ -232,10 +264,12 @@ export default function FinancialsPage() {
       totalExpense,
       paid,
       unpaid,
+      grossProfit,
+      grossMargin,
       realizedNet: collected - stripeFees - paid,
       expectedNet: totalRevenue - totalExpense,
     }
-  }, [filteredSales, filteredOrders, filteredEc])
+  }, [filteredSales, filteredOrders, filteredEc, filteredInvoices, purchaseInvoices, costByProduct])
 
   const monthly = useMemo<MonthlyRow[]>(() => {
     const map = new Map<string, MonthlyRow>()
@@ -391,20 +425,37 @@ export default function FinancialsPage() {
     return [...map.values()].sort((a, b) => b.total - a.total)
   }, [filteredSales])
 
+  // 仕入先別の支払状況。支払管理(payables)と同じ買掛モデルで判定する:
+  //  - 請求書ベース(invoice-driven): 各請求書が買掛。支払済=invoicePaidTotal。
+  //  - PO直払い(前払金＋残金 / 旧来の分割・単一): poPaidTotal（無ければ paymentStatus）。
+  // これにより「請求書で支払済／分割で全額支払済」なのに未払表示になるバグを解消。
+  // 請求書で精算されるPOを二重計上しないよう invoicedPoIds を除外する。
   const partnerSuppliers = useMemo<PartnerRow[]>(() => {
     const map = new Map<string, PartnerRow>()
-    for (const o of filteredOrders) {
-      const key = o.supplierName || '(未設定)'
+    const add = (name: string, total: number, paid: number) => {
+      const key = name || '(未設定)'
       const row = map.get(key) ?? { name: key, total: 0, settled: 0, outstanding: 0, count: 0 }
-      const amt = poExpense(o)
-      row.total += amt
-      if (o.paymentStatus === 'paid') row.settled += amt
-      else row.outstanding += amt
+      row.total += total
+      row.settled += Math.min(paid, total)
+      row.outstanding += Math.max(0, total - paid)
       row.count += 1
       map.set(key, row)
     }
+    // 請求書によって精算されるPO（期間外の請求書も含めて判定）。
+    const invoicedPoIds = new Set(purchaseInvoices.flatMap(inv => inv.linkedPoIds ?? []))
+    for (const inv of filteredInvoices) {
+      add(inv.supplierName, inv.totalAmount ?? 0, invoicePaidTotal(inv))
+    }
+    for (const o of filteredOrders) {
+      const schedule = hasInstallmentSchedule(o.payments)
+      // invoice-driven のPOは請求書側で計上済み → ここでは除外。
+      if (!(isLegacyPayablePo(o) && (schedule || !invoicedPoIds.has(o.id)))) continue
+      const total = computePoTaxIncluded(o)
+      const paid = (o.payments?.length ?? 0) > 0 ? poPaidTotal(o) : (o.paymentStatus === 'paid' ? total : 0)
+      add(o.supplierName, total, paid)
+    }
     return [...map.values()].sort((a, b) => b.total - a.total)
-  }, [filteredOrders])
+  }, [filteredOrders, filteredInvoices, purchaseInvoices])
 
   const today = todayIso()
   const isOverdueSale = (r: SaleRecord): boolean => {
@@ -431,30 +482,44 @@ export default function FinancialsPage() {
     inv => inv.paymentStatus !== 'paid' && !!inv.paymentDueDate && inv.paymentDueDate < today && invoiceRemaining(inv) > 0,
   )
 
-  const applyPreset = (preset: 'thisMonth' | 'lastMonth' | 'thisFY' | 'all') => {
+  type Preset = 'thisMonth' | 'lastMonth' | 'last3Months' | 'thisFY' | 'lastFY' | 'all'
+  const applyPreset = (preset: Preset) => {
     const now = new Date()
-    if (preset === 'all') {
-      setDateFrom('')
-      setDateTo('')
-      return
-    }
-    if (preset === 'thisMonth') {
-      setDateFrom(startOfMonth(now))
-      setDateTo(endOfMonth(now))
-      return
-    }
+    if (preset === 'all') { setDateFrom(''); setDateTo(''); return }
+    if (preset === 'thisMonth') { setDateFrom(startOfMonth(now)); setDateTo(endOfMonth(now)); return }
     if (preset === 'lastMonth') {
       const d = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      setDateFrom(startOfMonth(d))
-      setDateTo(endOfMonth(d))
-      return
+      setDateFrom(startOfMonth(d)); setDateTo(endOfMonth(d)); return
+    }
+    if (preset === 'last3Months') {
+      // 直近3ヶ月（当月含む）。
+      const d = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+      setDateFrom(startOfMonth(d)); setDateTo(endOfMonth(now)); return
     }
     if (preset === 'thisFY') {
       const fy = fiscalYearOf(now)
-      setDateFrom(startOfFiscalYear(fy))
-      setDateTo(endOfFiscalYear(fy))
+      setDateFrom(startOfFiscalYear(fy)); setDateTo(endOfFiscalYear(fy)); return
+    }
+    if (preset === 'lastFY') {
+      const fy = fiscalYearOf(now) - 1
+      setDateFrom(startOfFiscalYear(fy)); setDateTo(endOfFiscalYear(fy))
     }
   }
+  // 現在の期間がどのプリセットに一致するか（ハイライト用）。
+  const activePreset: Preset | null = (() => {
+    if (!dateFrom && !dateTo) return 'all'
+    const now = new Date()
+    const eq = (f: string, t: string) => dateFrom === f && dateTo === t
+    if (eq(startOfMonth(now), endOfMonth(now))) return 'thisMonth'
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    if (eq(startOfMonth(lm), endOfMonth(lm))) return 'lastMonth'
+    const l3 = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+    if (eq(startOfMonth(l3), endOfMonth(now))) return 'last3Months'
+    const fy = fiscalYearOf(now)
+    if (eq(startOfFiscalYear(fy), endOfFiscalYear(fy))) return 'thisFY'
+    if (eq(startOfFiscalYear(fy - 1), endOfFiscalYear(fy - 1))) return 'lastFY'
+    return null
+  })()
 
   return (
     <AppLayout>
@@ -485,10 +550,15 @@ export default function FinancialsPage() {
               />
             </div>
             <div className="flex flex-wrap gap-1">
-              <button onClick={() => applyPreset('thisMonth')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">今月</button>
-              <button onClick={() => applyPreset('lastMonth')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">先月</button>
-              <button onClick={() => applyPreset('thisFY')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">今年度</button>
-              <button onClick={() => applyPreset('all')} className="rounded-full border border-line bg-white px-2.5 py-1 text-[11px] text-matchaDeep hover:bg-[#eef3eb]">全期間</button>
+              {([['thisMonth', '今月'], ['lastMonth', '先月'], ['last3Months', '直近3ヶ月'], ['thisFY', '今年度'], ['lastFY', '前年度'], ['all', '全期間']] as [Preset, string][]).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => applyPreset(key)}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] transition ${activePreset === key ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-matchaDeep hover:bg-[#eef3eb]'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[11px] text-mist">集計基準</span>
@@ -507,20 +577,39 @@ export default function FinancialsPage() {
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
-          <KPICard title="うち EC売上" value={formatCurrency(kpis.ecRevenue)} color="default" icon={<ShoppingBag size={16} />} />
-          <KPICard title="うち サンプル売上" value={formatCurrency(kpis.sampleRevenue)} color="default" icon={<ShoppingBag size={16} />} />
-          <KPICard title="入金済" value={formatCurrency(kpis.collected)} color="green" icon={<ArrowDownCircle size={16} />} />
-          <KPICard title="Stripe手数料" value={formatCurrency(kpis.stripeFees)} color="amber" icon={<Wallet size={16} />} />
-          <KPICard title="入金額（手数料差引後）" value={formatCurrency(kpis.netDeposited)} color="green" icon={<ArrowDownCircle size={16} />} />
-          <KPICard title="未収" value={formatCurrency(kpis.outstanding)} color="amber" icon={<AlertTriangle size={16} />} />
-          <KPICard title="仕入計" value={formatCurrency(kpis.totalExpense)} color="default" icon={<ArrowUpCircle size={16} />} />
-          <KPICard title="支払済 PO" value={formatCurrency(kpis.paid)} color="green" icon={<Wallet size={16} />} />
-          <KPICard title="未払 PO" value={formatCurrency(kpis.unpaid)} color="amber" icon={<AlertTriangle size={16} />} />
-          <KPICard title="純収支（入金−支払）" value={formatCurrency(kpis.realizedNet)} color={kpis.realizedNet >= 0 ? 'green' : 'red'} />
-          <KPICard title="見込み収支" value={formatCurrency(kpis.expectedNet)} color={kpis.expectedNet >= 0 ? 'green' : 'red'} />
+        {/* KPIs — カテゴリ別に整理 */}
+        <div className="space-y-3">
+          {/* 収支サマリー（最重要） */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-mono uppercase tracking-brand text-mist">収支・粗利</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <KPICard title="売上計" value={formatCurrency(kpis.totalRevenue)} color="default" icon={<TrendingUp size={16} />} />
+              <KPICard title="粗利（売上原価差引）" value={`${formatCurrency(kpis.grossProfit)}${kpis.grossMargin != null ? `（${kpis.grossMargin.toFixed(1)}%）` : ''}`} color={kpis.grossProfit >= 0 ? 'green' : 'red'} icon={<TrendingUp size={16} />} />
+              <KPICard title="純収支（入金−支払）" value={formatCurrency(kpis.realizedNet)} color={kpis.realizedNet >= 0 ? 'green' : 'red'} />
+              <KPICard title="見込み収支（売上−仕入）" value={formatCurrency(kpis.expectedNet)} color={kpis.expectedNet >= 0 ? 'green' : 'red'} />
+            </div>
+          </div>
+          {/* 売上・入金 */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-mono uppercase tracking-brand text-mist">売上・入金</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <KPICard title="入金済" value={formatCurrency(kpis.collected)} color="green" icon={<ArrowDownCircle size={16} />} />
+              <KPICard title="未収" value={formatCurrency(kpis.outstanding)} color="amber" icon={<AlertTriangle size={16} />} />
+              <KPICard title="うち EC売上" value={formatCurrency(kpis.ecRevenue)} color="default" icon={<ShoppingBag size={16} />} />
+              <KPICard title="うち サンプル売上" value={formatCurrency(kpis.sampleRevenue)} color="default" icon={<ShoppingBag size={16} />} />
+              <KPICard title="Stripe手数料" value={formatCurrency(kpis.stripeFees)} color="amber" icon={<Wallet size={16} />} />
+              <KPICard title="入金額（手数料差引後）" value={formatCurrency(kpis.netDeposited)} color="green" icon={<ArrowDownCircle size={16} />} />
+            </div>
+          </div>
+          {/* 仕入・支払（請求書＋PO直払いの実支払で判定） */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-mono uppercase tracking-brand text-mist">仕入・支払</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <KPICard title="仕入計" value={formatCurrency(kpis.totalExpense)} color="default" icon={<ArrowUpCircle size={16} />} />
+              <KPICard title="支払済" value={formatCurrency(kpis.paid)} color="green" icon={<Wallet size={16} />} />
+              <KPICard title="未払" value={formatCurrency(kpis.unpaid)} color="amber" icon={<AlertTriangle size={16} />} />
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -617,8 +706,15 @@ export default function FinancialsPage() {
 
         {activeTab === 'partner' && (
           <div className="space-y-4">
-            <PartnerTable title="販売先" rows={partnerBuyers} headers={['請求総額', '入金済', '未収']} />
-            <PartnerTable title="仕入先" rows={partnerSuppliers} headers={['仕入総額', '支払済', '未払']} />
+            <input
+              type="search"
+              value={partnerQuery}
+              onChange={e => setPartnerQuery(e.target.value)}
+              placeholder="取引先名で絞り込み…"
+              className="w-full max-w-xs rounded-lg border border-line bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-matcha"
+            />
+            <PartnerTable title="販売先" rows={partnerBuyers.filter(r => !partnerQuery.trim() || r.name.toLowerCase().includes(partnerQuery.trim().toLowerCase()))} headers={['請求総額', '入金済', '未収']} />
+            <PartnerTable title="仕入先" rows={partnerSuppliers.filter(r => !partnerQuery.trim() || r.name.toLowerCase().includes(partnerQuery.trim().toLowerCase()))} headers={['仕入総額', '支払済', '未払']} />
           </div>
         )}
 
