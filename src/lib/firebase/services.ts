@@ -912,6 +912,8 @@ function mapPurchaseInvoice(id: string, data: DocumentData): PurchaseInvoice {
     flowVersion: 'invoice',
     supplierName: String(data.supplierName ?? ''),
     supplierNormalizedName: data.supplierNormalizedName ? String(data.supplierNormalizedName) : undefined,
+    billerName: data.billerName ? String(data.billerName) : undefined,
+    billerNormalizedName: data.billerNormalizedName ? String(data.billerNormalizedName) : undefined,
     invoiceNumber: data.invoiceNumber ? String(data.invoiceNumber) : undefined,
     invoiceDate: String(data.invoiceDate ?? ''),
     receivedDate: String(data.receivedDate ?? data.invoiceDate ?? ''),
@@ -1176,6 +1178,15 @@ async function writePurchaseInvoice(
     }) as Record<string, unknown>
     scalar.file = fileToWrite
     if (totalOverride == null) scalar.totalOverride = deleteField()
+    // 請求元 (biller): store when set, clear when blank.
+    const billerName = (input.billerName ?? (prevData?.billerName as string) ?? '').trim()
+    if (billerName) {
+      scalar.billerName = billerName
+      scalar.billerNormalizedName = normalizeBuyerName(billerName)
+    } else {
+      scalar.billerName = deleteField()
+      scalar.billerNormalizedName = deleteField()
+    }
 
     if (id) {
       txn.update(invoiceRef, scalar)
@@ -1310,6 +1321,36 @@ async function syncSuppliersCollection(): Promise<void> {
 
   // Note: do not delete suppliers with no orders — they may have manually edited details
   await batch.commit()
+}
+
+/**
+ * Ensure each given name exists in the suppliers master (create a minimal doc when
+ * missing). Used when a purchase invoice introduces a 仕入先 / 請求元 that has no PO
+ * (so syncSuppliersCollection — which reads only POs — would never register it).
+ * Never overwrites existing suppliers (preserves bankInfo / manual edits).
+ */
+async function ensureSuppliersByName(names: (string | undefined)[]): Promise<void> {
+  const db = getFirebaseDb()
+  const suppliers = await getAllSuppliers()
+  const existing = new Set(suppliers.map(s => s.normalizedName))
+  const batch = writeBatch(db)
+  let any = false
+  for (const raw of names) {
+    const name = (raw ?? '').trim()
+    const normalizedName = normalizeBuyerName(name)
+    if (!normalizedName || existing.has(normalizedName)) continue
+    existing.add(normalizedName)
+    const ref = doc(collection(db, COLLECTIONS.suppliers))
+    batch.set(ref, sanitizeRecord({
+      name,
+      normalizedName,
+      orderCount: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }))
+    any = true
+  }
+  if (any) await batch.commit()
 }
 
 async function stripPurchaseOrderArrivalsFromProducts(orderId: string): Promise<void> {
@@ -2198,12 +2239,15 @@ export function createFirebaseServices(): IServices {
 
     async createPurchaseInvoice(input) {
       const id = await writePurchaseInvoice(db, null, input)
+      // Register the 仕入先 / 請求元 in the master if new (they may have no PO).
+      await ensureSuppliersByName([input.supplierName, input.billerName]).catch(() => {})
       const snap = await getDoc(doc(db, COLLECTIONS.purchaseInvoices, id))
       return mapPurchaseInvoice(id, snap.data() ?? {})
     },
 
     async updatePurchaseInvoice(id, input) {
       await writePurchaseInvoice(db, id, input)
+      await ensureSuppliersByName([input.supplierName, input.billerName]).catch(() => {})
       const snap = await getDoc(doc(db, COLLECTIONS.purchaseInvoices, id))
       if (!snap.exists()) throw new Error('請求書が見つかりません')
       return mapPurchaseInvoice(id, snap.data() ?? {})

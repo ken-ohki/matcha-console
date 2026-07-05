@@ -577,6 +577,8 @@ export interface PurchaseInvoice {
   flowVersion: 'invoice'           // discriminator constant
   supplierName: string
   supplierNormalizedName?: string  // for picker scoping
+  billerName?: string              // 請求元（仕入先と異なる場合）
+  billerNormalizedName?: string
   invoiceNumber?: string
   invoiceDate: string              // 請求日 ISO YYYY-MM-DD
   receivedDate: string             // 受領日 (defaults today)
@@ -615,6 +617,7 @@ export interface PurchaseInvoiceLineInput {
 
 export interface PurchaseInvoiceInput {
   supplierName: string
+  billerName?: string              // 請求元（仕入先と異なる場合の実際の請求者）
   invoiceNumber?: string
   invoiceDate: string
   receivedDate?: string

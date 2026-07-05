@@ -101,6 +101,7 @@ export default function PurchaseInvoiceDetailPage() {
             {invoice && (
               <p className="text-sm text-mist">
                 {invoice.supplierName}
+                {invoice.billerName && invoice.billerName !== invoice.supplierName ? `（請求元: ${invoice.billerName}）` : ''}
                 {invoice.invoiceNumber ? ` / ${invoice.invoiceNumber}` : ''}
               </p>
             )}

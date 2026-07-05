@@ -70,6 +70,7 @@ export function InvoiceForm({
 
   // --- Header fields ---
   const [supplierName, setSupplierName] = useState(invoice?.supplierName ?? initialSupplier ?? '')
+  const [billerName, setBillerName] = useState(invoice?.billerName ?? '')
   const [invoiceNumber, setInvoiceNumber] = useState(invoice?.invoiceNumber ?? '')
   const [invoiceDate, setInvoiceDate] = useState(invoice?.invoiceDate ?? todayIso())
   const [receivedDate, setReceivedDate] = useState(invoice?.receivedDate ?? todayIso())
@@ -208,6 +209,7 @@ export function InvoiceForm({
 
     const base: PurchaseInvoiceInput = {
       supplierName: supplierName.trim(),
+      billerName: billerName.trim() || undefined,
       invoiceNumber: invoiceNumber.trim() || undefined,
       invoiceDate,
       receivedDate: receivedDate || undefined,
@@ -269,6 +271,16 @@ export function InvoiceForm({
                 <option key={s.id} value={s.name} />
               ))}
             </datalist>
+          </label>
+          <label className="text-xs text-mist">
+            <span className="mb-1 block">請求元（仕入先と異なる場合）</span>
+            <input
+              list="invoice-supplier-list"
+              value={billerName}
+              onChange={e => setBillerName(e.target.value)}
+              placeholder="未入力なら仕入先と同じ"
+              className={`${fieldCls} w-full`}
+            />
           </label>
           <label className="text-xs text-mist">
             <span className="mb-1 block">請求書番号</span>
