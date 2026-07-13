@@ -9,11 +9,15 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { getFirebaseAuthInstance } from '@/lib/firebase/config'
 import { getServices } from '@/lib/services'
 import type { MasterEntry } from '@/types'
+import { deriveOrderView, kindBadges, type NextAction, type OrderPhase } from '@/lib/orderView'
 import { ArrowLeft, RefreshCw, Plus, Trash2 } from 'lucide-react'
+
+type DetailTab = 'summary' | 'fulfillment' | 'documents' | 'finance' | 'memo'
 
 interface OrderItem {
   productId?: string
   productName: string
+  kind?: string
   quantityKg: number
   sampleUnits?: number
   unitPriceJpy?: number
@@ -40,6 +44,7 @@ interface Order {
   paymentStatus?: string
   needsRefund?: boolean
   bankDueAtMs?: number
+  acceptanceExpiresAtMs?: number
   transferReportedAt?: string
   status?: string
   shippingCountry?: string
@@ -102,16 +107,7 @@ async function token(): Promise<string> {
   return current.getIdToken()
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending_acceptance: '承諾待ち（見積）',
-  pending_approval: '承認待ち',
-  pending_quote: '見積待ち',
-  quoted: '支払い待ち（見積済）',
-  pending_payment: '支払い待ち',
-  paid: '支払い済み',
-  shipped: '出荷済み',
-  cancelled: '取消',
-}
+// Status labelling now lives in @/lib/orderView (deriveOrderView / PhaseStepper).
 const CARRIER_LABEL: Record<string, string> = {
   ems: 'EMS（国際スピード郵便）',
   epacket: '国際エアパケット',
@@ -170,6 +166,7 @@ export default function WholesaleOrderDetailPage() {
   const [linkCopied, setLinkCopied] = useState(false)
   const [adminMemo, setAdminMemo] = useState('')
   const [shippingMemo, setShippingMemo] = useState('')
+  const [tab, setTab] = useState<DetailTab>('summary')
   const { confirm, notify } = useConfirm()
 
   const copyLink = (url: string) => {
@@ -637,6 +634,27 @@ export default function WholesaleOrderDetailPage() {
   const isExport = o?.isDomestic === false
   const canProforma = isExport && !!o && !['pending_quote', 'pending_acceptance', 'pending_approval', 'cancelled'].includes(o.status ?? '')
 
+  // Unified presentation model: single phase + payment/fulfillment tracks + the
+  // 1–2 actions actually valid right now (the "次にやること" guide).
+  const view = o ? deriveOrderView(o) : null
+  const myRole: 'admin' | 'finance' | 'viewer' = isAdmin ? 'admin' : canConfirmPayment ? 'finance' : 'viewer'
+  const myNextActions: NextAction[] = (view?.nextActions ?? []).filter(a => (a.roles as string[]).includes(myRole))
+  // Run a next-action. Input-requiring steps (送料見積・出荷登録) switch to the 発送
+  // tab where the form lives; one-click steps call the existing handler directly.
+  const runNext = (a: NextAction) => {
+    switch (a.id) {
+      case 'quote':
+      case 'mark_shipped':
+        setTab('fulfillment'); break
+      case 'approve':
+        if (isExport) void saveShipping(true); else void act('approve'); break
+      case 'accept_quote': void act('accept_quote'); break
+      case 'confirm_payment': void act('confirm_payment'); break
+      case 'resend_payment_link': void act('resend_payment_link'); break
+      case 'notify_shipped': void act('notify_shipped'); break
+    }
+  }
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl">
@@ -684,10 +702,15 @@ export default function WholesaleOrderDetailPage() {
                 </div>
               )
             })() : null}
-            {/* Header */}
+            {/* Header — 注文種別バッジ ＋ フェーズ・ステッパー ＋「次にやること」 */}
             <div className="panel p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
+                  <div className="mb-1.5 flex flex-wrap gap-1">
+                    {view && kindBadges(view.kind).map(b => (
+                      <span key={b} className="rounded-full border border-line bg-bone px-2 py-0.5 text-[10px] font-medium text-graphite">{b}</span>
+                    ))}
+                  </div>
                   <p className="font-mono text-sm text-ink">{o.orderNumber}</p>
                   {o.createdAtMs ? (
                     <p className="text-xs text-mist">注文日: {new Date(o.createdAtMs).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
@@ -699,10 +722,64 @@ export default function WholesaleOrderDetailPage() {
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-semibold text-ink">¥{(o.totalJpy ?? 0).toLocaleString()}</p>
-                  <span className="mt-1 inline-block rounded border border-line px-2 py-0.5 text-[11px] text-ink">{STATUS_LABEL[o.status ?? ''] ?? o.status}</span>
+                  {view && (
+                    <div className="mt-1 flex flex-wrap justify-end gap-1">
+                      <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${view.phaseTone}`}>
+                        {view.phaseLabel}{view.phaseReasonLabel ? `：${view.phaseReasonLabel}` : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {view && (
+                <>
+                  <div className="mt-4">
+                    <PhaseStepper phase={view.phase} />
+                  </div>
+                  {!view.closed && (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="text-mist">支払い</span>
+                      <span className={`inline-block rounded border px-2 py-0.5 ${view.paymentTone}`}>{view.paymentLabel}</span>
+                      <span className="ml-2 text-mist">発送</span>
+                      <span className={`inline-block rounded border px-2 py-0.5 ${view.fulfillmentTone}`}>{view.fulfillmentLabel}</span>
+                    </div>
+                  )}
+                  {!editing && myNextActions.length > 0 && (
+                    <div className="mt-4 rounded-lg border border-matchaDeep/30 bg-[#eef3eb] p-3">
+                      <p className="mb-2 text-xs font-bold text-ink">次にやること</p>
+                      <div className="flex flex-wrap gap-2">
+                        {myNextActions.map(a => (
+                          <button key={a.id} onClick={() => runNext(a)} disabled={busy} className="btn-primary disabled:opacity-50">{a.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+
+            {/* タブ — 関心の分離（編集中は非表示） */}
+            {!editing && (
+              <div className="flex flex-wrap gap-1 border-b border-line">
+                {([
+                  ['summary', '概要'],
+                  ['fulfillment', '発送'],
+                  ['documents', '書類'],
+                  ...(canConfirmPayment || isAdmin ? [['finance', '経理'] as const] : []),
+                  ['memo', 'メモ'],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTab(key)}
+                    className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${tab === key ? 'border-ink text-ink' : 'border-transparent text-mist hover:text-ink'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Edit panel — 直販 orders only */}
             {editing && edit && (
@@ -781,7 +858,7 @@ export default function WholesaleOrderDetailPage() {
             )}
 
             {/* Items */}
-            <Section title="商品">
+            <Section title="商品" show={tab === 'summary'}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-line text-left text-xs text-mist">
@@ -838,7 +915,7 @@ export default function WholesaleOrderDetailPage() {
             </Section>
 
             {/* Finance — staff only */}
-            <Section title="財務">
+            <Section title="財務" show={tab === 'finance'}>
               <dl className="space-y-1 text-sm">
                 <Row label="売上（税抜）" value={`¥${revenueExTax.toLocaleString()}`} />
                 <Row label="税込み売上" value={`¥${(o.totalJpy ?? 0).toLocaleString()}`} />
@@ -864,10 +941,22 @@ export default function WholesaleOrderDetailPage() {
                 )}
               </dl>
               <p className="mt-2 text-[11px] text-mist">{o.costAmountJpy != null ? '※移行時の原価スナップショット' : '※現在の仕入単価から自動計算'}</p>
+              {/* Card fallback: if a Stripe webhook is missed and the order stays unpaid,
+                  staff can confirm manually AFTER verifying payment in the Stripe dashboard. */}
+              {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && o.paymentStatus !== 'paid' && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <button
+                    onClick={async () => { if (await confirm({ title: '入金の手動確定', message: 'Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。', confirmLabel: '確定する' })) act('confirm_payment') }}
+                    disabled={busy}
+                    className="btn-ghost"
+                  >入金を手動確認（カード）</button>
+                  <p className="mt-1 text-[11px] text-mist">Webhook未達などで未反映の場合の手動確定です。</p>
+                </div>
+              )}
             </Section>
 
             {/* Shipping & payment */}
-            <Section title="発送・支払い">
+            <Section title="発送・支払い" show={tab === 'summary'}>
               <dl className="space-y-1 text-sm">
                 <Row label="区分" value={o.isDomestic === false ? '海外' : '国内'} />
                 <Row label="発送方法" value={o.isDomestic === false ? (o.overseasCarrier ? CARRIER_LABEL[o.overseasCarrier] ?? o.overseasCarrier : '未定') : '国内配送（重量別）'} />
@@ -891,7 +980,7 @@ export default function WholesaleOrderDetailPage() {
             </Section>
 
             {/* Delivery address — one field per line for legibility */}
-            <Section title="お届け先">
+            <Section title="お届け先" show={tab === 'summary'}>
               {[o.shippingAddress, o.shippingPostalCode, o.shippingCountry, o.contactName, o.phone, o.memberEmail].some(Boolean) ? (
                 <dl className="space-y-1 text-sm">
                   <Field label="住所" value={[o.shippingAddress, o.shippingCountry].filter(Boolean).join(' / ')} />
@@ -908,7 +997,7 @@ export default function WholesaleOrderDetailPage() {
             </Section>
 
             {/* Staff-only memos (never shown to the customer). Shipping memo appears on 発送管理. */}
-            <Section title="メモ（社内用）">
+            <Section title="メモ（社内用）" show={tab === 'memo'}>
               <div className="space-y-3">
                 <label className="block">
                   <span className="text-xs text-mist">注文メモ</span>
@@ -938,6 +1027,8 @@ export default function WholesaleOrderDetailPage() {
               </div>
             </Section>
 
+            {/* ── 発送タブ: 見積・決済リンク・出荷・通関・発送先変更 ── */}
+            {tab === 'fulfillment' && (<>
             {/* Quote (overseas, not yet quoted) */}
             {o.status === 'pending_quote' && (
               <Section title="送料見積・リンク発行">
@@ -1142,51 +1233,44 @@ export default function WholesaleOrderDetailPage() {
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex flex-wrap gap-2">
-              {isAdmin && o.status === 'pending_acceptance' && !editing && (
-                <button onClick={() => act('accept_quote')} disabled={busy} className="btn-primary">承諾して確定</button>
-              )}
-              {isAdmin && o.status === 'pending_approval' && !editing && (
-                <button onClick={() => isExport ? saveShipping(true) : act('approve')} disabled={busy} className="btn-primary">{isExport ? '送料を保存して承認' : '承認して支払い案内を送る'}</button>
-              )}
-              {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod === 'bank_transfer' && (
-                <button onClick={() => act('confirm_payment')} disabled={busy} className="btn-primary">入金確認</button>
-              )}
-              {/* Card fallback: if a Stripe webhook is missed and the order stays unpaid,
-                  staff can confirm manually AFTER verifying payment in the Stripe dashboard. */}
-              {isAdmin && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && o.paymentStatus !== 'paid' && (
-                <button onClick={() => act('resend_payment_link')} disabled={busy} className="btn-primary">{o.checkoutUrl ? '決済リンクを再発行' : '決済リンクを発行'}</button>
-              )}
-              {canConfirmPayment && (o.status === 'pending_payment' || o.status === 'quoted') && o.paymentMethod !== 'bank_transfer' && (
-                <button
-                  onClick={async () => { if (await confirm({ title: '入金の手動確定', message: 'Stripeダッシュボードで入金を確認しましたか？\n\nこれはWebhook未達などで未反映の場合の手動確定です。実際に入金されていない注文は確定しないでください。', confirmLabel: '確定する' })) act('confirm_payment') }}
-                  disabled={busy}
-                  className="btn-ghost"
-                >入金を手動確認（カード）</button>
-              )}
-              {isAdmin && canInvoice && !isExport && (
-                <button onClick={() => downloadDoc('invoice')} disabled={busy} className="btn-ghost">請求書</button>
-              )}
-              {isAdmin && canProforma && (
-                <button onClick={() => downloadDoc('proforma')} disabled={busy} className="btn-ghost">Proforma Invoice</button>
-              )}
-              {isAdmin && canReceiptDelivery && (
-                <button onClick={() => downloadDoc('receipt')} disabled={busy} className="btn-ghost">領収書</button>
-              )}
-              {isAdmin && canReceiptDelivery && !isExport && (
-                <button onClick={() => downloadDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書兼領収書</button>
-              )}
-              {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
-                <button onClick={() => act('cancel')} disabled={busy} className="btn-danger">取消・在庫解放</button>
-              )}
-            </div>
+            </>)}
 
-            {/* Danger zone: permanent delete (test-data cleanup) — admin only */}
+            {/* ── 書類タブ ── */}
+            <Section title="書類" show={tab === 'documents' && isAdmin}>
+              {(canInvoice && !isExport) || canProforma || canReceiptDelivery ? (
+                <div className="flex flex-wrap gap-2">
+                  {canInvoice && !isExport && (
+                    <button onClick={() => downloadDoc('invoice')} disabled={busy} className="btn-ghost">請求書</button>
+                  )}
+                  {canProforma && (
+                    <button onClick={() => downloadDoc('proforma')} disabled={busy} className="btn-ghost">Proforma Invoice</button>
+                  )}
+                  {canReceiptDelivery && (
+                    <button onClick={() => downloadDoc('receipt')} disabled={busy} className="btn-ghost">領収書</button>
+                  )}
+                  {canReceiptDelivery && !isExport && (
+                    <button onClick={() => downloadDoc('deliveryNote')} disabled={busy} className="btn-ghost">納品書兼領収書</button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-mist">この注文の段階で発行できる書類はありません。</p>
+              )}
+            </Section>
+
+            {/* ── 危険な操作 — 可逆操作から隔離。取消は自動返金されないため警告を維持 ── */}
             {isAdmin && (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50/50 px-4 py-3">
-                <p className="text-xs text-red-800">テスト注文の削除：注文と在庫引当を完全に削除します（元に戻せません）。</p>
-                <button onClick={deleteOrder} disabled={busy} className="rounded-lg border border-red-400 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">注文を削除</button>
+              <div className="mt-2 space-y-2 rounded-lg border border-red-200 bg-red-50/50 p-4">
+                <p className="text-xs font-bold text-red-800">危険な操作</p>
+                {isAdmin && o.status !== 'cancelled' && o.status !== 'shipped' && (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-red-800">取消すると在庫引当を解放します。入金済みでも<strong>自動返金はされません</strong>（手動で返金してください）。</p>
+                    <button onClick={() => act('cancel')} disabled={busy} className="btn-danger shrink-0">取消・在庫解放</button>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-red-200 pt-2">
+                  <p className="text-xs text-red-800">テスト注文の削除：注文と在庫引当を完全に削除します（元に戻せません）。</p>
+                  <button onClick={deleteOrder} disabled={busy} className="shrink-0 rounded-lg border border-red-400 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">注文を削除</button>
+                </div>
               </div>
             )}
           </div>
@@ -1196,12 +1280,48 @@ export default function WholesaleOrderDetailPage() {
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, show = true }: { title: string; children: React.ReactNode; show?: boolean }) {
+  if (!show) return null
   return (
     <div className="panel p-5">
       <h2 className="mb-bl-2 text-xs font-medium text-graphite">{title}</h2>
       {children}
     </div>
+  )
+}
+
+// Horizontal lifecycle stepper — the same phase model on every screen.
+const STEPPER_PHASES: { key: OrderPhase; label: string }[] = [
+  { key: 'estimate', label: '見積・確認' },
+  { key: 'awaiting_payment', label: 'お支払い待ち' },
+  { key: 'fulfilling', label: '準備・発送' },
+  { key: 'shipped', label: '発送済み' },
+  { key: 'done', label: '完了' },
+]
+function PhaseStepper({ phase }: { phase: OrderPhase }) {
+  if (phase === 'cancelled') {
+    return <p className="text-sm font-medium text-mist">取消済み</p>
+  }
+  const activeIdx = STEPPER_PHASES.findIndex(p => p.key === phase)
+  return (
+    <ol className="flex flex-wrap items-center gap-1 text-[11px]">
+      {STEPPER_PHASES.map((p, i) => {
+        const done = i < activeIdx
+        const active = i === activeIdx
+        return (
+          <li key={p.key} className="flex items-center gap-1">
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-medium ${
+                active ? 'bg-ink text-paper' : done ? 'bg-[#e6f0e8] text-matchaDeep' : 'bg-bone text-mist'
+              }`}
+            >
+              {p.label}
+            </span>
+            {i < STEPPER_PHASES.length - 1 && <span className={done ? 'text-matchaDeep' : 'text-line'}>›</span>}
+          </li>
+        )
+      })}
+    </ol>
   )
 }
 

@@ -47,6 +47,10 @@ export default function NewWholesaleOrderPage() {
   // Direct (staff-entered) orders default to NOT emailing the customer.
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Wizard step: 1 取引先 → 2 商品 → 3 発送 → 4 確認. Reduces cognitive load and
+  // duplicate entry by walking the operator through one decision at a time.
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const WIZARD_STEPS = ['取引先', '商品', '発送', '確認'] as const
 
   const memberOptions = useMemo(
     () => members.map(m => ({
@@ -174,6 +178,11 @@ export default function NewWholesaleOrderPage() {
     }
   }
 
+  const memberChosen = mode === 'existing' ? !!memberUid : !!newMember.companyName.trim()
+  const hasItems = lines.some(l => l.productId && Number(l.quantityKg) > 0)
+  const stepValid = (s: number): boolean => (s === 1 ? memberChosen : s === 2 ? hasItems : true)
+  const memberSummary = mode === 'existing' ? (members.find(m => m.uid === memberUid)?.companyName ?? '—') : (newMember.companyName || '（新規取引先）')
+
   return (
     <AppLayout>
       <div className="mx-auto max-w-3xl">
@@ -188,9 +197,30 @@ export default function NewWholesaleOrderPage() {
 
         {error && <p className="mb-bl-2 rounded-lg border border-alert/40 bg-alert/5 px-4 py-2 text-sm text-alert">{error}</p>}
 
+        {/* Wizard step indicator */}
+        <ol className="mb-bl-3 flex flex-wrap items-center gap-1 text-xs">
+          {WIZARD_STEPS.map((label, i) => {
+            const n = (i + 1) as 1 | 2 | 3 | 4
+            const active = step === n
+            const done = step > n
+            return (
+              <li key={label} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => { if (n < step || stepValid(step)) setStep(n) }}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium ${active ? 'bg-ink text-paper' : done ? 'bg-[#e6f0e8] text-matchaDeep' : 'bg-bone text-mist'}`}
+                >
+                  <span className="tabular-nums">{n}</span> {label}
+                </button>
+                {i < WIZARD_STEPS.length - 1 && <span className={done ? 'text-matchaDeep' : 'text-line'}>›</span>}
+              </li>
+            )
+          })}
+        </ol>
+
         <div className={`space-y-5 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
           {/* Member */}
-          <section className="panel p-5">
+          <section className={`panel p-5 ${step === 1 ? '' : 'hidden'}`}>
             <h2 className="mb-bl-2 text-xs font-medium text-graphite">取引先</h2>
             <div className="mb-3 flex gap-2">
               <button onClick={() => setMode('existing')} className={`rounded-lg border px-3 py-1.5 text-sm ${mode === 'existing' ? 'border-ink bg-ink text-paper' : 'border-line text-graphite hover:bg-bone'}`}>既存会員</button>
@@ -217,7 +247,7 @@ export default function NewWholesaleOrderPage() {
           </section>
 
           {/* Items */}
-          <section className="panel p-5">
+          <section className={`panel p-5 ${step === 2 ? '' : 'hidden'}`}>
             <h2 className="mb-bl-2 text-xs font-medium text-graphite">商品</h2>
             <div className="space-y-2">
               {lines.map((l, i) => (
@@ -235,7 +265,7 @@ export default function NewWholesaleOrderPage() {
           </section>
 
           {/* Shipping & payment */}
-          <section className="panel p-5">
+          <section className={`panel p-5 ${step === 3 ? '' : 'hidden'}`}>
             <h2 className="mb-bl-2 text-xs font-medium text-graphite">発送・支払い</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <L label="国（JP=国内）"><Combobox options={countryOptions} value={ship.country} onChange={v => setShip({ ...ship, country: v })} placeholder="国を検索（JP=国内）" /></L>
@@ -260,9 +290,39 @@ export default function NewWholesaleOrderPage() {
             </div>
           </section>
 
+          {/* Step 4: 確認 */}
+          <section className={`panel p-5 ${step === 4 ? '' : 'hidden'}`}>
+            <h2 className="mb-bl-2 text-xs font-medium text-graphite">確認</h2>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-4"><dt className="text-mist">取引先</dt><dd className="text-ink">{memberSummary}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-mist">商品</dt><dd className="text-right text-ink">{lines.filter(l => l.productId && Number(l.quantityKg) > 0).map((l, i) => { const p = products.find(x => x.id === l.productId); return <div key={i}>{p?.name ?? l.productId} {l.quantityKg}kg</div> })}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-mist">発送先</dt><dd className="text-right text-ink">{ship.country === 'JP' ? '国内' : `海外（${ship.country}）`}{ship.address ? ` / ${ship.address}` : ''}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-mist">作成モード</dt><dd className="text-ink">{asQuote ? '見積として作成（承諾後に確定）' : markPaid ? '即確定・入金済み' : '即確定・入金待ち'}</dd></div>
+              <div className="flex justify-between gap-4 border-t border-line pt-1.5"><dt className="text-mist">概算合計（税抜＋送料）</dt><dd className="font-semibold text-ink">{yen(estTotal)}</dd></div>
+            </dl>
+            <p className="mt-2 text-[11px] text-mist">※税・原価・粗利はサーバ側で確定計算されます（wholesale_orders と共通）。直販注文は顧客へメール送信しません。</p>
+          </section>
+
+          {/* Wizard navigation */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-mist">概算合計（税抜＋送料）: <span className="font-semibold text-ink">{yen(estTotal)}</span></p>
-            <button onClick={submit} disabled={busy} className="btn-primary">注文を作成</button>
+            <button
+              type="button"
+              onClick={() => setStep(s => (s > 1 ? ((s - 1) as 1 | 2 | 3 | 4) : s))}
+              disabled={step === 1 || busy}
+              className="btn-ghost disabled:opacity-40"
+            >戻る</button>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-mist">概算: <span className="font-semibold text-ink">{yen(estTotal)}</span></p>
+              {step < 4 ? (
+                <button
+                  type="button"
+                  onClick={() => { if (stepValid(step)) { setError(''); setStep(s => ((s + 1) as 1 | 2 | 3 | 4)) } else { setError(step === 1 ? '取引先を選択してください。' : '商品を1つ以上入力してください。') } }}
+                  className="btn-primary"
+                >次へ</button>
+              ) : (
+                <button onClick={submit} disabled={busy} className="btn-primary">注文を作成</button>
+              )}
+            </div>
           </div>
         </div>
       </div>

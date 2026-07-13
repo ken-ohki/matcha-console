@@ -10,11 +10,14 @@ import { formatCurrency } from '@/lib/format'
 import { useStickyState } from '@/hooks/useStickyState'
 import { RefreshCw, Download } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { deriveOrderView, legacyPaymentStateLabel, legacyShippingStateLabel, isOverdue, isBankPending } from '@/lib/orderView'
 import * as XLSX from 'xlsx'
 
 interface OrderItem {
   productName: string
   quantityKg: number
+  kind?: string
+  madeToOrder?: boolean
 }
 interface Order {
   id: string
@@ -37,16 +40,8 @@ interface Order {
   acceptanceExpiresAtMs?: number
 }
 
-// Orders whose hold/deadline has lapsed and need staff to release (cancel) the stock.
-const STALE_DAYS = 30
-function isOverdue(o: Order, now: number): boolean {
-  if (isClosed(o) || o.paymentStatus === 'paid' || o.status === 'paid') return false
-  if (o.paymentMethod === 'bank_transfer' && o.status === 'pending_payment' && o.bankDueAtMs && o.bankDueAtMs < now) return true
-  if (o.status === 'pending_acceptance' && o.acceptanceExpiresAtMs && o.acceptanceExpiresAtMs < now) return true
-  const ageMs = now - (o.createdAtMs ?? now)
-  if ((o.status === 'pending_quote' || o.status === 'pending_approval') && ageMs > STALE_DAYS * 86_400_000) return true
-  return false
-}
+// Status-label / bucket helpers (isOverdue / isClosed / isBankPending / payment &
+// shipping badges) now live in the shared @/lib/orderView projection.
 
 type OrdersTab = 'all' | 'ec' | 'direct'
 
@@ -74,28 +69,8 @@ function paymentMethodLabel(o: Order): string {
   return '—'
 }
 
-// Payment vs shipping are separate concerns; `status` mixes them, so derive each.
-function paymentStateLabel(o: Order): { label: string; tone: string } {
-  if (o.status === 'cancelled') return { label: '取消', tone: 'border-line text-mist' }
-  if (o.status === 'pending_acceptance') return { label: '承諾待ち（見積）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-  if (o.status === 'pending_approval') return { label: '承認待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-  if (o.status === 'pending_quote') return { label: '見積待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-  if (o.status === 'quoted') return { label: '支払い待ち（見積済）', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-  // 発送済みでも入金は別管理（掛け取引で未入金のまま発送できる）。支払い済みは
-  // paymentStatus/status='paid' でのみ判定し、status==='shipped' からは推論しない。
-  if (o.paymentStatus === 'paid' || o.status === 'paid') return { label: '支払い済み', tone: 'border-matcha text-matcha' }
-  return { label: '支払い待ち', tone: 'border-[#a87b1e] text-[#a87b1e]' }
-}
-function shippingStateLabel(o: Order): { label: string; tone: string } {
-  if (o.status === 'cancelled') return { label: '—', tone: 'border-line text-mist' }
-  if (o.status === 'shipped' || o.shippedAt) return { label: '出荷済み', tone: 'border-ink text-ink' }
-  return { label: '未発送', tone: 'border-line text-mist' }
-}
-
-// Closed = 取引完了済（出荷済み）or 取消. Everything else still needs staff action.
-function isClosed(o: Order): boolean {
-  return o.status === 'shipped' || !!o.shippedAt || o.status === 'cancelled'
-}
+// Payment vs shipping are separate concerns; `status` mixes them. The label
+// derivation lives in @/lib/orderView (legacyPaymentStateLabel / legacyShippingStateLabel).
 
 // Date-only formatter for the list (createdAtMs is epoch-ms; shippedAt is ISO).
 function fmtDay(value?: number | string): string {
@@ -105,12 +80,37 @@ function fmtDay(value?: number | string): string {
   return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-// Manual bank-transfer order still awaiting deposit — the rows staff reconcile by hand.
-function isBankPending(o: Order): boolean {
-  return o.paymentMethod === 'bank_transfer' && o.paymentStatus !== 'paid' && (o.status === 'pending_payment' || o.status === 'quoted')
+// Work-tray = what a staffer must do next for this order (from the shared
+// deriveOrderView phase model). Staff pick a tray and process it top-down instead
+// of scanning an 11-column table hunting for the one order that needs them.
+type ConcreteTray = 'quote' | 'approve' | 'accept' | 'confirm' | 'ship' | 'notify' | 'progress' | 'done'
+type Tray = 'action' | ConcreteTray | 'all'
+// Ordered list of the action trays shown as chips (progress/done handled separately).
+const ACTION_TRAYS: ConcreteTray[] = ['quote', 'approve', 'accept', 'confirm', 'ship', 'notify', 'progress']
+const TRAY_LABEL: Record<ConcreteTray, string> = {
+  quote: '送料見積が必要',
+  approve: '承認が必要',
+  accept: '承諾の反映',
+  confirm: '入金確認が必要',
+  ship: '発送が必要',
+  notify: '発送通知が必要',
+  progress: '対応中',
+  done: '完了・取消',
 }
 
-type OrdersBucket = 'action' | 'done' | 'all'
+function trayOf(o: Order, now: number): ConcreteTray {
+  const v = deriveOrderView(o, now)
+  if (v.phase === 'cancelled' || v.phase === 'done') return 'done'
+  if (v.phase === 'shipped') return 'notify' // 発送済み・通知未 → 発送通知が必要
+  if (v.phase === 'fulfilling') return 'ship' // 入金済み・未発送 → 発送
+  if (v.phase === 'awaiting_payment') return o.paymentMethod === 'bank_transfer' ? 'confirm' : 'progress'
+  if (v.phase === 'estimate') {
+    if (v.phaseReason === 'quote_shipping') return 'quote'
+    if (v.phaseReason === 'production_approval') return 'approve'
+    return 'accept'
+  }
+  return 'progress'
+}
 
 export default function WholesaleOrdersPage() {
   const router = useRouter()
@@ -118,7 +118,7 @@ export default function WholesaleOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useStickyState<OrdersTab>('orders.tab', 'all')
-  const [bucket, setBucket] = useStickyState<OrdersBucket>('orders.bucket', 'action')
+  const [tray, setTray] = useStickyState<Tray>('orders.tray', 'action')
   const [search, setSearch] = useState('')
   const [bankPendingOnly, setBankPendingOnly] = useState(false)
   const [overdueOnly, setOverdueOnly] = useState(false)
@@ -133,18 +133,21 @@ export default function WholesaleOrdersPage() {
     direct: orders.filter(o => o.origin === 'direct').length,
   }
 
-  // 対応が必要 / 取引完了済 split, applied on top of the channel tab.
-  const bucketCounts = {
-    action: shown.filter(o => !isClosed(o)).length,
-    done: shown.filter(isClosed).length,
+  // Bucket each shown order into its work-tray once (deriveOrderView per order).
+  const trayById = new Map(shown.map(o => [o.id, trayOf(o, nowMs)]))
+  const trayFor = (o: Order): ConcreteTray => trayById.get(o.id) ?? 'progress'
+  const trayCounts = {
+    action: shown.filter(o => trayFor(o) !== 'done').length,
+    done: shown.filter(o => trayFor(o) === 'done').length,
     all: shown.length,
-  }
+  } as Record<Tray, number>
+  for (const t of ACTION_TRAYS) trayCounts[t] = shown.filter(o => trayFor(o) === t).length
   const list =
-    bucket === 'action'
-      ? shown.filter(o => !isClosed(o))
-      : bucket === 'done'
-        ? shown.filter(isClosed)
-        : [...shown].sort((a, b) => Number(isClosed(a)) - Number(isClosed(b))) // すべて: 対応が必要を上に
+    tray === 'action'
+      ? shown.filter(o => trayFor(o) !== 'done')
+      : tray === 'all'
+        ? [...shown].sort((a, b) => Number(trayFor(a) === 'done') - Number(trayFor(b) === 'done')) // 対応が必要を上に
+        : shown.filter(o => trayFor(o) === tray)
 
   // Reconciliation helpers: 銀行振込・入金待ちの絞り込み + 注文番号/会社名/金額の検索。
   const q = search.trim().toLowerCase()
@@ -190,9 +193,9 @@ export default function WholesaleOrdersPage() {
       '数量(kg)': (o.items ?? []).reduce((s, i) => s + (i.quantityKg ?? 0), 0),
       '金額(税込)': o.totalJpy ?? '',
       '支払い方法': paymentMethodLabel(o),
-      '支払い状況': paymentStateLabel(o).label,
+      '支払い状況': legacyPaymentStateLabel(o).label,
       '発送方法': shippingMethod(o),
-      '発送状況': shippingStateLabel(o).label,
+      '発送状況': legacyShippingStateLabel(o).label,
       '振込報告': o.transferReportedAt ? new Date(o.transferReportedAt).toLocaleDateString('ja-JP') : '',
     }))
     const sheet = XLSX.utils.json_to_sheet(rows)
@@ -286,17 +289,39 @@ export default function WholesaleOrdersPage() {
           ))}
         </div>
 
+        {/* 作業トレイ — 「次にやること」で自動フィルタ。空のトレイは表示しない。 */}
         <div className="mb-bl-3 flex flex-wrap items-center gap-1.5">
-          {([['action', '対応が必要'], ['done', '取引完了済'], ['all', 'すべて']] as const).map(([key, label]) => (
+          <button
+            type="button"
+            onClick={() => setTray('action')}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${tray === 'action' ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+          >
+            対応が必要 ({trayCounts.action})
+          </button>
+          {ACTION_TRAYS.filter(t => trayCounts[t] > 0).map(t => (
             <button
-              key={key}
+              key={t}
               type="button"
-              onClick={() => setBucket(key)}
-              className={`rounded-full border px-2.5 py-1 text-xs transition ${bucket === key ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+              onClick={() => setTray(t)}
+              className={`rounded-full border px-2.5 py-1 text-xs transition ${tray === t ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
             >
-              {label} ({bucketCounts[key]})
+              {TRAY_LABEL[t]} ({trayCounts[t]})
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setTray('done')}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${tray === 'done' ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+          >
+            完了・取消 ({trayCounts.done})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTray('all')}
+            className={`rounded-full border px-2.5 py-1 text-xs transition ${tray === 'all' ? 'border-[#174c33] bg-ink text-paper' : 'border-line bg-white text-ink hover:bg-bone'}`}
+          >
+            すべて ({trayCounts.all})
+          </button>
           <span className="mx-1 text-line">|</span>
           <button
             type="button"
@@ -325,7 +350,7 @@ export default function WholesaleOrdersPage() {
         {loading ? (
           <p className="text-sm text-mist">読み込み中…</p>
         ) : filtered.length === 0 ? (
-          <EmptyState message={search || bankPendingOnly ? '該当する注文はありません。' : bucket === 'action' ? '対応が必要な注文はありません。' : bucket === 'done' ? '完了済みの注文はありません。' : '注文はありません。'} />
+          <EmptyState message={search || bankPendingOnly ? '該当する注文はありません。' : tray === 'action' ? '対応が必要な注文はありません。' : tray === 'done' ? '完了済みの注文はありません。' : '注文はありません。'} />
         ) : (
           <div className="overflow-x-auto panel">
             <table className="min-w-[1280px] w-full text-sm">
@@ -377,7 +402,7 @@ export default function WholesaleOrdersPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-mist">{paymentMethodLabel(o)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${paymentStateLabel(o).tone}`}>{paymentStateLabel(o).label}</span>
+                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${legacyPaymentStateLabel(o).tone}`}>{legacyPaymentStateLabel(o).label}</span>
                         {isBankPending(o) && o.transferReportedAt && (
                           <span className="rounded border border-[#a87b1e] bg-[#fdf6e9] px-1.5 py-0.5 text-[10px] text-[#a87b1e]" title={`振込報告: ${o.transferReportedAt.slice(0, 10)}`}>振込報告あり</span>
                         )}
@@ -406,7 +431,7 @@ export default function WholesaleOrdersPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${shippingStateLabel(o).tone}`}>{shippingStateLabel(o).label}</span>
+                        <span className={`inline-block rounded border px-2 py-0.5 text-[11px] ${legacyShippingStateLabel(o).tone}`}>{legacyShippingStateLabel(o).label}</span>
                         {o.shipRequestedAt && o.status !== 'shipped' && o.status !== 'cancelled' && (
                           <span className="inline-block rounded border border-matcha bg-[#e6f0e8] px-1.5 py-0.5 text-[10px] font-medium text-matchaDeep" title={`発送指示: ${o.shipRequestedAt.slice(0, 16).replace('T', ' ')}`}>発送指示</span>
                         )}
