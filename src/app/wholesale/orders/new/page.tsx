@@ -42,7 +42,8 @@ export default function NewWholesaleOrderPage() {
   const [lines, setLines] = useState<Line[]>([{ productId: '', quantityKg: '', unitPriceOverrideJpy: '' }])
   const [ship, setShip] = useState({ country: 'JP', postalCode: '', address: '', contactName: '', phone: '', overseasCarrier: 'ems' })
   const [shippingFeeJpy, setShippingFeeJpy] = useState('')
-  const [markPaid, setMarkPaid] = useState(true)
+  // 入金済みは既定でOFF。売上計上・入金確定は明示的な操作でのみ行う（誤操作防止）。
+  const [markPaid, setMarkPaid] = useState(false)
   const [asQuote, setAsQuote] = useState(false)
   // Direct (staff-entered) orders default to NOT emailing the customer.
   const [busy, setBusy] = useState(false)
