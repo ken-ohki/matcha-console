@@ -29,6 +29,7 @@ interface OrderItem {
 interface Order {
   id: string
   orderNumber: string
+  memberUid?: string
   memberCompanyName?: string
   memberEmail?: string
   shippingEmail?: string
@@ -167,6 +168,8 @@ export default function WholesaleOrderDetailPage() {
   const [adminMemo, setAdminMemo] = useState('')
   const [shippingMemo, setShippingMemo] = useState('')
   const [tab, setTab] = useState<DetailTab>('summary')
+  // 会員登録がある注文だけ、会社名から会員詳細へリンクする（無ければただのテキスト）。
+  const [memberLinkUid, setMemberLinkUid] = useState<string | null>(null)
   const { confirm, notify } = useConfirm()
 
   const copyLink = (url: string) => {
@@ -297,6 +300,23 @@ export default function WholesaleOrderDetailPage() {
     }
   }
 
+  /** 注文に紐づく会員が実在するか確認し、リンク先 uid を決める（無ければ null）。 */
+  const resolveMemberLink = useCallback(async (memberUid?: string) => {
+    if (!memberUid) { setMemberLinkUid(null); return }
+    try {
+      const res = await fetch(`/api/wholesale/members/${memberUid}`, {
+        headers: { Authorization: `Bearer ${await token()}` },
+        cache: 'no-store',
+      })
+      // 404 (member_not_found) = 会員登録なし／削除済み → リンクしない。
+      if (!res.ok) { setMemberLinkUid(null); return }
+      const d = (await res.json()) as { member?: { migratedToUid?: string } }
+      setMemberLinkUid(d.member?.migratedToUid || memberUid)
+    } catch {
+      setMemberLinkUid(null)
+    }
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -317,6 +337,10 @@ export default function WholesaleOrderDetailPage() {
       setShipCarrier(found?.overseasCarrier ?? 'ems')
       setAdminMemo(found?.adminMemo ?? '')
       setShippingMemo(found?.shippingMemo ?? '')
+      // 会員が実在するときだけ会社名をリンクにする。手動作成の取引先がログイン
+      // アカウントへ移行済みの場合は、移行先(migratedToUid)の会員ページへ送る
+      // （会員一覧は移行元の手動レコードを隠すため、そちらだと 404 になる）。
+      void resolveMemberLink(found?.memberUid)
       // Purchase prices for live cost/gross-profit on orders without a snapshot.
       const [products, masters] = await Promise.all([
         services.inventory.getProductsWithInventory(),
@@ -334,7 +358,7 @@ export default function WholesaleOrderDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, resolveMemberLink])
 
   useEffect(() => {
     load()
@@ -715,7 +739,15 @@ export default function WholesaleOrderDetailPage() {
                   {o.createdAtMs ? (
                     <p className="text-xs text-mist">注文日: {new Date(o.createdAtMs).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                   ) : null}
-                  <p className="mt-1 text-lg font-semibold text-ink">{o.memberCompanyName}</p>
+                  {memberLinkUid ? (
+                    <Link
+                      href={`/wholesale/members/${memberLinkUid}`}
+                      className="mt-1 block text-lg font-semibold text-ink underline decoration-line underline-offset-4 hover:text-matchaDeep hover:decoration-matchaDeep"
+                      title="会員詳細を開く"
+                    >{o.memberCompanyName}</Link>
+                  ) : (
+                    <p className="mt-1 text-lg font-semibold text-ink">{o.memberCompanyName}</p>
+                  )}
                   {(o.contactName || o.phone) && (
                     <p className="text-sm text-mist">{[o.contactName, o.phone].filter(Boolean).join(' · ')}</p>
                   )}
