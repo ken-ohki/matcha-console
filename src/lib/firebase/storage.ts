@@ -109,6 +109,51 @@ export async function uploadSaleDocumentPdf(blob: Blob, saleKey: string, fileNam
   return getDownloadURL(storageRef)
 }
 
+/** Resource Center のサムネイル。非会員にもぼかして見せるティザー用なので、
+ *  他の画像と同じく公開URL(getDownloadURL)で問題ない。 */
+export async function uploadResourceThumbnail(file: File, resourceKey: string): Promise<string> {
+  const storage = getFirebaseStorageInstance()
+  const compressed = await compressImage(file)
+  const safeKey = resourceKey || 'unsorted'
+  const path = `resources/${safeKey}/thumb-${Date.now()}.jpg`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, compressed, {
+    contentType: 'image/jpeg',
+    cacheControl: 'public, max-age=31536000, immutable',
+  })
+  return getDownloadURL(storageRef)
+}
+
+/** Resource Center の保護素材（農園の写真・動画の原本）。
+ *
+ *  IMPORTANT: ここでは getDownloadURL() を呼ばない。呼ぶとトークン付きの
+ *  実質公開URLが発行され、URL を知る誰でも落とせてしまい会員限定が崩れる。
+ *  代わりに storagePath を返して Firestore に保存し、配信は sabo-wholesale の
+ *  /api/wholesale/resources/[id]/download が会員確認後に署名付きURLで行う。
+ *  （圧縮もしない — 素材は原寸のまま配る） */
+export async function uploadResourceAsset(file: File, resourceKey: string): Promise<{
+  storagePath: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}> {
+  const storage = getFirebaseStorageInstance()
+  const safeKey = resourceKey || 'unsorted'
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  const storagePath = `resources/${safeKey}/asset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const storageRef = ref(storage, storagePath)
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/octet-stream',
+    cacheControl: 'private, max-age=0, no-store',
+  })
+  return {
+    storagePath,
+    fileName: file.name,
+    contentType: file.type || 'application/octet-stream',
+    sizeBytes: file.size,
+  }
+}
+
 export async function deleteStorageObjectByUrl(url: string): Promise<void> {
   if (!url) return
   try {

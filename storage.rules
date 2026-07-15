@@ -32,5 +32,13 @@ service firebase.storage {
     match /shipping-slips/{allPaths=**} {
       allow read, write: if signedIn();
     }
+    // Resource Center（会員限定のレシピ・農園素材）。
+    // ここは console のスタッフがアップロードするためのルール。会員への配信は
+    // sabo-wholesale が Admin SDK で発行する署名付きURL経由で行うため、
+    // これらのルール（＝クライアントSDK向け）の影響を受けない。
+    // 素材の原本は getDownloadURL を使わない運用なので公開トークンURLは存在しない。
+    match /resources/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
   }
 }
