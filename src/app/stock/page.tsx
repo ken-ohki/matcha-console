@@ -6,8 +6,12 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { KPICard } from '@/components/ui/KPICard'
 import { EmptyTableRow } from '@/components/ui/EmptyState'
 import { getServices } from '@/lib/services'
+import { fetchWholesaleOrders, type WholesaleOrderRow } from '@/lib/wholesaleAdapter'
 import type { ProductWithInventory } from '@/types'
 import { Package, Search, Boxes, ClipboardList } from 'lucide-react'
+
+// 受注生産として受注中 = 未出荷の確定系ステータス（承認待ち→入金待ち→支払済）。
+const MTO_STATUSES = new Set(['pending_approval', 'pending_payment', 'paid'])
 
 /** Color-code a stock quantity by tier: マイナス / 0 / 10kg未満 / 10kg以上. */
 function stockColorClass(kg: number): string {
@@ -21,6 +25,7 @@ type SortKey = 'stock' | 'name'
 
 export default function StockPage() {
   const [products, setProducts] = useState<ProductWithInventory[]>([])
+  const [orders, setOrders] = useState<WholesaleOrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [lowOnly, setLowOnly] = useState(false)
@@ -29,8 +34,13 @@ export default function StockPage() {
   const load = async () => {
     setLoading(true)
     const services = await getServices()
-    const list = await services.inventory.getProductsWithInventory()
+    // 受注生産・見積待ちは ec_sales 台帳に載らないため、注文からも集計する。
+    const [list, ords] = await Promise.all([
+      services.inventory.getProductsWithInventory(),
+      fetchWholesaleOrders().catch(() => [] as WholesaleOrderRow[]),
+    ])
     setProducts(list.filter(p => p.isActive !== false && !p.archived))
+    setOrders(ords)
     setLoading(false)
   }
 
@@ -46,6 +56,37 @@ export default function StockPage() {
       window.removeEventListener('focus', handler)
     }
   }, [])
+
+  /**
+   * 注文から2つの数量を商品ごとに集計する（どちらも ec_sales 台帳に出ないぶん）。
+   *  - madeToOrder: 受注生産として受注中（在庫を引き当てていない明細）。未出荷のみ。
+   *  - extraNegotiating: 商談中に加える「海外の見積待ち」「銀行振込の入金待ち」。
+   *    見積提示済・承諾待ち・カード入金待ちは reserved 台帳として既に商談中に入るため対象外。
+   * 受注生産の明細は受注生産列に出すので、商談中には二重計上しない。
+   */
+  const { madeToOrderByProduct, extraNegotiatingByProduct } = useMemo(() => {
+    const mto: Record<string, number> = {}
+    const neg: Record<string, number> = {}
+    for (const o of orders) {
+      if (o.status === 'cancelled' || o.status === 'shipped') continue
+      const countsAsMto = MTO_STATUSES.has(o.status ?? '')
+      const isQuoteWaiting = o.status === 'pending_quote'
+      const isBankAwaiting = o.status === 'pending_payment' && o.paymentMethod === 'bank_transfer'
+      for (const it of o.items ?? []) {
+        if (!it.productId || it.kind === 'sample') continue
+        const kg = Number(it.quantityKg) || 0
+        if (kg <= 0) continue
+        if (it.madeToOrder) {
+          if (countsAsMto) mto[it.productId] = (mto[it.productId] ?? 0) + kg
+          continue
+        }
+        if (isQuoteWaiting || isBankAwaiting) neg[it.productId] = (neg[it.productId] ?? 0) + kg
+      }
+    }
+    return { madeToOrderByProduct: mto, extraNegotiatingByProduct: neg }
+  }, [orders])
+
+  const negotiatingOf = (p: ProductWithInventory) => p.negotiatingKg + (extraNegotiatingByProduct[p.id] ?? 0)
 
   const kpis = useMemo(() => {
     const negative = products.filter(p => p.currentStockKg < 0).length
@@ -136,13 +177,14 @@ export default function StockPage() {
                   <th className="px-3 py-3 font-medium">SKU</th>
                   <th className="px-3 py-3 text-right font-medium">在庫数量</th>
                   <th className="px-3 py-3 text-right font-medium">商談中</th>
+                  <th className="px-3 py-3 text-right font-medium">受注生産</th>
                   <th className="px-3 py-3 font-medium">入荷元の商品名</th>
                   <th className="px-3 py-3 font-medium">仕入先</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && filtered.length === 0 && (
-                  <EmptyTableRow colSpan={6} message="該当する商品がありません。" />
+                  <EmptyTableRow colSpan={7} message="該当する商品がありません。" />
                 )}
                 {filtered.map(p => (
                   <tr key={p.id} className="border-b border-[#f0ebdf] hover:bg-bone">
@@ -151,7 +193,12 @@ export default function StockPage() {
                     </td>
                     <td className="px-3 py-3 font-mono text-graphite">{p.sku || '—'}</td>
                     <td className={`px-3 py-3 text-right text-base font-semibold ${stockColorClass(p.currentStockKg)}`}>{p.currentStockKg.toFixed(1)} kg</td>
-                    <td className="px-3 py-3 text-right text-graphite">{p.negotiatingKg > 0 ? `${p.negotiatingKg.toFixed(1)} kg` : '—'}</td>
+                    <td className="px-3 py-3 text-right text-graphite">{negotiatingOf(p) > 0 ? `${negotiatingOf(p).toFixed(1)} kg` : '—'}</td>
+                    <td className="px-3 py-3 text-right text-graphite">
+                      {(madeToOrderByProduct[p.id] ?? 0) > 0
+                        ? <span className="font-medium text-[#6d5bd0]">{(madeToOrderByProduct[p.id] ?? 0).toFixed(1)} kg</span>
+                        : '—'}
+                    </td>
                     <td className="px-3 py-3 text-graphite">{p.purchaseProductName || '—'}</td>
                     <td className="px-3 py-3 text-graphite">{p.supplier || '—'}</td>
                   </tr>
@@ -162,6 +209,10 @@ export default function StockPage() {
 
           <p className="mt-3 text-[11px] text-mist">
             在庫数量の色: <span className="text-alert font-bold">マイナス</span> ／ <span className="text-[#c2410c]">0（切れ）</span> ／ <span className="text-[#a87b1e]">10kg未満</span> ／ <span className="text-matchaDeep">10kg以上</span>
+          </p>
+          <p className="mt-1 text-[11px] text-mist">
+            <span className="font-medium">商談中</span>: 見積提示中・承諾待ち・支払い待ち（カード／銀行振込）・海外の見積待ちの受注量。
+            <span className="ml-2 font-medium text-[#6d5bd0]">受注生産</span>: 在庫を引き当てずに受注している未出荷の数量（在庫数量には含まれません）。
           </p>
         </div>
       </div>

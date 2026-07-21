@@ -15,7 +15,7 @@ export interface WholesaleOrderRow {
   orderNumber?: string
   memberUid?: string
   memberCompanyName?: string
-  items?: Array<{ productId: string; productSku?: string; productName?: string; quantityKg: number; unitPriceJpy: number; lineTotalJpy: number; kind?: string }>
+  items?: Array<{ productId: string; productSku?: string; productName?: string; quantityKg: number; unitPriceJpy: number; lineTotalJpy: number; kind?: string; madeToOrder?: boolean }>
   subtotalJpy?: number
   shippingFeeJpy?: number
   optionFeesJpy?: number
